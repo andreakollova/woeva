@@ -1,0 +1,82 @@
+import React, { useState } from 'react';
+import { View, Text, StyleSheet, ScrollView, TouchableOpacity } from 'react-native';
+import { useRouter } from 'expo-router';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { Button } from '@/components/ui/Button';
+import { Tag } from '@/components/ui/Tag';
+import { Colors } from '@/constants/colors';
+import { supabase } from '@/lib/supabase';
+import { CATEGORIES } from '@/types';
+
+export default function InterestsScreen() {
+  const router = useRouter();
+  const insets = useSafeAreaInsets();
+  const [selected, setSelected] = useState<string[]>([]);
+  const [loading, setLoading] = useState(false);
+
+  function toggle(cat: string) {
+    setSelected(s => s.includes(cat) ? s.filter(x => x !== cat) : [...s, cat]);
+  }
+
+  async function handleContinue() {
+    setLoading(true);
+    const { data: { user } } = await supabase.auth.getUser();
+    if (user) {
+      await supabase.from('profiles').upsert({
+        id: user.id,
+        interests: selected,
+        name: user.user_metadata?.full_name ?? '',
+      });
+    }
+    setLoading(false);
+    router.push('/(auth)/permissions');
+  }
+
+  return (
+    <View style={[styles.container, { paddingTop: insets.top + 20, paddingBottom: insets.bottom + 24 }]}>
+      <TouchableOpacity onPress={() => router.back()} style={styles.backBtn}>
+        <Text style={styles.backText}>{'<'}</Text>
+      </TouchableOpacity>
+      <ScrollView contentContainerStyle={styles.scroll} showsVerticalScrollIndicator={false}>
+        <View style={styles.header}>
+          <Text style={styles.title}>What's your thing?</Text>
+          <Text style={styles.subtitle}>Pick your favourites</Text>
+        </View>
+
+        <View style={styles.tags}>
+          {CATEGORIES.map((cat, i) => (
+            <Tag
+              key={cat}
+              label={cat}
+              selected={selected.includes(cat)}
+              onPress={() => toggle(cat)}
+              floatDelay={i * 317 + (i % 4) * 213 + (i % 7) * 89}
+            />
+          ))}
+        </View>
+      </ScrollView>
+
+      <View style={styles.footer}>
+        <Button
+          label="Continue"
+          onPress={handleContinue}
+          loading={loading}
+          disabled={selected.length === 0}
+          variant="lime"
+        />
+      </View>
+    </View>
+  );
+}
+
+const styles = StyleSheet.create({
+  container: { flex: 1, backgroundColor: Colors.white },
+  backBtn: { paddingHorizontal: 24, marginBottom: 8 },
+  backText: { fontSize: 22, color: Colors.black, fontWeight: '400' },
+  scroll: { paddingHorizontal: 24, paddingBottom: 100 },
+  header: { marginTop: 24, marginBottom: 28, gap: 6 },
+  title: { fontSize: 28, fontWeight: '700', color: Colors.black, letterSpacing: -0.5 },
+  subtitle: { fontSize: 15, color: Colors.gray },
+  tags: { flexDirection: 'row', flexWrap: 'wrap', gap: 10 },
+  footer: { position: 'absolute', bottom: 24, left: 24, right: 24 },
+});

@@ -1,0 +1,70 @@
+import React, { useState } from 'react';
+import { View, Text, StyleSheet, TouchableOpacity, Alert } from 'react-native';
+import { useRouter } from 'expo-router';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { Colors } from '@/constants/colors';
+import { Button } from '@/components/ui/Button';
+import { supabase } from '@/lib/supabase';
+
+export default function DeleteAccountScreen() {
+  const router = useRouter();
+  const insets = useSafeAreaInsets();
+  const [loading, setLoading] = useState(false);
+
+  async function handleDelete() {
+    Alert.alert(
+      'Final warning',
+      'This will permanently delete your account. This cannot be undone.',
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Delete forever',
+          style: 'destructive',
+          onPress: async () => {
+            setLoading(true);
+            // Call Supabase Edge Function to delete user data + auth user
+            await supabase.functions.invoke('delete-account');
+            await supabase.auth.signOut();
+            setLoading(false);
+            router.replace('/(auth)');
+          },
+        },
+      ]
+    );
+  }
+
+  return (
+    <View style={[styles.container, { paddingTop: insets.top, paddingBottom: insets.bottom + 24 }]}>
+      <View style={styles.header}>
+        <TouchableOpacity onPress={() => router.back()} style={styles.backBtn}>
+          <Text style={styles.backIcon}>{'<'}</Text>
+        </TouchableOpacity>
+        <Text style={styles.title}>Delete account</Text>
+      </View>
+
+      <View style={styles.content}>
+        <Text style={styles.warningTitle}>This action{'\n'}can't be{'\n'}undone.</Text>
+        <Text style={styles.warningText}>
+          Your profile, events and all data will be permanently removed.
+        </Text>
+      </View>
+
+      <View style={styles.footer}>
+        <Button label="Delete account" onPress={handleDelete} loading={loading} variant="danger" />
+        <Button label="Cancel" onPress={() => router.back()} variant="ghost" />
+      </View>
+    </View>
+  );
+}
+
+const styles = StyleSheet.create({
+  container: { flex: 1, backgroundColor: Colors.white, paddingHorizontal: 24 },
+  header: { flexDirection: 'row', alignItems: 'center', gap: 12, marginBottom: 48 },
+  backBtn: { padding: 4 },
+  backIcon: { fontSize: 20, color: Colors.black },
+  title: { fontSize: 20, fontWeight: '700', color: Colors.black },
+  content: { flex: 1, justifyContent: 'center', gap: 16 },
+  warningTitle: { fontSize: 38, fontWeight: '800', color: Colors.black, letterSpacing: -1, lineHeight: 44 },
+  warningText: { fontSize: 15, color: Colors.gray, lineHeight: 22 },
+  footer: { gap: 10 },
+});
