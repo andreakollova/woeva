@@ -28,17 +28,19 @@ export default function CreateStep3Screen() {
   const [toast, setToast] = useState(false);
 
   async function handleShare() {
-    if (!user) { Alert.alert('Not logged in', 'Please log in and try again.'); return; }
     if (!venue.trim()) { Alert.alert('Missing venue', 'Please enter a venue or location.'); return; }
     if (!params.title) { Alert.alert('Missing title', 'Go back and enter an event name.'); return; }
     setLoading(true);
+
+    const { data: { user: currentUser } } = await supabase.auth.getUser();
+    if (!currentUser) { setLoading(false); Alert.alert('Not logged in', 'Please log in and try again.'); return; }
 
     const eventDate = date.toISOString().split('T')[0];
     const eventTime = `${time.getHours().toString().padStart(2, '0')}:${time.getMinutes().toString().padStart(2, '0')}`;
     const priceNum = parseFloat(price) || 0;
 
     const { data, error } = await supabase.from('events').insert({
-      creator_id: user.id,
+      creator_id: currentUser.id,
       title: String(params.title),
       tagline: String(params.tagline || ''),
       category: String(params.category || 'Other'),
@@ -54,7 +56,7 @@ export default function CreateStep3Screen() {
     }).select().single();
 
     if (!error && data) {
-      await supabase.from('event_attendees').insert({ event_id: data.id, user_id: user.id, paid: true });
+      await supabase.from('event_attendees').insert({ event_id: data.id, user_id: currentUser.id, paid: true });
     }
 
     setLoading(false);
