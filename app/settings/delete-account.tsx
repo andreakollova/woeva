@@ -1,3 +1,4 @@
+import { BackButton } from '@/components/ui/BackButton';
 import React, { useState } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, Alert } from 'react-native';
 import { useRouter } from 'expo-router';
@@ -36,9 +37,7 @@ export default function DeleteAccountScreen() {
   return (
     <View style={[styles.container, { paddingTop: insets.top, paddingBottom: insets.bottom + 24 }]}>
       <View style={styles.header}>
-        <TouchableOpacity onPress={() => router.back()} style={styles.backBtn}>
-          <Text style={styles.backIcon}>{'<'}</Text>
-        </TouchableOpacity>
+        <BackButton />
         <Text style={styles.title}>Delete account</Text>
       </View>
 

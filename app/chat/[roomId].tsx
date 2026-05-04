@@ -1,3 +1,4 @@
+import { BackButton } from '@/components/ui/BackButton';
 import React, { useEffect, useState, useRef } from 'react';
 import { View, Text, StyleSheet, FlatList, TextInput, TouchableOpacity, KeyboardAvoidingView, Platform } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
@@ -5,7 +6,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Colors } from '@/constants/colors';
 import { supabase } from '@/lib/supabase';
 import { Message } from '@/types';
-import { useAuth } from '@/hooks/useAuth';
+import { useAuth } from '@/context/AuthContext';
 
 export default function ChatScreen() {
   const { roomId } = useLocalSearchParams<{ roomId: string }>();
@@ -92,9 +93,7 @@ export default function ChatScreen() {
     >
       {/* Header */}
       <View style={styles.header}>
-        <TouchableOpacity onPress={() => router.back()} style={styles.backBtn}>
-          <Text style={styles.backIcon}>{'<'}</Text>
-        </TouchableOpacity>
+        <BackButton />
         <View style={styles.headerText}>
           <Text style={styles.headerTitle} numberOfLines={1}>{eventTitle}</Text>
           <Text style={styles.headerSub}>Group chat</Text>

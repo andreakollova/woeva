@@ -1,3 +1,4 @@
+import { BackButton } from '@/components/ui/BackButton';
 import React, { useState } from 'react';
 import { View, Text, StyleSheet, ScrollView, TouchableOpacity } from 'react-native';
 import { useRouter } from 'expo-router';
@@ -22,11 +23,9 @@ export default function InterestsScreen() {
     setLoading(true);
     const { data: { user } } = await supabase.auth.getUser();
     if (user) {
-      await supabase.from('profiles').upsert({
-        id: user.id,
-        interests: selected,
-        name: user.user_metadata?.full_name ?? '',
-      });
+      // Only update interests — name was already saved during registration
+      await supabase.from('profiles')
+        .upsert({ id: user.id, interests: selected }, { onConflict: 'id', ignoreDuplicates: false });
     }
     setLoading(false);
     router.push('/(auth)/permissions');
@@ -34,9 +33,7 @@ export default function InterestsScreen() {
 
   return (
     <View style={[styles.container, { paddingTop: insets.top + 20, paddingBottom: insets.bottom + 24 }]}>
-      <TouchableOpacity onPress={() => router.back()} style={styles.backBtn}>
-        <Text style={styles.backText}>{'<'}</Text>
-      </TouchableOpacity>
+      <BackButton />
       <ScrollView contentContainerStyle={styles.scroll} showsVerticalScrollIndicator={false}>
         <View style={styles.header}>
           <Text style={styles.title}>What's your thing?</Text>

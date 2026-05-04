@@ -1,3 +1,4 @@
+import { BackButton } from '@/components/ui/BackButton';
 import React, { useState } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, ScrollView, KeyboardAvoidingView, Platform } from 'react-native';
 import { useRouter } from 'expo-router';
@@ -37,7 +38,14 @@ export default function LoginScreen() {
     setLoading(false);
 
     if (error) {
-      setErrors({ password: '*Incorrect password' });
+      const msg = error.message ?? '';
+      if (msg.toLowerCase().includes('email') && msg.toLowerCase().includes('confirm')) {
+        setErrors({ email: 'Email nebol potvrdený. Skontroluj schránku a potvrď účet.' });
+      } else if (msg.toLowerCase().includes('invalid')) {
+        setErrors({ password: 'Nesprávny email alebo heslo' });
+      } else {
+        setErrors({ password: msg });
+      }
     } else {
       router.replace('/(tabs)');
     }
@@ -50,9 +58,7 @@ export default function LoginScreen() {
         contentContainerStyle={[styles.content, { paddingTop: insets.top + 20, paddingBottom: insets.bottom + 24 }]}
         keyboardShouldPersistTaps="handled"
       >
-        <TouchableOpacity onPress={() => router.back()} style={styles.backBtn}>
-          <Text style={styles.backText}>{'<'}</Text>
-        </TouchableOpacity>
+        <BackButton />
 
         <View style={styles.header}>
           <Text style={styles.title}>Welcome back</Text>

@@ -1,10 +1,13 @@
 import { Tabs } from 'expo-router';
-import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, Modal, Pressable } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Svg, { Path, Circle, Rect } from 'react-native-svg';
 import { Colors } from '@/constants/colors';
 import { Fonts } from '@/constants/fonts';
 import { useRouter } from 'expo-router';
+import { useEffect, useState } from 'react';
+import { supabase } from '@/lib/supabase';
+import { useAuth } from '@/context/AuthContext';
 
 function HomeIcon({ color }: { color: string }) {
   return (
@@ -59,8 +62,68 @@ const TAB_LABELS: Record<string, string> = {
 function TabBar({ state, descriptors, navigation }: any) {
   const insets = useSafeAreaInsets();
   const router = useRouter();
+  const { user, loading } = useAuth();
+  const [hasClub, setHasClub] = useState<boolean | null>(null);
+  const [showMenu, setShowMenu] = useState(false);
+
+  useEffect(() => {
+    if (!user) { setHasClub(null); return; }
+    supabase.from('clubs').select('id').eq('creator_id', user.id).limit(1).then(({ data }) => {
+      setHasClub((data ?? []).length > 0);
+    });
+  }, [user]);
+
+  function handleCreatePress() {
+    if (loading) return;
+    if (!user) { router.push('/(auth)/login'); return; }
+    setShowMenu(true);
+  }
 
   return (
+    <>
+      {/* Create menu sheet */}
+      <Modal visible={showMenu} transparent animationType="fade" onRequestClose={() => setShowMenu(false)}>
+        <Pressable style={styles.modalOverlay} onPress={() => setShowMenu(false)}>
+          <View style={[styles.menuSheet, { paddingBottom: insets.bottom + 16 }]}>
+            <Text style={styles.menuTitle}>Create</Text>
+
+            {/* New Club */}
+            <TouchableOpacity
+              style={styles.menuItem}
+              onPress={() => { setShowMenu(false); router.push('/club/create'); }}
+              activeOpacity={0.8}
+            >
+              <View style={styles.menuItemIcon}><Text style={styles.menuItemEmoji}>🏠</Text></View>
+              <View style={styles.menuItemText}>
+                <Text style={styles.menuItemTitle}>New club</Text>
+                <Text style={styles.menuItemSub}>Start your own community</Text>
+              </View>
+            </TouchableOpacity>
+
+            {/* New Event */}
+            <TouchableOpacity
+              style={[styles.menuItem, !hasClub && styles.menuItemLocked]}
+              onPress={() => {
+                if (!hasClub) return;
+                setShowMenu(false);
+                router.push('/event/create/step1');
+              }}
+              activeOpacity={hasClub ? 0.8 : 1}
+            >
+              <View style={[styles.menuItemIcon, !hasClub && styles.menuItemIconLocked]}>
+                <Text style={styles.menuItemEmoji}>{hasClub ? '🎉' : '🔒'}</Text>
+              </View>
+              <View style={styles.menuItemText}>
+                <Text style={[styles.menuItemTitle, !hasClub && styles.menuItemTitleLocked]}>New event</Text>
+                <Text style={styles.menuItemSub}>
+                  {hasClub ? 'Add an event to your club' : 'Create a club first to add events'}
+                </Text>
+              </View>
+            </TouchableOpacity>
+          </View>
+        </Pressable>
+      </Modal>
+
     <View style={[styles.container, { paddingBottom: insets.bottom + 8 }]}>
       <View style={styles.bar}>
         {state.routes.map((route: any, index: number) => {
@@ -69,7 +132,7 @@ function TabBar({ state, descriptors, navigation }: any) {
               <TouchableOpacity
                 key="create"
                 style={styles.createBtn}
-                onPress={() => router.push('/event/create/step1')}
+                onPress={handleCreatePress}
                 activeOpacity={0.85}
               >
                 <Text style={styles.createIcon}>+</Text>
@@ -100,6 +163,7 @@ function TabBar({ state, descriptors, navigation }: any) {
         })}
       </View>
     </View>
+    </>
   );
 }
 
@@ -161,5 +225,63 @@ const styles = StyleSheet.create({
     fontWeight: '300',
     color: Colors.black,
     lineHeight: 28,
+  },
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.4)',
+    justifyContent: 'flex-end',
+  },
+  menuSheet: {
+    backgroundColor: Colors.white,
+    borderTopLeftRadius: 24,
+    borderTopRightRadius: 24,
+    paddingTop: 20,
+    paddingHorizontal: 20,
+    gap: 8,
+  },
+  menuTitle: {
+    fontSize: 13,
+    fontWeight: '600',
+    fontFamily: Fonts.semibold,
+    color: Colors.gray,
+    letterSpacing: 0.5,
+    textTransform: 'uppercase',
+    marginBottom: 8,
+  },
+  menuItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 14,
+    padding: 16,
+    backgroundColor: Colors.grayLight,
+    borderRadius: 16,
+  },
+  menuItemLocked: {
+    opacity: 0.5,
+  },
+  menuItemIcon: {
+    width: 48,
+    height: 48,
+    borderRadius: 14,
+    backgroundColor: Colors.lime,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  menuItemIconLocked: {
+    backgroundColor: Colors.grayBorder,
+  },
+  menuItemEmoji: { fontSize: 22 },
+  menuItemText: { flex: 1, gap: 2 },
+  menuItemTitle: {
+    fontSize: 16,
+    fontWeight: '600',
+    fontFamily: Fonts.semibold,
+    color: Colors.black,
+  },
+  menuItemTitleLocked: { color: Colors.gray },
+  menuItemSub: {
+    fontSize: 13,
+    color: Colors.gray,
+    fontFamily: Fonts.regular,
   },
 });

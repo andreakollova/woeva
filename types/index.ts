@@ -11,6 +11,7 @@ export interface Profile {
 export interface Event {
   id: string;
   creator_id: string;
+  club_id: string | null;
   title: string;
   tagline: string | null;
   category: string;
@@ -24,9 +25,12 @@ export interface Event {
   price: number;
   going_count: number;
   is_free: boolean;
+  is_recurring: boolean;
   city: string;
   created_at: string;
   creator?: Profile;
+  club?: { id: string; name: string; cover_url: string | null } | null;
+  attendees?: Array<{ profile?: { id: string; name: string; avatar_url: string | null } | null }>;
 }
 
 export interface Club {

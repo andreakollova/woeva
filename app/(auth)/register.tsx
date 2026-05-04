@@ -1,5 +1,6 @@
+import { BackButton } from '@/components/ui/BackButton';
 import React, { useState } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, ScrollView, KeyboardAvoidingView, Platform } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, ScrollView, KeyboardAvoidingView, Platform, Alert } from 'react-native';
 import { useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Button } from '@/components/ui/Button';
@@ -40,17 +41,42 @@ export default function RegisterScreen() {
   async function handleRegister() {
     if (!validate()) return;
     setLoading(true);
-    const { error } = await supabase.auth.signUp({
+    const { data, error } = await supabase.auth.signUp({
       email,
       password,
       options: { data: { full_name: name } },
     });
     setLoading(false);
+
     if (error) {
-      setErrors({ email: error.message });
-    } else {
-      router.push('/(auth)/interests');
+      if (error.message.toLowerCase().includes('already registered') || error.message.toLowerCase().includes('already exists')) {
+        setErrors({ email: 'Tento email je už zaregistrovaný.' });
+        Alert.alert('Účet existuje', 'Tento email je už zaregistrovaný. Chceš sa prihlásiť?', [
+          { text: 'Zrušiť', style: 'cancel' },
+          { text: 'Prihlásiť sa', onPress: () => router.replace('/(auth)/login') },
+        ]);
+      } else {
+        setErrors({ email: error.message });
+      }
+      return;
     }
+
+    if (!data.session) {
+      // Email confirmation required — user must confirm before they can log in
+      Alert.alert(
+        'Skontroluj email',
+        `Poslali sme ti potvrdzovací odkaz na ${email}. Po potvrdení sa môžeš prihlásiť.\n\nAk chceš preskočiť overovanie (pre vývoj), vypni "Confirm email" v Supabase → Authentication → Providers → Email.`,
+        [{ text: 'OK', onPress: () => router.replace('/(auth)') }],
+      );
+      return;
+    }
+
+    // Session created — save profile with name immediately
+    if (data.user) {
+      await supabase.from('profiles').upsert({ id: data.user.id, name: name.trim() });
+    }
+
+    router.push('/(auth)/interests');
   }
 
   return (
@@ -60,9 +86,7 @@ export default function RegisterScreen() {
         contentContainerStyle={[styles.content, { paddingTop: insets.top + 20, paddingBottom: insets.bottom + 24 }]}
         keyboardShouldPersistTaps="handled"
       >
-        <TouchableOpacity onPress={() => router.back()} style={styles.backBtn}>
-          <Text style={styles.backText}>{'<'}</Text>
-        </TouchableOpacity>
+        <BackButton />
 
         <View style={styles.header}>
           <Text style={styles.title}>Create account</Text>

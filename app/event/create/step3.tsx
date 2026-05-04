@@ -11,7 +11,7 @@ import { Input } from '@/components/ui/Input';
 import { VenueInput } from '@/components/ui/VenueInput';
 import { Button } from '@/components/ui/Button';
 import { supabase } from '@/lib/supabase';
-import { useAuth } from '@/hooks/useAuth';
+import { useAuth } from '@/context/AuthContext';
 
 export default function CreateStep3Screen() {
   const router = useRouter();
@@ -26,6 +26,7 @@ export default function CreateStep3Screen() {
   const [venueLat, setVenueLat] = useState<number | undefined>();
   const [venueLng, setVenueLng] = useState<number | undefined>();
   const [price, setPrice] = useState('0');
+  const [isRecurring, setIsRecurring] = useState(false);
   const [loading, setLoading] = useState(false);
   const [showDate, setShowDate] = useState(false);
   const [showTime, setShowTime] = useState(false);
@@ -36,19 +37,36 @@ export default function CreateStep3Screen() {
     if (!params.title) { Alert.alert('Missing title', 'Go back and enter an event name.'); return; }
     setLoading(true);
 
-    const { data: { user: currentUser } } = await supabase.auth.getUser();
+    const currentUser = user;
     if (!currentUser) { setLoading(false); Alert.alert('Not logged in', 'Please log in and try again.'); return; }
 
     const eventDate = date.toISOString().split('T')[0];
     const eventTime = `${time.getHours().toString().padStart(2, '0')}:${time.getMinutes().toString().padStart(2, '0')}`;
     const priceNum = parseFloat(price) || 0;
 
+    // Find creator's club
+    const { data: clubData } = await supabase.from('clubs').select('id').eq('creator_id', currentUser.id).limit(1).single();
+
+    // Upload cover image if provided
+    let cover_url: string | null = null;
+    if (params.cover) {
+      try {
+        const blob = await fetch(params.cover).then(r => r.blob());
+        const ext = params.cover.split('.').pop() ?? 'jpg';
+        const fileName = `${Date.now()}.${ext}`;
+        await supabase.storage.from('event-covers').upload(fileName, blob, { contentType: blob.type, upsert: true });
+        const { data: urlData } = supabase.storage.from('event-covers').getPublicUrl(fileName);
+        cover_url = urlData.publicUrl;
+      } catch (_) {}
+    }
+
     const { data, error } = await supabase.from('events').insert({
       creator_id: currentUser.id,
+      club_id: clubData?.id ?? null,
       title: String(params.title),
       tagline: String(params.tagline || ''),
       category: String(params.category || 'Other'),
-      cover_url: null,
+      cover_url,
       date: eventDate,
       time: eventTime,
       duration: parseFloat(String(duration)) || 2,
@@ -57,6 +75,7 @@ export default function CreateStep3Screen() {
       lng: venueLng ?? null,
       price: priceNum,
       is_free: priceNum === 0,
+      is_recurring: isRecurring,
       going_count: 1,
       city: 'Bratislava',
     }).select().single();
@@ -156,10 +175,24 @@ export default function CreateStep3Screen() {
               <Text style={styles.stripeIcon}>💳</Text>
               <View style={styles.stripeText}>
                 <Text style={styles.stripeTitle}>Stripe account required</Text>
-                <Text style={styles.stripeSub}>To collect payments you need to connect a Stripe account. You can do this in Settings → Payment methods after publishing your event.</Text>
+                <Text style={styles.stripeSub}>Connect your Stripe account to collect payments.</Text>
+                <TouchableOpacity onPress={() => router.push('/settings/payment-methods' as any)} activeOpacity={0.7}>
+                  <Text style={styles.stripeLink}>Set up payments →</Text>
+                </TouchableOpacity>
               </View>
             </View>
           )}
+
+          {/* Recurring toggle */}
+          <TouchableOpacity style={styles.recurringRow} onPress={() => setIsRecurring(r => !r)} activeOpacity={0.7}>
+            <View style={styles.recurringText}>
+              <Text style={styles.recurringTitle}>Repeat every week</Text>
+              <Text style={styles.recurringSub}>Same day, time and venue each week</Text>
+            </View>
+            <View style={[styles.toggle, isRecurring && styles.toggleOn]}>
+              <View style={[styles.toggleThumb, isRecurring && styles.toggleThumbOn]} />
+            </View>
+          </TouchableOpacity>
         </View>
       </ScrollView>
 
@@ -185,9 +218,18 @@ const styles = StyleSheet.create({
   fieldValue: { fontSize: 16, color: Colors.black },
   row: { flexDirection: 'row', gap: 12 },
   footer: { paddingHorizontal: 24, paddingTop: 12, borderTopWidth: 1, borderColor: Colors.grayBorder, gap: 8, backgroundColor: Colors.white },
-  stripeNotice: { flexDirection: 'row', gap: 12, backgroundColor: Colors.grayLight, borderRadius: 12, padding: 14, alignItems: 'flex-start' },
+  recurringRow: { flexDirection: 'row', alignItems: 'center', gap: 14, backgroundColor: Colors.grayLight, borderRadius: 12, padding: 14 },
+  recurringText: { flex: 1 },
+  recurringTitle: { fontSize: 15, fontWeight: '600', fontFamily: Fonts.semibold, color: Colors.black },
+  recurringSub: { fontSize: 13, color: Colors.gray, fontFamily: Fonts.regular, marginTop: 2 },
+  toggle: { width: 44, height: 26, borderRadius: 13, backgroundColor: Colors.grayBorder, justifyContent: 'center', padding: 2 },
+  toggleOn: { backgroundColor: Colors.lime },
+  toggleThumb: { width: 22, height: 22, borderRadius: 11, backgroundColor: Colors.white },
+  toggleThumbOn: { alignSelf: 'flex-end' },
+  stripeNotice: { flexDirection: 'row', gap: 12, backgroundColor: '#EFFFB0', borderRadius: 12, padding: 14, alignItems: 'flex-start' },
   stripeIcon: { fontSize: 20 },
   stripeText: { flex: 1, gap: 4 },
   stripeTitle: { fontSize: 14, fontWeight: '600', fontFamily: Fonts.semibold, color: Colors.black },
   stripeSub: { fontSize: 13, color: Colors.gray, fontFamily: Fonts.regular, lineHeight: 18 },
+  stripeLink: { fontSize: 13, fontWeight: '600', fontFamily: Fonts.semibold, color: Colors.black, marginTop: 6 },
 });

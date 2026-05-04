@@ -1,7 +1,8 @@
-import React, { useEffect, useState } from 'react';
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity, RefreshControl } from 'react-native';
+import React, { useEffect, useState, useCallback } from 'react';
+import { View, Text, StyleSheet, ScrollView, TouchableOpacity, RefreshControl, Image } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
+import { useFocusEffect } from 'expo-router';
 import Animated, { FadeInDown } from 'react-native-reanimated';
 import * as Location from 'expo-location';
 import { WMark } from '@/components/ui/WMark';
@@ -11,15 +12,16 @@ import { Colors } from '@/constants/colors';
 import { Fonts } from '@/constants/fonts';
 import { supabase } from '@/lib/supabase';
 import { Event } from '@/types';
-import { useAuth } from '@/hooks/useAuth';
+import { useAuth } from '@/context/AuthContext';
 
 
-const FILTER_TAGS = ['All', 'Coffee', 'Sport', 'Party', 'Music', 'Art', 'Yoga'];
+const FILTER_TAGS = ['All', 'Free', 'Coffee', 'Sport', 'Party', 'Music', 'Art', 'Yoga'];
 
 export default function HomeScreen() {
   const insets = useSafeAreaInsets();
   const router = useRouter();
-  const { profile } = useAuth();
+  const { profile, user } = useAuth();
+  const avatarInitial = (profile?.name || (user as any)?.user_metadata?.full_name || '?').charAt(0).toUpperCase();
   const [events, setEvents] = useState<Event[]>([]);
   const [filter, setFilter] = useState('All');
   const [refreshing, setRefreshing] = useState(false);
@@ -43,13 +45,14 @@ export default function HomeScreen() {
     })();
   }, []);
 
-  useEffect(() => { loadEvents(); }, [filter]);
+  useFocusEffect(useCallback(() => { loadEvents(); }, [filter]));
 
   async function loadEvents() {
-    let query = supabase.from('events').select('*').order('date', { ascending: true }).limit(30);
-    if (filter !== 'All') query = query.eq('category', filter);
+    let query = supabase.from('events').select('*, club:clubs(id, name, cover_url), attendees:event_attendees(profile:profiles(id, name, avatar_url))').order('date', { ascending: true }).limit(30);
+    if (filter === 'Free') query = query.eq('is_free', true);
+    else if (filter !== 'All') query = query.eq('category', filter);
     const { data } = await query;
-    setEvents(data ?? []);
+    setEvents((data ?? []) as any);
   }
 
   async function onRefresh() {
@@ -73,8 +76,14 @@ export default function HomeScreen() {
           <View style={styles.topBarSide} />
           <WMark size={34} color={Colors.lime} />
           <View style={styles.topBarSide}>
-            <TouchableOpacity style={styles.avatar} onPress={() => router.push('/settings/index')}>
-              <View style={styles.avatarCircle} />
+            <TouchableOpacity style={styles.avatar} onPress={() => router.push('/(tabs)/profile')}>
+              {profile?.avatar_url ? (
+                <Image source={{ uri: profile.avatar_url }} style={styles.avatarCircle} />
+              ) : (
+                <View style={[styles.avatarCircle, { alignItems: 'center', justifyContent: 'center' }]}>
+                  <Text style={styles.avatarInitial}>{avatarInitial}</Text>
+                </View>
+              )}
             </TouchableOpacity>
           </View>
         </View>
@@ -143,6 +152,7 @@ const styles = StyleSheet.create({
   title: { fontSize: 28, fontWeight: '700', color: Colors.black, letterSpacing: -0.5, fontFamily: Fonts.bold },
   avatar: { width: 36, height: 36, borderRadius: 18, overflow: 'hidden' },
   avatarCircle: { width: 36, height: 36, borderRadius: 18, backgroundColor: Colors.lime },
+  avatarInitial: { fontSize: 15, fontWeight: '700', color: Colors.black },
   filters: { paddingHorizontal: 20, paddingBottom: 16, gap: 8 },
   featured: { marginHorizontal: 20, marginBottom: 20 },
   list: { paddingHorizontal: 20 },

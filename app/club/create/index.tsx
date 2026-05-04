@@ -4,11 +4,12 @@ import { useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import * as ImagePicker from 'expo-image-picker';
 import { Colors } from '@/constants/colors';
+import { Fonts } from '@/constants/fonts';
 import { WMark } from '@/components/ui/WMark';
 import { Input } from '@/components/ui/Input';
 import { Button } from '@/components/ui/Button';
 import { supabase } from '@/lib/supabase';
-import { useAuth } from '@/hooks/useAuth';
+import { useAuth } from '@/context/AuthContext';
 import { CATEGORIES } from '@/types';
 
 export default function CreateClubScreen() {
@@ -70,13 +71,19 @@ export default function CreateClubScreen() {
       >
         <View style={styles.stepRow}>
           <WMark size={28} color={Colors.lime} />
-          <View style={styles.stepBadge}><Text style={styles.stepText}>2 / 3</Text></View>
         </View>
 
         <Text style={styles.title}>New club</Text>
 
         <View style={styles.form}>
-          <Input label="Club name" value={name} onChangeText={setName} placeholder="Run club BA" />
+          <View>
+            <Input label="Club name" value={name} onChangeText={setName} placeholder="Run club BA" />
+            {name.length > 16 && (
+              <Text style={styles.nameWarning}>
+                Names over 16 characters may be cut off with … in some places.
+              </Text>
+            )}
+          </View>
           <Input label="Tagline" value={tagline} onChangeText={setTagline} placeholder="Running for everyone" />
 
           <View>
@@ -141,4 +148,5 @@ const styles = StyleSheet.create({
   coverPlus: { fontSize: 32, color: Colors.gray },
   coverHint: { fontSize: 14, color: Colors.gray },
   footer: { paddingHorizontal: 24, paddingTop: 12, borderTopWidth: 1, borderColor: Colors.grayBorder, gap: 8, backgroundColor: Colors.white },
+  nameWarning: { fontSize: 12, color: '#B8860B', fontFamily: Fonts.regular, marginTop: 6, lineHeight: 17 },
 });

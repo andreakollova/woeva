@@ -4,6 +4,7 @@ import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { StripeProvider } from '@stripe/stripe-react-native';
 import { StyleSheet } from 'react-native';
+import { AuthProvider } from '@/context/AuthContext';
 import {
   useFonts,
   Inter_400Regular,
@@ -29,18 +30,21 @@ export default function RootLayout() {
   return (
     <GestureHandlerRootView style={styles.root}>
       <SafeAreaProvider>
+        <AuthProvider>
         <StripeProvider publishableKey={STRIPE_KEY} merchantIdentifier="merchant.com.woeva.app">
           <StatusBar style="auto" />
           <Stack screenOptions={{ headerShown: false, animation: 'fade_from_bottom' }}>
             <Stack.Screen name="(auth)" options={{ animation: 'none' }} />
             <Stack.Screen name="(tabs)" options={{ animation: 'none' }} />
             <Stack.Screen name="event/[id]" options={{ animation: 'slide_from_right' }} />
+            <Stack.Screen name="event/[id]/edit" options={{ animation: 'slide_from_right' }} />
             <Stack.Screen name="event/create/step1" options={{ animation: 'slide_from_bottom', presentation: 'modal' }} />
             <Stack.Screen name="event/create/step2" options={{ animation: 'slide_from_right' }} />
             <Stack.Screen name="event/create/step3" options={{ animation: 'slide_from_right' }} />
             <Stack.Screen name="event/create/published" options={{ animation: 'fade', gestureEnabled: false }} />
             <Stack.Screen name="club/[id]" options={{ animation: 'slide_from_right' }} />
-            <Stack.Screen name="club/create" options={{ animation: 'slide_from_right' }} />
+            <Stack.Screen name="club/[id]/members" options={{ animation: 'slide_from_right' }} />
+            <Stack.Screen name="club/create/index" options={{ animation: 'slide_from_right' }} />
             <Stack.Screen name="chat/[roomId]" options={{ animation: 'slide_from_right' }} />
             <Stack.Screen name="settings/index" options={{ animation: 'slide_from_right' }} />
             <Stack.Screen name="settings/profile" options={{ animation: 'slide_from_right' }} />
@@ -50,6 +54,7 @@ export default function RootLayout() {
             <Stack.Screen name="settings/delete-account" options={{ animation: 'slide_from_right' }} />
           </Stack>
         </StripeProvider>
+        </AuthProvider>
       </SafeAreaProvider>
     </GestureHandlerRootView>
   );

@@ -27,7 +27,6 @@ export default function SearchScreen() {
     const { data } = await supabase
       .from('events')
       .select('*')
-      .not('lat', 'is', null)
       .limit(50);
     setMapEvents(data ?? []);
   }
@@ -74,10 +73,13 @@ export default function SearchScreen() {
           }}
           customMapStyle={mapStyle}
         >
-          {mapEvents.map(event => (
+          {mapEvents.map((event, i) => (
             <Marker
               key={event.id}
-              coordinate={{ latitude: event.lat!, longitude: event.lng! }}
+              coordinate={{
+                latitude: event.lat ?? (48.1486 + (i % 5) * 0.003 - 0.006),
+                longitude: event.lng ?? (17.1077 + (i % 3) * 0.004 - 0.004),
+              }}
               onPress={() => router.push(`/event/${event.id}`)}
             >
               <View style={styles.pin}>

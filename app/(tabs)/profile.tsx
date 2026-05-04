@@ -2,141 +2,119 @@ import React, { useEffect, useState } from 'react';
 import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Image } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
-import Animated, { FadeInDown } from 'react-native-reanimated';
+import Svg, { Path, Circle } from 'react-native-svg';
 import { Colors } from '@/constants/colors';
 import { Fonts } from '@/constants/fonts';
-import { supabase } from '@/lib/supabase';
-import { Event, Club } from '@/types';
-import { EventCard } from '@/components/ui/EventCard';
-import { Button } from '@/components/ui/Button';
 import { WMark } from '@/components/ui/WMark';
-import { useAuth } from '@/hooks/useAuth';
+import { supabase } from '@/lib/supabase';
+import { useAuth } from '@/context/AuthContext';
+
+function SettingsIcon() {
+  return (
+    <Svg width={24} height={24} viewBox="0 0 24 24" fill="none">
+      <Circle cx="12" cy="12" r="3" stroke="#0A0A0A" strokeWidth={1.6} />
+      <Path
+        d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"
+        stroke="#0A0A0A"
+        strokeWidth={1.6}
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+    </Svg>
+  );
+}
 
 export default function ProfileScreen() {
   const insets = useSafeAreaInsets();
   const router = useRouter();
   const { user, profile } = useAuth();
-  const [myEvents, setMyEvents] = useState<Event[]>([]);
-  const [myClubs, setMyClubs] = useState<Club[]>([]);
-  const [clubTab, setClubTab] = useState<'yours' | 'discover'>('yours');
+  const [eventsCount, setEventsCount] = useState(0);
+  const [clubsCount, setClubsCount] = useState(0);
 
   useEffect(() => {
-    if (user) {
-      loadMyEvents();
-      loadMyClubs();
-    }
+    if (!user) return;
+    supabase.from('event_attendees').select('id', { count: 'exact' }).eq('user_id', user.id).then(({ count }) => setEventsCount(count ?? 0));
+    supabase.from('club_members').select('id', { count: 'exact' }).eq('user_id', user.id).eq('status', 'approved').then(({ count }) => setClubsCount(count ?? 0));
   }, [user]);
 
-  async function loadMyEvents() {
-    const { data } = await supabase
-      .from('events')
-      .select('*')
-      .eq('creator_id', user!.id)
-      .order('date', { ascending: false })
-      .limit(10);
-    setMyEvents(data ?? []);
-  }
-
-  async function loadMyClubs() {
-    const { data } = await supabase
-      .from('club_members')
-      .select('club:clubs(*)')
-      .eq('user_id', user!.id)
-      .eq('status', 'approved');
-    setMyClubs((data ?? []).map((r: any) => r.club).filter(Boolean));
-  }
-
-  const initial = profile?.name?.charAt(0).toUpperCase() ?? '?';
+  const displayName = profile?.name || (user as any)?.user_metadata?.full_name || '';
+  const initial = displayName.charAt(0).toUpperCase() || '?';
+  const createdAt = user?.created_at || (user as any)?.created_at;
+  const joinedDate = createdAt
+    ? new Date(createdAt).toLocaleDateString('en-US', { month: 'long', year: 'numeric' })
+    : '';
+  const city = profile?.city || '';
 
   return (
     <View style={[styles.container, { paddingTop: insets.top }]}>
-      <ScrollView contentContainerStyle={styles.scroll} showsVerticalScrollIndicator={false}>
+      <ScrollView contentContainerStyle={[styles.scroll, { paddingBottom: insets.bottom + 40 }]} showsVerticalScrollIndicator={false}>
         {/* Top bar */}
         <View style={styles.topBar}>
           <WMark size={34} color={Colors.lime} />
-          <TouchableOpacity onPress={() => router.push('/settings/index')}>
-            <Text style={styles.settingsIcon}>⚙</Text>
+          <TouchableOpacity onPress={() => router.push('/settings')}>
+            <SettingsIcon />
           </TouchableOpacity>
         </View>
 
-        {/* Profile header */}
-        <Animated.View entering={FadeInDown.springify()} style={styles.profileHeader}>
-          <View style={styles.avatarWrap}>
-            {profile?.avatar_url ? (
-              <Image source={{ uri: profile.avatar_url }} style={styles.avatar} />
-            ) : (
-              <View style={[styles.avatar, styles.avatarFallback]}>
-                <Text style={styles.avatarText}>{initial}</Text>
-              </View>
-            )}
-          </View>
-          <Text style={styles.name}>{profile?.name ?? 'Your name'}</Text>
-          {profile?.bio && <Text style={styles.bio}>{profile.bio}</Text>}
-          {profile?.city && <Text style={styles.city}>{profile.city}</Text>}
-          <Button
-            label="Edit profile"
-            onPress={() => router.push('/settings/profile')}
-            variant="outline"
-            style={styles.editBtn}
-          />
-        </Animated.View>
+        <Text style={styles.pageTitle}>Profile</Text>
 
-        {/* Clubs section */}
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Clubs</Text>
-          <View style={styles.tabs}>
-            {(['yours', 'discover'] as const).map(t => (
-              <TouchableOpacity
-                key={t}
-                style={[styles.tabBtn, clubTab === t && styles.tabBtnActive]}
-                onPress={() => setClubTab(t)}
-              >
-                <Text style={[styles.tabText, clubTab === t && styles.tabTextActive]}>
-                  {t.charAt(0).toUpperCase() + t.slice(1)}
-                </Text>
-              </TouchableOpacity>
-            ))}
-          </View>
-
-          {clubTab === 'yours' && myClubs.length === 0 && (
-            <View style={styles.empty}>
-              <View style={styles.emptyDot} />
-              <Text style={styles.emptyTitle}>No clubs yet</Text>
-              <Text style={styles.emptyText}>Join one that fits you, or start your own.</Text>
-              <Button label="Discover clubs" onPress={() => setClubTab('discover')} variant="lime" style={styles.cta} />
-              <Button label="Start a club" onPress={() => router.push('/club/create')} variant="ghost" />
+        {/* Avatar */}
+        <View style={styles.avatarWrap}>
+          {profile?.avatar_url ? (
+            <Image source={{ uri: profile.avatar_url }} style={styles.avatar} />
+          ) : (
+            <View style={styles.avatar}>
+              <Text style={styles.avatarText}>{initial}</Text>
             </View>
           )}
-
-          {clubTab === 'yours' && myClubs.map(club => (
-            <TouchableOpacity
-              key={club.id}
-              style={styles.clubRow}
-              onPress={() => router.push(`/club/${club.id}`)}
-            >
-              <View style={styles.clubThumb}>
-                {club.cover_url
-                  ? <Image source={{ uri: club.cover_url }} style={styles.clubImage} />
-                  : <View style={[styles.clubImage, { backgroundColor: Colors.lime }]} />
-                }
-              </View>
-              <View style={styles.clubInfo}>
-                <Text style={styles.clubName}>{club.name}</Text>
-                <Text style={styles.clubMeta}>{club.member_count} members · {club.category}</Text>
-              </View>
-            </TouchableOpacity>
-          ))}
         </View>
 
-        {/* My events */}
-        {myEvents.length > 0 && (
+        {/* Name + subtitle */}
+        <Text style={styles.name}>{displayName || 'Your name'}</Text>
+        <Text style={styles.subtitle}>
+          {city ? `${city}  ·  ` : ''}{joinedDate ? `joined ${joinedDate}` : ''}
+        </Text>
+
+        {/* Edit profile */}
+        <TouchableOpacity style={styles.editBtn} onPress={() => router.push('/settings/profile')}>
+          <Text style={styles.editBtnText}>Edit profile</Text>
+        </TouchableOpacity>
+
+        {/* Stats */}
+        <View style={styles.stats}>
+          <View style={styles.statCard}>
+            <Text style={styles.statNum}>{eventsCount}</Text>
+            <Text style={styles.statLabel}>Events</Text>
+          </View>
+          <View style={[styles.statCard, styles.statCardLime]}>
+            <Text style={styles.statNum}>{clubsCount}</Text>
+            <Text style={styles.statLabel}>Clubs</Text>
+          </View>
+        </View>
+
+        {/* Bio */}
+        <View style={styles.section}>
+          <Text style={styles.sectionTitle}>Bio</Text>
+          {profile?.bio ? (
+            <Text style={styles.bioText}>{profile.bio}</Text>
+          ) : (
+            <TouchableOpacity onPress={() => router.push('/settings/profile')}>
+              <Text style={styles.bioEmpty}>Add a bio →</Text>
+            </TouchableOpacity>
+          )}
+        </View>
+
+        {/* Favorites / Interests */}
+        {(profile?.interests?.length ?? 0) > 0 && (
           <View style={styles.section}>
-            <Text style={styles.sectionTitle}>My events</Text>
-            {myEvents.slice(0, 3).map(event => (
-              <View key={event.id} style={{ marginBottom: 12 }}>
-                <EventCard event={event} featured />
-              </View>
-            ))}
+            <Text style={styles.sectionTitle}>Favorites</Text>
+            <View style={styles.tags}>
+              {profile!.interests.map(tag => (
+                <View key={tag} style={styles.tag}>
+                  <Text style={styles.tagText}>{tag}</Text>
+                </View>
+              ))}
+            </View>
           </View>
         )}
       </ScrollView>
@@ -146,35 +124,27 @@ export default function ProfileScreen() {
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: Colors.white },
-  scroll: { paddingBottom: 40 },
-  topBar: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingHorizontal: 20, paddingTop: 8, marginBottom: 20 },
-  logoW: { fontSize: 24, fontWeight: '800', color: Colors.lime, letterSpacing: -1 },
-  settingsIcon: { fontSize: 20, color: Colors.black },
-  profileHeader: { alignItems: 'center', paddingHorizontal: 24, marginBottom: 32, gap: 6 },
-  avatarWrap: { marginBottom: 8 },
-  avatar: { width: 80, height: 80, borderRadius: 40 },
-  avatarFallback: { backgroundColor: Colors.lime, alignItems: 'center', justifyContent: 'center' },
-  avatarText: { fontSize: 32, fontWeight: '700', fontFamily: Fonts.bold, color: Colors.black },
-  name: { fontSize: 22, fontWeight: '700', fontFamily: Fonts.bold, color: Colors.black },
-  bio: { fontSize: 14, color: Colors.gray, textAlign: 'center', lineHeight: 20, fontFamily: Fonts.regular },
-  city: { fontSize: 13, color: Colors.gray, fontFamily: Fonts.regular },
-  editBtn: { marginTop: 12, height: 40, paddingHorizontal: 24 },
-  section: { paddingHorizontal: 20, marginBottom: 24 },
-  sectionTitle: { fontSize: 20, fontWeight: '700', fontFamily: Fonts.bold, color: Colors.black, marginBottom: 14, letterSpacing: -0.3 },
-  tabs: { flexDirection: 'row', gap: 8, marginBottom: 16 },
-  tabBtn: { paddingHorizontal: 18, paddingVertical: 8, borderRadius: 50, backgroundColor: Colors.grayLight },
-  tabBtnActive: { backgroundColor: Colors.black },
-  tabText: { fontSize: 14, fontWeight: '500', fontFamily: Fonts.medium, color: Colors.gray },
-  tabTextActive: { color: Colors.white },
-  empty: { alignItems: 'center', gap: 10, paddingVertical: 32 },
-  emptyDot: { width: 56, height: 56, borderRadius: 28, backgroundColor: Colors.grayLight },
-  emptyTitle: { fontSize: 20, fontWeight: '700', fontFamily: Fonts.bold, color: Colors.black },
-  emptyText: { fontSize: 14, color: Colors.gray, textAlign: 'center', fontFamily: Fonts.regular },
-  cta: { width: '100%' },
-  clubRow: { flexDirection: 'row', gap: 14, alignItems: 'center', paddingVertical: 10, borderBottomWidth: 1, borderColor: Colors.grayBorder },
-  clubThumb: { width: 56, height: 56, borderRadius: 12, overflow: 'hidden' },
-  clubImage: { width: '100%', height: '100%' },
-  clubInfo: { flex: 1, gap: 3 },
-  clubName: { fontSize: 16, fontWeight: '600', fontFamily: Fonts.semibold, color: Colors.black },
-  clubMeta: { fontSize: 13, color: Colors.gray, fontFamily: Fonts.regular },
+  scroll: { paddingHorizontal: 24 },
+  topBar: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingVertical: 8, marginBottom: 4 },
+  settingsIcon: { fontSize: 22, color: Colors.black }, // unused, kept for safety
+  pageTitle: { fontSize: 32, fontWeight: '700', fontFamily: Fonts.bold, color: Colors.black, marginBottom: 24, letterSpacing: -0.5 },
+  avatarWrap: { alignItems: 'flex-start', marginBottom: 16 },
+  avatar: { width: 80, height: 80, borderRadius: 40, backgroundColor: Colors.lime, alignItems: 'center', justifyContent: 'center' },
+  avatarText: { fontSize: 36, fontWeight: '700', fontFamily: Fonts.bold, color: Colors.black },
+  name: { fontSize: 26, fontWeight: '700', fontFamily: Fonts.bold, color: Colors.black, marginBottom: 4 },
+  subtitle: { fontSize: 14, color: Colors.gray, fontFamily: Fonts.regular, marginBottom: 24 },
+  stats: { flexDirection: 'row', gap: 10, marginBottom: 32 },
+  statCard: { flex: 1, backgroundColor: Colors.grayLight, borderRadius: 14, padding: 14, alignItems: 'center', gap: 2 },
+  statCardLime: { backgroundColor: Colors.lime },
+  statNum: { fontSize: 22, fontWeight: '700', fontFamily: Fonts.bold, color: Colors.black },
+  statLabel: { fontSize: 12, color: Colors.gray, fontFamily: Fonts.regular },
+  section: { marginBottom: 24 },
+  sectionTitle: { fontSize: 18, fontWeight: '700', fontFamily: Fonts.bold, color: Colors.black, marginBottom: 12 },
+  bioText: { fontSize: 15, color: Colors.gray, fontFamily: Fonts.regular, lineHeight: 22 },
+  bioEmpty: { fontSize: 15, color: Colors.gray, fontFamily: Fonts.regular },
+  editBtn: { alignSelf: 'flex-start', borderWidth: 1.5, borderColor: Colors.grayBorder, borderRadius: 50, paddingHorizontal: 18, paddingVertical: 8, marginBottom: 24 },
+  editBtnText: { fontSize: 14, fontWeight: '500', fontFamily: Fonts.medium, color: Colors.black },
+  tags: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
+  tag: { paddingHorizontal: 16, paddingVertical: 8, borderRadius: 50, borderWidth: 1.5, borderColor: Colors.grayBorder },
+  tagText: { fontSize: 14, fontFamily: Fonts.regular, color: Colors.black },
 });

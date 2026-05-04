@@ -1,3 +1,4 @@
+import { BackButton } from '@/components/ui/BackButton';
 import React, { useState, useRef } from 'react';
 import { View, Text, StyleSheet, TextInput, TouchableOpacity } from 'react-native';
 import { useRouter, useLocalSearchParams } from 'expo-router';
@@ -35,9 +36,7 @@ export default function OtpScreen() {
 
   return (
     <View style={[styles.container, { paddingTop: insets.top + 20, paddingBottom: insets.bottom + 24 }]}>
-      <TouchableOpacity onPress={() => router.back()} style={styles.backBtn}>
-        <Text style={styles.backText}>{'<'}</Text>
-      </TouchableOpacity>
+      <BackButton />
 
       <View style={styles.header}>
         <Text style={styles.title}>Check your messages</Text>

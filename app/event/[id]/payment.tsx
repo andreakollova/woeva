@@ -1,14 +1,16 @@
+import { BackButton } from '@/components/ui/BackButton';
 import React, { useEffect, useState } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, ScrollView } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useStripe } from '@stripe/stripe-react-native';
+import { Alert } from 'react-native';
 import { Colors } from '@/constants/colors';
 import { supabase } from '@/lib/supabase';
 import { Event } from '@/types';
 import { Button } from '@/components/ui/Button';
 import { Toast } from '@/components/ui/Toast';
-import { useAuth } from '@/hooks/useAuth';
+import { useAuth } from '@/context/AuthContext';
 
 export default function PaymentScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
@@ -41,6 +43,7 @@ export default function PaymentScreen() {
 
     if (error || !data?.clientSecret) {
       setLoading(false);
+      Alert.alert('Platba nie je dostupná', 'Organizátor ešte nenastavil platby. Skús neskôr alebo kontaktuj klub.');
       return;
     }
 
@@ -76,9 +79,7 @@ export default function PaymentScreen() {
       <Toast visible={toast} title="You're in" subtitle="See you out there." />
 
       <View style={styles.header}>
-        <TouchableOpacity onPress={() => router.back()} style={styles.backBtn}>
-          <Text style={styles.backIcon}>{'<'}</Text>
-        </TouchableOpacity>
+        <BackButton />
         <Text style={styles.headerTitle}>Payment</Text>
       </View>
 
