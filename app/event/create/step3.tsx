@@ -4,6 +4,7 @@ import { useRouter, useLocalSearchParams } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import DateTimePicker from '@react-native-community/datetimepicker';
 import { Colors } from '@/constants/colors';
+import { Fonts } from '@/constants/fonts';
 import { WMark } from '@/components/ui/WMark';
 import { Toast } from '@/components/ui/Toast';
 import { Input } from '@/components/ui/Input';
@@ -150,6 +151,15 @@ export default function CreateStep3Screen() {
             placeholder="0"
             keyboardType="numeric"
           />
+          {parseFloat(price) > 0 && (
+            <View style={styles.stripeNotice}>
+              <Text style={styles.stripeIcon}>💳</Text>
+              <View style={styles.stripeText}>
+                <Text style={styles.stripeTitle}>Stripe account required</Text>
+                <Text style={styles.stripeSub}>To collect payments you need to connect a Stripe account. You can do this in Settings → Payment methods after publishing your event.</Text>
+              </View>
+            </View>
+          )}
         </View>
       </ScrollView>
 
@@ -175,4 +185,9 @@ const styles = StyleSheet.create({
   fieldValue: { fontSize: 16, color: Colors.black },
   row: { flexDirection: 'row', gap: 12 },
   footer: { paddingHorizontal: 24, paddingTop: 12, borderTopWidth: 1, borderColor: Colors.grayBorder, gap: 8, backgroundColor: Colors.white },
+  stripeNotice: { flexDirection: 'row', gap: 12, backgroundColor: Colors.grayLight, borderRadius: 12, padding: 14, alignItems: 'flex-start' },
+  stripeIcon: { fontSize: 20 },
+  stripeText: { flex: 1, gap: 4 },
+  stripeTitle: { fontSize: 14, fontWeight: '600', fontFamily: Fonts.semibold, color: Colors.black },
+  stripeSub: { fontSize: 13, color: Colors.gray, fontFamily: Fonts.regular, lineHeight: 18 },
 });
