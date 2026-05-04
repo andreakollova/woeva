@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity, RefreshControl, Image } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, TouchableOpacity, RefreshControl, Image, ImageStyle, Modal } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import Animated, { FadeInDown } from 'react-native-reanimated';
@@ -14,10 +14,17 @@ import { useAuth } from '@/context/AuthContext';
 
 type BookedEvent = Event & { attendee_id?: string };
 
+const SAMPLE_AVATARS = [
+  require('@/assets/images/sample_av1.jpg'),
+  require('@/assets/images/sample_av2.jpg'),
+  require('@/assets/images/sample_av3.jpg'),
+  require('@/assets/images/sample_av4.jpg'),
+];
+
 export default function BookedScreen() {
   const insets = useSafeAreaInsets();
   const router = useRouter();
-  const { user } = useAuth();
+  const { user, profile } = useAuth();
   const [tab, setTab] = useState<'upcoming' | 'past'>('upcoming');
   const [events, setEvents] = useState<BookedEvent[]>([]);
   const [ratedIds, setRatedIds] = useState<Set<string>>(new Set());
@@ -31,7 +38,7 @@ export default function BookedScreen() {
 
     const { data } = await supabase
       .from('event_attendees')
-      .select('id, event:events(*, club:clubs(id, name, cover_url))')
+      .select('id, event:events(*, club:clubs(id, name, cover_url), attendees:event_attendees(profile:profiles(id, name, avatar_url)))')
       .eq('user_id', user.id);
 
     const allEvents: BookedEvent[] = (data ?? [])
@@ -66,7 +73,9 @@ export default function BookedScreen() {
   return (
     <View style={[styles.container, { paddingTop: insets.top }]}>
       <View style={styles.topBar}>
-        <WMark size={34} color={Colors.lime} />
+        <TouchableOpacity onPress={() => router.push('/(tabs)')} activeOpacity={0.7}>
+          <WMark size={34} color={Colors.lime} />
+        </TouchableOpacity>
       </View>
 
       <Text style={styles.title}>My tickets</Text>
@@ -111,6 +120,8 @@ export default function BookedScreen() {
               <TicketCard
                 event={event}
                 userId={user!.id}
+                userAvatar={profile?.avatar_url ?? null}
+                userName={profile?.name ?? user!.email ?? ''}
                 isPast={tab === 'past'}
                 isRated={ratedIds.has(event.id)}
                 onPress={() => router.push(`/event/${event.id}`)}
@@ -124,14 +135,36 @@ export default function BookedScreen() {
   );
 }
 
-function TicketCard({ event, userId, isPast, isRated, onPress, onRate }: {
+function TicketCard({ event, userId, userAvatar, userName, isPast, isRated, onPress, onRate }: {
   event: BookedEvent;
   userId: string;
+  userAvatar: string | null;
+  userName: string;
   isPast: boolean;
   isRated: boolean;
   onPress: () => void;
   onRate: () => void;
 }) {
+  const [qrModal, setQrModal] = useState(false);
+  const [goingCount, setGoingCount] = useState(event.going_count ?? 0);
+
+  useEffect(() => {
+    const channel = supabase
+      .channel(`event_going_${event.id}`)
+      .on('postgres_changes', {
+        event: 'UPDATE',
+        schema: 'public',
+        table: 'events',
+        filter: `id=eq.${event.id}`,
+      }, payload => {
+        if (payload.new?.going_count !== undefined) {
+          setGoingCount(payload.new.going_count);
+        }
+      })
+      .subscribe();
+    return () => { supabase.removeChannel(channel); };
+  }, [event.id]);
+
   const d = new Date(event.date + 'T00:00:00');
   const dayName = d.toLocaleDateString('en-US', { weekday: 'long' });
   const dateStr = `${d.getDate()} ${d.toLocaleDateString('en-US', { month: 'long' })} ${d.getFullYear()}`;
@@ -183,26 +216,35 @@ function TicketCard({ event, userId, isPast, isRated, onPress, onRate }: {
           </View>
         ) : null}
 
-        {/* Going count */}
-        {(event.going_count ?? 0) > 0 && (
-          <View style={styles.ticketGoingRow}>
-            <View style={styles.goingDots}>
-              {Array.from({ length: Math.min(event.going_count ?? 0, 3) }).map((_, i) => (
-                <View key={i} style={[styles.goingDot, { marginLeft: i === 0 ? 0 : -6, backgroundColor: ['#C8FF00','#FFE566','#A8EDFF'][i] }]} />
-              ))}
+        {/* Going count — always show since user is attending */}
+        <View style={styles.ticketGoingRow}>
+          <View style={styles.goingAvatars}>
+            {/* User's own avatar always first */}
+            <View style={[styles.goingAvatar, styles.goingAvatarFallback, { marginLeft: 0 }]}>
+              <Text style={styles.goingAvatarInitial}>{(userName || '?').charAt(0).toUpperCase()}</Text>
+              {userAvatar ? <Image source={{ uri: userAvatar }} style={[StyleSheet.absoluteFill, { borderRadius: 11 }] as ImageStyle} /> : null}
             </View>
-            <Text style={styles.goingLabel}>{event.going_count} {event.going_count === 1 ? 'person' : 'people'} going</Text>
-            <View style={[styles.pricePill, isFree && styles.pricePillFree]}>
-              <Text style={[styles.priceText, isFree && styles.priceTextFree]}>{priceLabel}</Text>
-            </View>
+            {/* Other attendees */}
+            {Array.from({ length: 2 }).map((_, i) => {
+              const others = ((event as any).attendees ?? []).filter((a: any) => a?.profile?.id !== userId);
+              const att = others[i];
+              const avatarUrl = att?.profile?.avatar_url;
+              return avatarUrl
+                ? <Image key={i} source={{ uri: avatarUrl }} style={[styles.goingAvatar, { marginLeft: -7 }] as ImageStyle} />
+                : <Image key={i} source={SAMPLE_AVATARS[(i + 1) % SAMPLE_AVATARS.length]} style={[styles.goingAvatar, { marginLeft: -7 }] as ImageStyle} />;
+            })}
           </View>
-        )}
+          <Text style={styles.goingLabel}>{Math.max(goingCount, 1)} {goingCount === 1 ? 'person' : 'people'} going</Text>
+          <View style={[styles.pricePill, isFree && styles.pricePillFree]}>
+            <Text style={[styles.priceText, isFree && styles.priceTextFree]}>{priceLabel}</Text>
+          </View>
+        </View>
 
         {/* Perforated separator */}
         <View style={styles.perfRow}>
           <View style={styles.perfNub} />
           <View style={styles.perfLine}>
-            {Array.from({ length: 22 }).map((_, i) => (
+            {Array.from({ length: 16 }).map((_, i) => (
               <View key={i} style={styles.perfDash} />
             ))}
           </View>
@@ -210,16 +252,29 @@ function TicketCard({ event, userId, isPast, isRated, onPress, onRate }: {
         </View>
 
         {/* QR section */}
+        <Modal visible={qrModal} transparent animationType="fade" onRequestClose={() => setQrModal(false)}>
+          <TouchableOpacity style={styles.qrModalBg} activeOpacity={1} onPress={() => setQrModal(false)}>
+            <View style={styles.qrModalCard}>
+              <Text style={styles.qrModalTitle}>{event.title}</Text>
+              <Text style={styles.qrModalSub}>{isPast ? 'Event attended' : 'Show at the door'}</Text>
+              <View style={styles.qrModalCode}>
+                <QRCode value={qrValue} size={220} color={Colors.black} backgroundColor={Colors.white} />
+              </View>
+              <Text style={styles.qrModalHint}>Tap anywhere to close</Text>
+            </View>
+          </TouchableOpacity>
+        </Modal>
         <View style={styles.qrSection}>
-          <View style={styles.qrWrap}>
+          <TouchableOpacity style={styles.qrWrap} onPress={() => setQrModal(true)} activeOpacity={0.75}>
             <QRCode
               value={qrValue}
               size={88}
               color={isPast ? Colors.gray : Colors.black}
               backgroundColor={Colors.white}
             />
-          </View>
+          </TouchableOpacity>
           <View style={styles.qrInfo}>
+            <Text style={styles.qrAttendeeName} numberOfLines={1}>{userName}</Text>
             <Text style={styles.qrTitle}>{isPast ? 'Event attended' : 'Your ticket'}</Text>
             <Text style={styles.qrSub}>
               {isPast ? 'Thanks for coming!' : 'Show this QR at the door'}
@@ -246,7 +301,7 @@ function TicketCard({ event, userId, isPast, isRated, onPress, onRate }: {
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: '#F5F5F5' },
   topBar: { alignItems: 'center', paddingTop: 8, marginBottom: 4 },
-  title: { fontSize: 26, fontWeight: '800', fontFamily: Fonts.extrabold, color: Colors.black, paddingHorizontal: 20, marginBottom: 16, letterSpacing: -0.5 },
+  title: { fontSize: 28, fontWeight: '700', fontFamily: Fonts.bold, color: Colors.black, paddingHorizontal: 20, marginBottom: 16, letterSpacing: -0.5 },
   tabs: { flexDirection: 'row', paddingHorizontal: 20, gap: 8, marginBottom: 20 },
   tabBtn: { paddingHorizontal: 18, paddingVertical: 8, borderRadius: 50, backgroundColor: Colors.white },
   tabBtnActive: { backgroundColor: Colors.black },
@@ -261,62 +316,79 @@ const styles = StyleSheet.create({
 
   // Ticket
   ticket: {
-    backgroundColor: Colors.white,
-    borderRadius: 20,
+    backgroundColor: '#111',
+    borderRadius: 24,
     overflow: 'hidden',
     shadowColor: '#000',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.08,
-    shadowRadius: 16,
-    elevation: 4,
+    shadowOffset: { width: 0, height: 8 },
+    shadowOpacity: 0.22,
+    shadowRadius: 20,
+    elevation: 8,
   },
 
   // Cover
-  ticketCover: { height: 140, position: 'relative' },
+  ticketCover: { height: 160, position: 'relative' },
   ticketCoverImg: { width: '100%', height: '100%' },
-  ticketCoverOverlay: { ...StyleSheet.absoluteFillObject, backgroundColor: 'rgba(0,0,0,0.42)' },
-  ticketCoverContent: { position: 'absolute', bottom: 0, left: 0, right: 0, padding: 16, gap: 6 },
-  ticketStatusPill: { flexDirection: 'row', alignItems: 'center', gap: 6, alignSelf: 'flex-start', backgroundColor: 'rgba(0,0,0,0.5)', borderRadius: 50, paddingHorizontal: 10, paddingVertical: 4 },
-  ticketStatusText: { fontSize: 10, fontWeight: '800', color: Colors.white, letterSpacing: 1 },
+  ticketCoverOverlay: { ...StyleSheet.absoluteFillObject, backgroundColor: 'rgba(0,0,0,0.5)' },
+  ticketCoverContent: { position: 'absolute', bottom: 0, left: 0, right: 0, padding: 18, gap: 6 },
+  ticketStatusPill: { flexDirection: 'row', alignItems: 'center', gap: 6, alignSelf: 'flex-start', backgroundColor: 'rgba(255,255,255,0.15)', borderRadius: 50, paddingHorizontal: 10, paddingVertical: 5 },
+  ticketStatusText: { fontSize: 9, fontWeight: '800', color: Colors.white, letterSpacing: 1.2 },
   ticketStatusDot: { width: 6, height: 6, borderRadius: 3 },
-  ticketEventTitle: { fontSize: 20, fontWeight: '800', color: Colors.white, letterSpacing: -0.3, fontFamily: Fonts.extrabold },
+  ticketEventTitle: { fontSize: 22, fontWeight: '800', color: Colors.white, letterSpacing: -0.5, lineHeight: 28, fontFamily: Fonts.extrabold },
 
   // Body
   ticketBody: { paddingHorizontal: 18, paddingTop: 18, paddingBottom: 18 },
 
   ticketInfoGrid: { flexDirection: 'row', marginBottom: 14 },
   ticketInfoCell: { flex: 1, gap: 2 },
-  ticketInfoDivider: { width: 1, backgroundColor: Colors.grayBorder, marginHorizontal: 14 },
-  ticketInfoLabel: { fontSize: 9, fontWeight: '700', color: Colors.gray, letterSpacing: 1, textTransform: 'uppercase', marginBottom: 2 },
-  ticketInfoValue: { fontSize: 15, fontWeight: '700', color: Colors.black, fontFamily: Fonts.semibold },
-  ticketInfoSub: { fontSize: 11, color: Colors.gray, fontFamily: Fonts.regular },
+  ticketInfoDivider: { width: 1, backgroundColor: 'rgba(255,255,255,0.1)', marginHorizontal: 14 },
+  ticketInfoLabel: { fontSize: 9, fontWeight: '700', color: 'rgba(255,255,255,0.4)', letterSpacing: 1.2, textTransform: 'uppercase', marginBottom: 3 },
+  ticketInfoValue: { fontSize: 15, fontWeight: '700', color: Colors.white, fontFamily: Fonts.semibold },
+  ticketInfoSub: { fontSize: 11, color: 'rgba(255,255,255,0.45)', fontFamily: Fonts.regular },
 
   ticketVenueRow: { marginBottom: 14, gap: 2 },
-  ticketVenue: { fontSize: 13, fontWeight: '500', color: Colors.black, fontFamily: Fonts.medium },
+  ticketVenue: { fontSize: 13, fontWeight: '500', color: 'rgba(255,255,255,0.8)', fontFamily: Fonts.medium },
 
   ticketGoingRow: { flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 16 },
-  goingDots: { flexDirection: 'row' },
-  goingDot: { width: 18, height: 18, borderRadius: 9, borderWidth: 1.5, borderColor: Colors.white },
-  goingLabel: { flex: 1, fontSize: 12, color: Colors.gray, fontFamily: Fonts.regular },
-  pricePill: { backgroundColor: Colors.grayLight, borderRadius: 50, paddingHorizontal: 10, paddingVertical: 4 },
+  goingAvatars: { flexDirection: 'row' },
+  goingAvatar: { width: 22, height: 22, borderRadius: 11, borderWidth: 1.5, borderColor: '#111' },
+  goingAvatarFallback: { backgroundColor: Colors.lime, alignItems: 'center', justifyContent: 'center' },
+  goingAvatarInitial: { fontSize: 9, fontWeight: '700', color: Colors.black },
+
+  goingLabel: { flex: 1, fontSize: 12, color: 'rgba(255,255,255,0.45)', fontFamily: Fonts.regular },
+  pricePill: { backgroundColor: 'rgba(255,255,255,0.12)', borderRadius: 50, paddingHorizontal: 10, paddingVertical: 4 },
   pricePillFree: { backgroundColor: Colors.lime },
-  priceText: { fontSize: 11, fontWeight: '700', color: Colors.gray },
+  priceText: { fontSize: 11, fontWeight: '700', color: 'rgba(255,255,255,0.7)' },
   priceTextFree: { color: Colors.black },
 
   // Perforated line
   perfRow: { flexDirection: 'row', alignItems: 'center', marginBottom: 16 },
-  perfNub: { width: 16, height: 16, borderRadius: 8, backgroundColor: '#F5F5F5', marginHorizontal: -18 },
-  perfLine: { flex: 1, flexDirection: 'row', justifyContent: 'space-between', paddingHorizontal: 4 },
-  perfDash: { width: 4, height: 1.5, backgroundColor: Colors.grayBorder, borderRadius: 1 },
+  perfNub: { width: 20, height: 20, borderRadius: 10, backgroundColor: '#F5F5F5', marginHorizontal: -18 },
+  perfLine: { flex: 1, flexDirection: 'row', justifyContent: 'space-between', paddingHorizontal: 8 },
+  perfDash: { width: 8, height: 3, backgroundColor: 'rgba(255,255,255,0.18)', borderRadius: 2 },
 
   // QR
-  qrSection: { flexDirection: 'row', gap: 16, alignItems: 'flex-start' },
-  qrWrap: { padding: 8, backgroundColor: Colors.white, borderRadius: 12, borderWidth: 1, borderColor: Colors.grayBorder },
-  qrInfo: { flex: 1, gap: 4, justifyContent: 'center' },
-  qrTitle: { fontSize: 15, fontWeight: '700', color: Colors.black, fontFamily: Fonts.semibold },
-  qrSub: { fontSize: 12, color: Colors.gray, fontFamily: Fonts.regular, lineHeight: 18 },
-  qrClub: { fontSize: 11, color: Colors.gray, fontFamily: Fonts.medium, marginTop: 2 },
-  rateBtn: { marginTop: 8, backgroundColor: Colors.black, borderRadius: 8, paddingVertical: 8, paddingHorizontal: 12, alignSelf: 'flex-start' },
-  rateBtnText: { fontSize: 12, fontWeight: '700', color: Colors.white, fontFamily: Fonts.semibold },
-  ratedText: { fontSize: 12, color: Colors.gray, fontFamily: Fonts.medium, marginTop: 6 },
+  qrSection: { flexDirection: 'row', gap: 16, alignItems: 'center' },
+  qrWrap: { padding: 10, backgroundColor: Colors.white, borderRadius: 16 },
+  qrInfo: { flex: 1, gap: 5, justifyContent: 'center' },
+  qrAttendeeRow: { flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 4 },
+  qrAvatar: { width: 28, height: 28, borderRadius: 14 },
+  qrAvatarFallback: { backgroundColor: Colors.lime, alignItems: 'center', justifyContent: 'center' },
+  qrAvatarInitial: { fontSize: 12, fontWeight: '700', color: Colors.black },
+
+  qrAttendeeName: { fontSize: 13, fontWeight: '600', color: Colors.white, fontFamily: Fonts.semibold, flex: 1 },
+  qrTitle: { fontSize: 13, fontWeight: '700', color: 'rgba(255,255,255,0.6)', fontFamily: Fonts.semibold },
+  qrSub: { fontSize: 11, color: 'rgba(255,255,255,0.35)', fontFamily: Fonts.regular, lineHeight: 16 },
+  qrClub: { fontSize: 11, color: 'rgba(255,255,255,0.35)', fontFamily: Fonts.medium, marginTop: 2 },
+  rateBtn: { marginTop: 8, backgroundColor: Colors.lime, borderRadius: 10, paddingVertical: 8, paddingHorizontal: 14, alignSelf: 'flex-start' },
+  rateBtnText: { fontSize: 12, fontWeight: '700', color: Colors.black, fontFamily: Fonts.semibold },
+  ratedText: { fontSize: 12, color: 'rgba(255,255,255,0.4)', fontFamily: Fonts.medium, marginTop: 6 },
+
+  // QR modal
+  qrModalBg: { flex: 1, backgroundColor: 'rgba(0,0,0,0.75)', alignItems: 'center', justifyContent: 'center' },
+  qrModalCard: { backgroundColor: Colors.white, borderRadius: 28, padding: 32, alignItems: 'center', gap: 8, marginHorizontal: 32 },
+  qrModalTitle: { fontSize: 18, fontWeight: '800', color: Colors.black, fontFamily: Fonts.extrabold, textAlign: 'center' },
+  qrModalSub: { fontSize: 13, color: Colors.gray, fontFamily: Fonts.regular, marginBottom: 8 },
+  qrModalCode: { padding: 12, backgroundColor: Colors.white, borderRadius: 16, borderWidth: 1, borderColor: Colors.grayBorder },
+  qrModalHint: { fontSize: 11, color: Colors.gray, fontFamily: Fonts.regular, marginTop: 8 },
 });

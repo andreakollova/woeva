@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, Image, Alert, Dimensions } from 'react-native';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import { View, Text, StyleSheet, TouchableOpacity, Image, Alert, Dimensions, Modal, Share, Platform } from 'react-native';
 import QRCode from 'react-native-qrcode-svg';
 import { useLocalSearchParams, useRouter, useFocusEffect } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -7,6 +8,7 @@ import Animated, {
   FadeInDown, FadeIn,
   useSharedValue, useAnimatedScrollHandler,
   useAnimatedStyle, interpolate, Extrapolation,
+  withRepeat, withSequence, withTiming, useReducedMotion,
 } from 'react-native-reanimated';
 import Svg, { Path, Circle, Defs, LinearGradient as SvgGrad, Stop, Rect } from 'react-native-svg';
 import { Colors } from '@/constants/colors';
@@ -29,13 +31,13 @@ const SAMPLE_AVATARS = [
   require('@/assets/images/sample_av4.jpg'),
 ];
 
-type Attendee = { id: string; profile: { name: string | null; avatar_url: string | null } | null };
+type Attendee = { id: string; user_id: string; profile: { name: string | null; avatar_url: string | null } | null };
 
 export default function EventDetailScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const insets = useSafeAreaInsets();
   const router = useRouter();
-  const { user, loading: authLoading } = useAuth();
+  const { user, profile, loading: authLoading } = useAuth();
 
   const [event, setEvent] = useState<Event | null>(null);
   const [creator, setCreator] = useState<Profile | null>(null);
@@ -44,6 +46,27 @@ export default function EventDetailScreen() {
   const [toast, setToast] = useState(false);
   const [attendees, setAttendees] = useState<Attendee[]>([]);
   const [isMember, setIsMember] = useState(false);
+  const [unreadCount, setUnreadCount] = useState(0);
+  const [qrModal, setQrModal] = useState(false);
+
+  const waveRot = useSharedValue(0);
+  const waveStyle = useAnimatedStyle(() => ({
+    transform: [{ rotate: `${waveRot.value}deg` }],
+    display: 'flex',
+  }));
+  React.useEffect(() => {
+    waveRot.value = withRepeat(
+      withSequence(
+        withTiming(25, { duration: 220 }),
+        withTiming(-10, { duration: 180 }),
+        withTiming(20, { duration: 180 }),
+        withTiming(0, { duration: 220 }),
+        withTiming(0, { duration: 800 }),
+      ),
+      -1,
+      false,
+    );
+  }, []);
 
   const scrollY = useSharedValue(0);
   const scrollHandler = useAnimatedScrollHandler(e => { scrollY.value = e.contentOffset.y; });
@@ -71,13 +94,22 @@ export default function EventDetailScreen() {
     }
     const { data: attData } = await supabase
       .from('event_attendees')
-      .select('id, profile:profiles(name, avatar_url)')
-      .eq('event_id', id).limit(5);
+      .select('id, user_id, profile:profiles(name, avatar_url)')
+      .eq('event_id', id).limit(10);
     setAttendees((attData ?? []) as any);
 
     if (user) {
       const { data: att } = await supabase.from('event_attendees').select('id').eq('event_id', id).eq('user_id', user.id).single();
       setIsAttending(!!att);
+
+      // Unread chat messages
+      const lastRead = await AsyncStorage.getItem(`chat_read_${id}`);
+      const { count } = await supabase
+        .from('messages')
+        .select('id', { count: 'exact', head: true })
+        .eq('room_id', id)
+        .gt('created_at', lastRead ?? '1970-01-01T00:00:00Z');
+      setUnreadCount(count ?? 0);
       if (data?.club_id) {
         const { data: mem } = await supabase.from('club_members').select('id').eq('club_id', data.club_id).eq('user_id', user.id).single();
         setIsMember(!!mem);
@@ -108,6 +140,24 @@ export default function EventDetailScreen() {
     ]);
   }
 
+  async function handleInvite() {
+    if (!event) return;
+    const d = new Date(event.date + 'T00:00:00');
+    const dateStr = d.toLocaleDateString('en-US', { weekday: 'short', day: 'numeric', month: 'short' });
+    const venueStr = event.venue ? ` · ${event.venue}` : '';
+    const deepLink = `woeva://event/${id}`;
+    const storeLink = Platform.OS === 'ios'
+      ? 'https://apps.apple.com/app/woeva/id000000000'
+      : 'https://play.google.com/store/apps/details?id=com.woeva.app';
+    const message = `Hey! Join me at ${event.title} 🎉\n${dateStr}${venueStr}\n\nOpen in Woeva: ${deepLink}\n\nDon't have the app? Download here: ${storeLink}`;
+    try {
+      await Share.share(
+        { title: event.title, message, url: event.cover_url ?? storeLink },
+        { dialogTitle: 'Invite a friend' }
+      );
+    } catch {}
+  }
+
   if (!event) return <View style={{ flex: 1, backgroundColor: Colors.white }} />;
 
   const isCreator = !!user && event.creator_id === user.id;
@@ -115,9 +165,9 @@ export default function EventDetailScreen() {
   const priceLabel = isFree ? 'Free' : `€${event.price}`;
   const hostName = event.club?.name ?? creator?.name ?? '';
   const hostInitial = hostName.charAt(0).toUpperCase();
-  const goingCount = event.going_count ?? 0;
-  const visibleAtt = attendees.slice(0, 4);
-  const overflow = Math.max(0, goingCount - visibleAtt.length);
+  const goingCount = Math.max(event.going_count ?? 0, attendees.length);
+  const otherAtts = attendees.filter(a => a.user_id !== user?.id);
+  const overflow = Math.max(0, goingCount - 4);
 
   const d = new Date(event.date + 'T00:00:00');
   const dayName = d.toLocaleDateString('en-US', { weekday: 'short' }).toUpperCase();
@@ -128,6 +178,20 @@ export default function EventDetailScreen() {
   return (
     <View style={s.container}>
       <Toast visible={toast} title="You're in" subtitle="See you out there." onHide={() => setToast(false)} />
+
+      {/* QR fullscreen modal */}
+      <Modal visible={qrModal} transparent animationType="fade" onRequestClose={() => setQrModal(false)}>
+        <TouchableOpacity style={s.qrModalBg} activeOpacity={1} onPress={() => setQrModal(false)}>
+          <View style={s.qrModalCard}>
+            <Text style={s.qrModalTitle}>{event?.title}</Text>
+            <Text style={s.qrModalSub}>Show at the door</Text>
+            <View style={s.qrModalCode}>
+              <QRCode value={`woeva:event:${id}:${user?.id}`} size={220} color={Colors.black} backgroundColor={Colors.white} />
+            </View>
+            <Text style={s.qrModalHint}>Tap anywhere to close</Text>
+          </View>
+        </TouchableOpacity>
+      </Modal>
 
       <Animated.ScrollView
         onScroll={scrollHandler}
@@ -147,13 +211,14 @@ export default function EventDetailScreen() {
           {/* SVG gradient: transparent → black */}
           <Svg style={s.coverGradient} preserveAspectRatio="none">
             <Defs>
-              <SvgGrad id="fadeBlack" x1="0" y1="0" x2="0" y2="1">
-                <Stop offset="0" stopColor="#000" stopOpacity="0" />
-                <Stop offset="0.5" stopColor="#000" stopOpacity="0.15" />
+              <SvgGrad id="fadeTop" x1="0" y1="0" x2="0" y2="1">
+                <Stop offset="0" stopColor="#000" stopOpacity="0.55" />
+                <Stop offset="0.25" stopColor="#000" stopOpacity="0.15" />
+                <Stop offset="0.55" stopColor="#000" stopOpacity="0.1" />
                 <Stop offset="1" stopColor="#000" stopOpacity="0.72" />
               </SvgGrad>
             </Defs>
-            <Rect x="0" y="0" width="100%" height="100%" fill="url(#fadeBlack)" />
+            <Rect x="0" y="0" width="100%" height="100%" fill="url(#fadeTop)" />
           </Svg>
 
           {/* Controls */}
@@ -194,170 +259,163 @@ export default function EventDetailScreen() {
           </View>
         </View>
 
-        {/* ── Main content — white rounded card ── */}
+        {/* ── Body ── */}
         <Animated.View entering={FadeInDown.delay(60).springify()} style={s.body}>
 
-          {/* ── Info card ── */}
-          <View style={s.infoCard}>
-            <View style={s.infoRows}>
-              <View style={s.infoRow}>
-                <Svg width={14} height={14} viewBox="0 0 24 24" fill="none">
-                  <Rect x="3" y="4" width="18" height="18" rx="3" stroke={Colors.gray} strokeWidth={2} />
-                  <Path d="M16 2v4M8 2v4M3 10h18" stroke={Colors.gray} strokeWidth={2} strokeLinecap="round" />
-                </Rect>
-                </Svg>
-                <Text style={s.infoText}>
-                  {isToday ? 'Today' : `${dayName}, ${dayNum} ${monthName}`}
-                </Text>
+          {/* ── You're going card ── */}
+          {isAttending && user && (
+            <TouchableOpacity style={s.goingBanner} onPress={() => router.push('/(tabs)/booked')} activeOpacity={0.85}>
+              <View style={s.liveDot} />
+              <Text style={s.goingBannerText}>You're going</Text>
+              <View style={s.goingAvatarRow}>
+                  {/* Current user always on top */}
+                  <View style={[s.goingAv, s.goingAvUser, { marginLeft: 0, zIndex: 10 }]}>
+                    <Text style={s.goingAvInitial}>{(profile?.name ?? user?.email ?? '?').charAt(0).toUpperCase()}</Text>
+                    {profile?.avatar_url ? <Image source={{ uri: profile.avatar_url }} style={[StyleSheet.absoluteFill, { borderRadius: 13 }]} /> : null}
+                  </View>
+                  {/* Other attendees — always show 3 */}
+                  {Array.from({ length: 3 }).map((_, i) => {
+                    const att = otherAtts[i];
+                    const src = att?.profile?.avatar_url ? { uri: att.profile.avatar_url } : SAMPLE_AVATARS[i % SAMPLE_AVATARS.length];
+                    return <View key={i} style={[s.goingAv, s.goingAvOther, { marginLeft: -6, zIndex: 9 - i }]}><Image source={src} style={s.goingAvImg} /></View>;
+                  })}
+                  {overflow > 0 && <View style={[s.goingAv, s.goingAvOverflow, { marginLeft: -6, zIndex: 8 }]}><Text style={s.goingAvOverflowText}>+{overflow}</Text></View>}
+                </View>
+              <Text style={s.goingBannerArrow}>→</Text>
+            </TouchableOpacity>
+          )}
+
+          {/* ── Date / Location / Going ── */}
+          <View style={s.infoSection}>
+
+            {/* Date + Location with inline QR */}
+            <View style={s.infoDateBlock}>
+              <View style={{ flex: 1, gap: 16 }}>
+                {/* Date row */}
+                <View style={s.infoRow}>
+                  <View style={s.infoIconBox}>
+                    <Svg width={15} height={15} viewBox="0 0 24 24" fill="none">
+                      <Rect x="3" y="4" width="18" height="18" rx="3" stroke={Colors.black} strokeWidth={2} />
+                      <Path d="M16 2v4M8 2v4M3 10h18" stroke={Colors.black} strokeWidth={2} strokeLinecap="round" />
+                    </Svg>
+                  </View>
+                  <View style={{ flex: 1 }}>
+                    <Text style={s.infoText}>{isToday ? 'Today' : `${dayName}, ${dayNum} ${monthName}`}</Text>
+                    {event.time ? <Text style={s.infoSub}>{event.time}{event.duration ? `  ·  ${event.duration}h` : ''}</Text> : null}
+                  </View>
+                </View>
+
+                {/* Location row */}
+                {event.venue ? (
+                  <View style={s.infoRow}>
+                    <View style={s.infoIconBox}>
+                      <Svg width={15} height={15} viewBox="0 0 24 24" fill="none">
+                        <Path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7z" stroke={Colors.black} strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" />
+                        <Circle cx="12" cy="9" r="2.5" stroke={Colors.black} strokeWidth={2} />
+                      </Svg>
+                    </View>
+                    <View style={{ flex: 1 }}>
+                      <Text style={s.infoText}>{event.city ? event.venue.replace(new RegExp(`,?\\s*${event.city}`, 'i'), '').trim() : event.venue}</Text>
+                      {event.city ? <Text style={s.infoSub}>{event.city}</Text> : null}
+                    </View>
+                  </View>
+                ) : null}
               </View>
-              {event.time ? (
-                <View style={s.infoRow}>
-                  <Svg width={14} height={14} viewBox="0 0 24 24" fill="none">
-                    <Circle cx={12} cy={12} r={9} stroke={Colors.gray} strokeWidth={2} />
-                    <Path d="M12 7v5l3 2" stroke={Colors.gray} strokeWidth={2} strokeLinecap="round" />
-                  </Svg>
-                  <Text style={s.infoText}>{event.time}{event.duration ? `  ·  ${event.duration}h` : ''}</Text>
-                </View>
+
+              {/* Inline QR */}
+              {isAttending && user ? (
+                <TouchableOpacity style={s.inlinQR} onPress={() => setQrModal(true)} activeOpacity={0.8}>
+                  <QRCode value={`woeva:event:${id}:${user.id}`} size={48} color={Colors.black} backgroundColor={Colors.white} />
+                  <Text style={s.inlinQRHint}>ticket</Text>
+                </TouchableOpacity>
               ) : null}
-              {event.venue ? (
-                <View style={s.infoRow}>
-                  <Svg width={14} height={14} viewBox="0 0 24 24" fill="none">
-                    <Path d="M21 10c0 6-9 13-9 13S3 16 3 10a9 9 0 0 1 18 0z" stroke={Colors.gray} strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" />
-                    <Circle cx={12} cy={10} r={3} stroke={Colors.gray} strokeWidth={2} />
-                  </Svg>
-                  <Text style={s.infoText} numberOfLines={2}>{event.venue}</Text>
-                </View>
-              ) : null}
-              {event.is_recurring && (
-                <View style={s.infoRow}>
-                  <Svg width={14} height={14} viewBox="0 0 24 24" fill="none">
-                    <Path d="M17 1l4 4-4 4M3 11V9a4 4 0 0 1 4-4h14M7 23l-4-4 4-4M21 13v2a4 4 0 0 1-4 4H3" stroke={Colors.gray} strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" />
-                  </Svg>
-                  <Text style={s.infoText}>Every {d.toLocaleDateString('en-US', { weekday: 'long' })}</Text>
-                </View>
-              )}
             </View>
 
-            {/* Small QR — only when attending */}
-            {isAttending && user && (
-              <TouchableOpacity onPress={() => router.push('/(tabs)/booked')} activeOpacity={0.75} style={s.qrCorner}>
-                <QRCode value={`woeva:event:${id}:${user.id}`} size={48} color={Colors.black} backgroundColor="transparent" />
-                <Text style={s.qrCornerLabel}>ticket</Text>
-              </TouchableOpacity>
+            {/* Going row — hidden when attending (shown in banner) */}
+            {!isAttending && (
+              <View style={s.infoRow}>
+                <View style={s.avatarStack}>
+                  {Array.from({ length: 3 }).map((_, i) => {
+                    const att = attendees[i];
+                    const src = att?.profile?.avatar_url ? { uri: att.profile.avatar_url } : SAMPLE_AVATARS[i % SAMPLE_AVATARS.length];
+                    return <View key={i} style={[s.av, { marginLeft: i === 0 ? 0 : -10, zIndex: 10 - i }]}><Image source={src} style={s.avImg} /></View>;
+                  })}
+                  {overflow > 0 && <View style={[s.av, s.avOverflow, { marginLeft: -6 }]}><Text style={s.avOverflowText}>+{overflow}</Text></View>}
+                </View>
+                {goingCount > 0 && <Text style={s.infoSub}><Text style={s.infoGoingNum}>{goingCount}</Text> {goingCount === 1 ? 'person' : 'people'} going</Text>}
+              </View>
             )}
           </View>
-
-          {/* ── Going ── */}
-          {goingCount > 0 && (
-            <>
-              <View style={s.divider} />
-              <Text style={s.sectionLabel}>Who's going</Text>
-              <View style={s.goingRow}>
-                <View style={s.avatarStack}>
-                  {Array.from({ length: Math.min(goingCount, 4) }).map((_, i) => {
-                    const att = visibleAtt[i];
-                    const ml = i === 0 ? 0 : -10;
-                    const src = att?.profile?.avatar_url
-                      ? { uri: att.profile.avatar_url }
-                      : SAMPLE_AVATARS[i % SAMPLE_AVATARS.length];
-                    return (
-                      <View key={i} style={[s.av, { marginLeft: ml, zIndex: 10 - i }]}>
-                        <Image source={src} style={s.avImg} />
-                      </View>
-                    );
-                  })}
-                  {overflow > 0 && (
-                    <View style={[s.av, s.avOverflow, { marginLeft: -4 }]}>
-                      <Text style={s.avOverflowText}>+{overflow}</Text>
-                    </View>
-                  )}
-                </View>
-                <Text style={s.goingText}>
-                  <Text style={s.goingNum}>{goingCount}</Text>{' people going'}
-                </Text>
-              </View>
-            </>
-          )}
 
           {/* ── About ── */}
           {event.tagline ? (
             <>
-              <View style={s.divider} />
-              <Text style={s.sectionLabel}>About</Text>
-              <Text style={s.aboutText}>{event.tagline}</Text>
+              <View style={s.hairline} />
+              <View style={s.aboutSection}>
+                <Text style={s.aboutText}>{event.tagline}</Text>
+              </View>
             </>
           ) : null}
 
-          {/* ── Hosted by ── */}
+          {/* ── Host ── */}
           {hostName ? (
             <>
-              <View style={s.divider} />
-              <Text style={s.sectionLabel}>Hosted by</Text>
+              <View style={s.hairline} />
               <TouchableOpacity
-                style={s.hostCard}
+                style={s.hostRow}
                 onPress={() => event.club ? router.push(`/club/${event.club!.id}`) : null}
-                activeOpacity={event.club ? 0.75 : 1}
+                activeOpacity={event.club ? 0.7 : 1}
               >
                 {event.club?.cover_url
-                  ? <Image source={{ uri: event.club.cover_url }} style={s.hostImg} />
-                  : <View style={[s.hostImg, s.hostImgFallback]}><Text style={s.hostInitial}>{hostInitial}</Text></View>
+                  ? <Image source={{ uri: event.club.cover_url }} style={s.hostAvatar} />
+                  : <View style={[s.hostAvatar, s.hostAvatarFallback]}><Text style={s.hostAvatarInitial}>{hostInitial}</Text></View>
                 }
-                <View style={s.hostInfo}>
+                <View style={{ flex: 1 }}>
+                  <Text style={s.hostLabel}>Hosted by</Text>
                   <Text style={s.hostName}>{hostName}</Text>
-                  {event.club && <Text style={s.hostSub}>Tap to view club →</Text>}
                 </View>
+                {isMember
+                  ? <View style={s.memberPill}><Text style={s.memberPillText}>Member</Text></View>
+                  : user && isAttending && event.club
+                    ? <TouchableOpacity style={s.joinPill} onPress={async (e) => {
+                        e.stopPropagation?.();
+                        await supabase.from('club_members').insert({ club_id: event.club!.id, user_id: user.id, role: 'member', status: 'approved' });
+                        setIsMember(true);
+                      }}><Text style={s.joinPillText}>+ Join</Text></TouchableOpacity>
+                    : event.club
+                      ? <Svg width={16} height={16} viewBox="0 0 24 24" fill="none"><Path d="M9 18l6-6-6-6" stroke={Colors.gray} strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" /></Svg>
+                      : null
+                }
               </TouchableOpacity>
-
-              {user && isAttending && event.club && !isMember && (
-                <TouchableOpacity style={s.joinClubBtn} activeOpacity={0.8}
-                  onPress={async () => {
-                    await supabase.from('club_members').insert({ club_id: event.club!.id, user_id: user.id, role: 'member', status: 'approved' });
-                    setIsMember(true);
-                  }}
-                >
-                  <Text style={s.joinClubBtnText}>+ Join {hostName}</Text>
-                </TouchableOpacity>
-              )}
-              {user && isAttending && event.club && isMember && (
-                <View style={s.memberBadge}>
-                  <Text style={s.memberBadgeText}>✓  You're a member</Text>
-                </View>
-              )}
             </>
           ) : null}
 
-          {/* ── Group chat ── */}
-          <View style={s.divider} />
-          <Text style={s.sectionLabel}>Group chat</Text>
-          {isAttending ? (
-            <TouchableOpacity style={s.chatCard} onPress={() => router.push(`/chat/${id}`)} activeOpacity={0.8}>
-              <View style={s.chatIconWrap}>
-                <Svg width={20} height={20} viewBox="0 0 24 24" fill="none">
-                  <Path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" stroke={Colors.black} strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" />
-                </Svg>
-              </View>
-              <View style={s.chatInfo}>
-                <Text style={s.chatTitle}>Event group chat</Text>
-                <Text style={s.chatSub}>Chat with everyone going</Text>
-              </View>
-              <Svg width={16} height={16} viewBox="0 0 24 24" fill="none">
-                <Path d="M9 18l6-6-6-6" stroke={Colors.gray} strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" />
+          {/* ── Chat ── */}
+          <View style={s.hairline} />
+          <TouchableOpacity
+            style={[s.chatRow, !isAttending && { opacity: 0.4 }]}
+            onPress={() => { if (!isAttending) return; setUnreadCount(0); router.push(`/chat/${id}`); }}
+            activeOpacity={isAttending ? 0.7 : 1}
+          >
+            <View style={[s.chatIconBox, !isAttending && { backgroundColor: Colors.grayLight }]}>
+              <Svg width={15} height={15} viewBox="0 0 24 24" fill="none">
+                <Path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" stroke={isAttending ? Colors.black : Colors.gray} strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" />
               </Svg>
-            </TouchableOpacity>
-          ) : (
-            <View style={s.chatCardLocked}>
-              <View style={s.chatIconWrap}>
-                <Svg width={18} height={18} viewBox="0 0 24 24" fill="none">
-                  <Path d="M19 11H5a2 2 0 0 0-2 2v7a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7a2 2 0 0 0-2-2z" stroke={Colors.gray} strokeWidth={2} />
-                  <Path d="M7 11V7a5 5 0 0 1 10 0v4" stroke={Colors.gray} strokeWidth={2} strokeLinecap="round" />
-                </Svg>
-              </View>
-              <View style={s.chatInfo}>
-                <Text style={s.chatTitleLocked}>Event group chat</Text>
-                <Text style={s.chatSub}>Join the event to unlock</Text>
-              </View>
             </View>
-          )}
+            <View style={{ flex: 1 }}>
+              <Text style={[s.chatLabel, !isAttending && { color: Colors.gray }]}>Group chat</Text>
+              <Text style={s.chatSub}>
+                {isAttending
+                  ? (unreadCount > 0 ? `${unreadCount} new message${unreadCount === 1 ? '' : 's'}` : 'Tap to open')
+                  : 'Join the event to unlock'}
+              </Text>
+            </View>
+            {isAttending && unreadCount > 0 && <View style={s.unreadBadge}><Text style={s.unreadBadgeText}>{unreadCount > 99 ? '99+' : unreadCount}</Text></View>}
+            {isAttending && <Svg width={14} height={14} viewBox="0 0 24 24" fill="none">
+              <Path d="M9 18l6-6-6-6" stroke={Colors.gray} strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" />
+            </Svg>}
+          </TouchableOpacity>
+
         </Animated.View>
       </Animated.ScrollView>
 
@@ -374,13 +432,10 @@ export default function EventDetailScreen() {
         {user && isAttending
           ? (
             <View style={s.attendingRow}>
-              <Button label="✓  You're going" onPress={() => {}} variant="lime" disabled style={s.attendingBtn} />
-              <TouchableOpacity style={s.ticketBtn} onPress={() => router.push('/(tabs)/booked')} activeOpacity={0.8}>
-                <Svg width={18} height={18} viewBox="0 0 24 24" fill="none">
-                  <Path d="M2 9a1 1 0 0 1 0-2V5a1 1 0 0 1 1-1h18a1 1 0 0 1 1 1v2a1 1 0 0 1 0 2v2a1 1 0 0 1 0 2v2a1 1 0 0 1-1 1H3a1 1 0 0 1-1-1v-2a1 1 0 0 1 0-2V9z" stroke={Colors.black} strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round" />
-                  <Path d="M9 4v16M9 9h6M9 15h6" stroke={Colors.black} strokeWidth={1.5} strokeLinecap="round" />
-                </Svg>
-                <Text style={s.ticketBtnText}>My ticket</Text>
+              <Button label="✓  You're going" onPress={() => {}} variant="lime" disabled style={s.attendingBtn} textStyle={{ fontSize: 13 }} />
+              <TouchableOpacity style={s.ticketBtn} onPress={handleInvite} activeOpacity={0.8}>
+                <Animated.Text style={[s.ticketBtnEmoji, waveStyle]}>👋</Animated.Text>
+                <Text style={s.ticketBtnText}>Invite a friend</Text>
               </TouchableOpacity>
             </View>
           )
@@ -417,70 +472,96 @@ const s = StyleSheet.create({
   catText: { fontSize: 9, fontWeight: '800', color: Colors.black, letterSpacing: 1 },
   coverTitleRow: { flexDirection: 'row', alignItems: 'flex-end', gap: 10 },
   coverTitle: { flex: 1, fontSize: 26, fontWeight: '800', color: Colors.white, letterSpacing: -0.5, lineHeight: 32, fontFamily: Fonts.extrabold },
+  coverVenueRow: { flexDirection: 'row', alignItems: 'center', gap: 6 },
+  coverVenueText: { fontSize: 13, color: 'rgba(255,255,255,0.8)', fontFamily: Fonts.regular, flex: 1 },
   priceBadge: { backgroundColor: 'rgba(0,0,0,0.45)', borderRadius: 50, paddingHorizontal: 12, paddingVertical: 6, marginBottom: 2 },
   priceBadgeFree: { backgroundColor: Colors.lime },
   priceText: { fontSize: 13, fontWeight: '700', color: Colors.white },
   priceTextFree: { color: Colors.black },
 
-  // Body — white rounded card overlapping cover bottom
-  body: { backgroundColor: Colors.white, borderTopLeftRadius: 28, borderTopRightRadius: 28, marginTop: -28, paddingHorizontal: 20, paddingTop: 24, paddingBottom: 8 },
+  // Body
+  body: { backgroundColor: Colors.white, borderTopLeftRadius: 28, borderTopRightRadius: 28, marginTop: -28, paddingHorizontal: 16, paddingTop: 16, paddingBottom: 8 },
 
-  // Info card
-  infoCard: { flexDirection: 'row', alignItems: 'center', backgroundColor: Colors.grayLight, borderRadius: 18, padding: 18, gap: 12 },
-  infoRows: { flex: 1, gap: 10 },
-  infoRow: { flexDirection: 'row', alignItems: 'center', gap: 10 },
-  infoText: { fontSize: 14, color: Colors.black, fontFamily: Fonts.medium, flex: 1, lineHeight: 18 },
-  qrCorner: { alignItems: 'center', gap: 4 },
-  qrCornerLabel: { fontSize: 9, fontWeight: '700', color: Colors.gray, letterSpacing: 0.5, textTransform: 'uppercase' },
+  // Going banner — black card
+  goingBanner: { flexDirection: 'row', alignItems: 'center', gap: 10, backgroundColor: Colors.black, borderRadius: 18, paddingHorizontal: 16, paddingVertical: 14, marginBottom: 4 },
+  livePill: { flexDirection: 'row', alignItems: 'center', gap: 5, backgroundColor: 'rgba(255,255,255,0.1)', borderRadius: 50, paddingHorizontal: 8, paddingVertical: 4 },
+  liveDot: { width: 6, height: 6, borderRadius: 3, backgroundColor: Colors.lime },
+  liveText: { fontSize: 9, fontWeight: '800', color: Colors.lime, letterSpacing: 1 },
+  goingBannerText: { fontSize: 14, fontWeight: '700', color: Colors.white, fontFamily: Fonts.semibold, flex: 1 },
+  goingAvatarRow: { flexDirection: 'row' },
+  goingAv: { width: 26, height: 26, borderRadius: 13, overflow: 'hidden' },
+  goingAvImg: { width: 26, height: 26, borderRadius: 13 },
+  goingAvUser: { backgroundColor: Colors.lime, alignItems: 'center', justifyContent: 'center' },
+  goingAvOther: { backgroundColor: Colors.lime, alignItems: 'center', justifyContent: 'center' },
+  goingAvInitial: { fontSize: 11, fontWeight: '700', color: Colors.black },
+  goingAvOverflow: { backgroundColor: 'rgba(255,255,255,0.15)', alignItems: 'center', justifyContent: 'center' },
+  goingAvOverflowText: { fontSize: 7, fontWeight: '800', color: Colors.white },
+  goingBannerArrow: { fontSize: 16, fontWeight: '700', color: 'rgba(255,255,255,0.4)', marginLeft: 4 },
 
-  divider: { height: 1, backgroundColor: Colors.grayBorder, marginVertical: 20 },
+  // Info section
+  infoSection: { paddingHorizontal: 6, paddingTop: 18, paddingBottom: 18, gap: 16 },
+  infoDateBlock: { flexDirection: 'row', alignItems: 'center', gap: 14 },
+  infoRow: { flexDirection: 'row', alignItems: 'center', gap: 14 },
+  infoIconBox: { width: 36, height: 36, borderRadius: 10, backgroundColor: Colors.grayLight, alignItems: 'center', justifyContent: 'center', flexShrink: 0 },
+  infoText: { fontSize: 15, fontWeight: '600', color: Colors.black, fontFamily: Fonts.semibold },
+  infoSub: { fontSize: 13, color: Colors.gray, fontFamily: Fonts.regular, marginTop: 2 },
+  infoGoingNum: { fontSize: 14, fontWeight: '700', color: Colors.black },
+  inlinQR: { backgroundColor: Colors.white, borderRadius: 18, padding: 8, flexShrink: 0, overflow: 'hidden', alignItems: 'center', gap: 4 },
+  inlinQRHint: { fontSize: 8, fontWeight: '700', color: Colors.black, letterSpacing: 1, textTransform: 'uppercase' },
 
-  // Going
-  goingRow: { flexDirection: 'row', alignItems: 'center', gap: 14 },
+  // Hairline + sections
+  hairline: { height: 1, backgroundColor: '#F0F0F0', marginHorizontal: 6 },
+  aboutSection: { paddingHorizontal: 6, paddingVertical: 16 },
+  aboutText: { fontSize: 14, color: '#555', lineHeight: 21, fontFamily: Fonts.regular },
+
+  // Going avatars
   avatarStack: { flexDirection: 'row' },
-  av: { width: AV, height: AV, borderRadius: AV / 2, borderWidth: 2, borderColor: Colors.white },
+  av: { width: AV, height: AV, borderRadius: AV / 2, borderWidth: 2, borderColor: Colors.white, overflow: 'hidden' },
   avImg: { width: AV, height: AV, borderRadius: AV / 2 },
-  avFallback: { backgroundColor: Colors.lime, alignItems: 'center', justifyContent: 'center' },
-  avInit: { fontSize: 12, fontWeight: '700', color: Colors.black },
-  avOverflow: { backgroundColor: '#888', alignItems: 'center', justifyContent: 'center' },
-  avOverflowText: { fontSize: 10, fontWeight: '700', color: Colors.white },
-  goingText: { fontSize: 15, color: Colors.gray, fontFamily: Fonts.regular },
-  goingNum: { fontSize: 15, fontWeight: '700', color: Colors.black, fontFamily: Fonts.semibold },
-
-  sectionLabel: { fontSize: 11, fontWeight: '700', color: Colors.gray, letterSpacing: 0.8, textTransform: 'uppercase', marginBottom: 12 },
-
-  // About
-  aboutText: { fontSize: 15, color: Colors.black, lineHeight: 24, fontFamily: Fonts.regular },
+  avUser: { backgroundColor: Colors.lime, alignItems: 'center', justifyContent: 'center' },
+  avUserInitial: { fontSize: 13, fontWeight: '700', color: Colors.black },
+  avOverflow: { backgroundColor: '#888', alignItems: 'center', justifyContent: 'center', minWidth: AV, width: 'auto', paddingHorizontal: 4 },
+  avOverflowText: { fontSize: 7, fontWeight: '800', color: Colors.white },
 
   // Host
-  hostCard: { flexDirection: 'row', alignItems: 'center', gap: 12, backgroundColor: Colors.grayLight, borderRadius: 16, padding: 14 },
-  hostImg: { width: 44, height: 44, borderRadius: 10 },
-  hostImgFallback: { backgroundColor: Colors.lime, alignItems: 'center', justifyContent: 'center' },
-  hostInitial: { fontSize: 18, fontWeight: '800', color: Colors.black },
-  hostInfo: { flex: 1 },
-  hostName: { fontSize: 15, fontWeight: '700', color: Colors.black, fontFamily: Fonts.semibold },
-  hostSub: { fontSize: 11, color: Colors.gray, fontFamily: Fonts.regular, marginTop: 1 },
-
-  joinClubBtn: { marginTop: 10, backgroundColor: Colors.black, borderRadius: 50, paddingVertical: 14, alignItems: 'center' },
-  joinClubBtnText: { fontSize: 14, fontWeight: '700', color: Colors.white, fontFamily: Fonts.semibold },
-  memberBadge: { marginTop: 10, backgroundColor: Colors.grayLight, borderRadius: 50, paddingVertical: 12, alignItems: 'center' },
-  memberBadgeText: { fontSize: 13, color: Colors.gray, fontFamily: Fonts.regular },
+  hostRow: { flexDirection: 'row', alignItems: 'center', gap: 14, paddingHorizontal: 6, paddingVertical: 16 },
+  hostAvatar: { width: 42, height: 42, borderRadius: 12 },
+  hostAvatarFallback: { backgroundColor: Colors.lime, alignItems: 'center', justifyContent: 'center' },
+  hostAvatarInitial: { fontSize: 17, fontWeight: '800', color: Colors.black },
+  hostLabel: { fontSize: 11, color: Colors.gray, fontFamily: Fonts.regular, marginBottom: 1 },
+  hostName: { fontSize: 15, fontWeight: '600', color: Colors.black, fontFamily: Fonts.semibold },
+  memberPill: { backgroundColor: Colors.lime, borderRadius: 50, paddingHorizontal: 10, paddingVertical: 4 },
+  memberPillText: { fontSize: 11, fontWeight: '700', color: Colors.black },
+  joinPill: { backgroundColor: Colors.black, borderRadius: 50, paddingHorizontal: 12, paddingVertical: 6 },
+  joinPillText: { fontSize: 12, fontWeight: '700', color: Colors.white },
 
   // Chat
-  chatCard: { flexDirection: 'row', alignItems: 'center', gap: 12, backgroundColor: Colors.grayLight, borderRadius: 16, padding: 14 },
-  chatCardLocked: { flexDirection: 'row', alignItems: 'center', gap: 12, backgroundColor: Colors.grayLight, borderRadius: 16, padding: 14, opacity: 0.55 },
-  chatIconWrap: { width: 40, height: 40, borderRadius: 12, backgroundColor: Colors.white, alignItems: 'center', justifyContent: 'center' },
-  chatInfo: { flex: 1 },
-  chatTitle: { fontSize: 14, fontWeight: '700', color: Colors.black, fontFamily: Fonts.semibold },
-  chatTitleLocked: { fontSize: 14, fontWeight: '700', color: Colors.gray, fontFamily: Fonts.semibold },
-  chatSub: { fontSize: 12, color: Colors.gray, fontFamily: Fonts.regular, marginTop: 1 },
+  chatRow: { flexDirection: 'row', alignItems: 'center', gap: 14, paddingHorizontal: 6, paddingVertical: 16 },
+  chatIconBox: { width: 42, height: 42, borderRadius: 12, backgroundColor: Colors.lime, alignItems: 'center', justifyContent: 'center', flexShrink: 0 },
+  chatLabel: { fontSize: 15, fontWeight: '600', color: Colors.black, fontFamily: Fonts.semibold },
+  chatSub: { fontSize: 12, color: Colors.gray, fontFamily: Fonts.regular, marginTop: 2 },
+  chatLocked: { fontSize: 12, color: Colors.gray, fontFamily: Fonts.regular },
+  chatRight: { flexDirection: 'row', alignItems: 'center', gap: 8 },
+  unreadBadge: { backgroundColor: Colors.black, borderRadius: 50, minWidth: 20, height: 20, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 5 },
+  unreadBadgeText: { fontSize: 11, fontWeight: '700', color: Colors.white },
+
+  divider: { height: 1, backgroundColor: Colors.grayBorder },
+
+  // QR modal
+  qrModalBg: { flex: 1, backgroundColor: 'rgba(0,0,0,0.75)', alignItems: 'center', justifyContent: 'center' },
+  qrModalCard: { backgroundColor: Colors.white, borderRadius: 28, padding: 32, alignItems: 'center', gap: 8, marginHorizontal: 32 },
+  qrModalTitle: { fontSize: 18, fontWeight: '800', color: Colors.black, fontFamily: Fonts.extrabold, textAlign: 'center' },
+  qrModalSub: { fontSize: 13, color: Colors.gray, fontFamily: Fonts.regular, marginBottom: 8 },
+  qrModalCode: { padding: 12, backgroundColor: Colors.white, borderRadius: 16, borderWidth: 1, borderColor: Colors.grayBorder },
+  qrModalHint: { fontSize: 11, color: Colors.gray, fontFamily: Fonts.regular, marginTop: 8 },
 
   // CTA
   cta: { position: 'absolute', bottom: 0, left: 0, right: 0, paddingHorizontal: 20, paddingTop: 14, backgroundColor: Colors.white, borderTopWidth: 1, borderColor: Colors.grayBorder, gap: 10 },
   attendingRow: { flexDirection: 'row', gap: 10 },
   attendingBtn: { flex: 1 },
-  ticketBtn: { height: 56, borderRadius: 50, borderWidth: 1.5, borderColor: Colors.black, paddingHorizontal: 18, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 7 },
-  ticketBtnText: { fontSize: 15, fontWeight: '600', color: Colors.black, fontFamily: Fonts.semibold },
+  ticketBtn: { flex: 1.4, height: 56, borderRadius: 50, backgroundColor: Colors.black, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 7 },
+  ticketBtnText: { fontSize: 13, fontWeight: '600', color: Colors.white, fontFamily: Fonts.semibold },
+  ticketBtnEmoji: { fontSize: 16 },
   guestRow: { flexDirection: 'row', justifyContent: 'center', alignItems: 'center', gap: 6, marginBottom: 4 },
   guestText: { fontSize: 13, color: Colors.gray, fontFamily: Fonts.regular },
   guestLink: { fontSize: 13, fontWeight: '700', color: Colors.black, fontFamily: Fonts.semibold },

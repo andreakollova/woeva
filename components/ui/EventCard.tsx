@@ -5,14 +5,17 @@ import Svg, { Defs, LinearGradient as SvgGrad, Stop, Rect } from 'react-native-s
 import { Colors } from '@/constants/colors';
 import { Fonts } from '@/constants/fonts';
 import { Event } from '@/types';
+import { useAuth } from '@/context/AuthContext';
 
 interface EventCardProps {
   event: Event;
   featured?: boolean;
+  attending?: boolean;
 }
 
-export function EventCard({ event, featured }: EventCardProps) {
+export function EventCard({ event, featured, attending }: EventCardProps) {
   const router = useRouter();
+  const { profile, user } = useAuth();
 
   const d = getEventDate(event.date, event.is_recurring);
   const dayName = d.toLocaleDateString('en-US', { weekday: 'short' }).toUpperCase();
@@ -23,7 +26,8 @@ export function EventCard({ event, featured }: EventCardProps) {
   const priceLabel = event.is_free || event.price === 0 ? 'Free' : `€${event.price}`;
   const isFree = event.is_free || event.price === 0;
   const clubName = event.club?.name ?? null;
-  const goingCount = event.going_count ?? 0;
+  // Use attendees length as fallback if going_count is stale/0
+  const goingCount = Math.max(event.going_count ?? 0, event.attendees?.length ?? 0, attending ? 1 : 0);
 
   if (featured) {
     return (
@@ -89,7 +93,7 @@ export function EventCard({ event, featured }: EventCardProps) {
       activeOpacity={0.8}
     >
       {/* Date block */}
-      <View style={[styles.dateBlock, isToday && styles.dateBlockToday]}>
+      <View style={[styles.dateBlock, isToday && styles.dateBlockToday, attending && styles.dateBlockGoing]}>
         <Text style={[styles.dateBlockDay, isToday && styles.dateBlockTextToday]}>
           {isToday ? 'NOW' : dayName}
         </Text>
@@ -110,7 +114,7 @@ export function EventCard({ event, featured }: EventCardProps) {
           ) : null}
         </View>
         <View style={styles.rowBottomRow}>
-          {goingCount > 0 && <GoingAvatars count={goingCount} attendees={event.attendees} />}
+          {(goingCount > 0 || attending) && <GoingAvatars count={goingCount} attendees={event.attendees} attending={attending} userProfile={profile} userId={user?.id} />}
           {clubName ? <Text style={styles.rowClub} numberOfLines={1}>{clubName}</Text> : null}
           <View style={[styles.pricePill, isFree && styles.pricePillFree]}>
             <Text style={[styles.pricePillText, isFree && styles.pricePillTextFree]}>{priceLabel}</Text>
@@ -119,11 +123,18 @@ export function EventCard({ event, featured }: EventCardProps) {
       </View>
 
       {/* Thumb */}
-      {event.cover_url ? (
-        <Image source={{ uri: event.cover_url }} style={styles.rowThumb} />
-      ) : (
-        <View style={[styles.rowThumb, { backgroundColor: Colors.grayLight }]} />
-      )}
+      <View style={styles.rowThumbWrap}>
+        {event.cover_url ? (
+          <Image source={{ uri: event.cover_url }} style={styles.rowThumb} />
+        ) : (
+          <View style={[styles.rowThumb, { backgroundColor: Colors.grayLight }]} />
+        )}
+        {attending && (
+          <View style={styles.goingBadge}>
+            <Text style={styles.goingBadgeText}>✓</Text>
+          </View>
+        )}
+      </View>
     </TouchableOpacity>
   );
 }
@@ -137,24 +148,51 @@ const SAMPLE_AVATARS = [
 
 type AttendeeProfile = { id: string; name: string; avatar_url: string | null } | null | undefined;
 
-function GoingAvatars({ count, attendees }: { count: number; attendees?: Array<{ profile?: AttendeeProfile }> }) {
-  const sorted = [...(attendees ?? [])].sort((a, b) => (b.profile?.avatar_url ? 1 : 0) - (a.profile?.avatar_url ? 1 : 0));
-  const visible = Math.min(count, 3);
-  const overflow = count - visible;
+function GoingAvatars({ count, attendees, attending, userProfile, userId }: {
+  count: number;
+  attendees?: Array<{ profile?: AttendeeProfile }>;
+  attending?: boolean;
+  userProfile?: { name?: string | null; avatar_url?: string | null } | null;
+  userId?: string;
+}) {
+  // Check if user is in attendees list (fallback when attending prop not yet set)
+  const userInList = userId ? (attendees ?? []).some((a: any) => a?.profile?.id === userId) : false;
+  const isAttending = attending || userInList;
+
+  // Build ordered list: exclude current user, others fill remaining slots
+  const others = (attendees ?? []).filter((a: any) => a?.profile?.id !== userId);
+  const sorted = [...others].sort((a, b) => (b.profile?.avatar_url ? 1 : 0) - (a.profile?.avatar_url ? 1 : 0));
+
+  const effectiveCount = Math.max(count, isAttending ? 1 : 0);
+  const visible = Math.min(effectiveCount, 3);
+  const overflow = effectiveCount - visible;
 
   return (
     <View style={avStyles.row}>
       {Array.from({ length: visible }).map((_, i) => {
         const ml = i === 0 ? 0 : -7;
-        const profile = sorted[i]?.profile;
-        if (profile?.avatar_url) {
-          return <Image key={i} source={{ uri: profile.avatar_url }} style={[avStyles.circle, { marginLeft: ml, zIndex: 3 - i }] as ImageStyle} />;
+        const zIdx = 3 - i;
+        // First slot: user's avatar if attending
+        if (i === 0 && isAttending) {
+          const initial = (userProfile?.name ?? '?').charAt(0).toUpperCase();
+          return (
+            <View key="me" style={{ width: 18, height: 18, borderRadius: 9, borderWidth: 1.5, borderColor: Colors.white, backgroundColor: Colors.lime, alignItems: 'center', justifyContent: 'center', marginLeft: ml, zIndex: zIdx, overflow: 'hidden' }}>
+              <Text style={{ fontSize: 7, fontWeight: '400', color: Colors.black }}>{initial}</Text>
+              {userProfile?.avatar_url ? <Image source={{ uri: userProfile.avatar_url }} style={StyleSheet.absoluteFill as ImageStyle} /> : null}
+            </View>
+          );
         }
-        return <Image key={i} source={SAMPLE_AVATARS[i % SAMPLE_AVATARS.length]} style={[avStyles.circle, { marginLeft: ml, zIndex: 3 - i }] as ImageStyle} />;
+        // Other slots
+        const slotIndex = isAttending ? i - 1 : i;
+        const att = sorted[slotIndex];
+        if (att?.profile?.avatar_url) {
+          return <Image key={i} source={{ uri: att.profile.avatar_url }} style={[avStyles.circle, { marginLeft: ml, zIndex: zIdx }] as ImageStyle} />;
+        }
+        return <Image key={i} source={SAMPLE_AVATARS[i % SAMPLE_AVATARS.length]} style={[avStyles.circle, { marginLeft: ml, zIndex: zIdx }] as ImageStyle} />;
       })}
       {overflow > 0 && (
         <View style={[avStyles.circle, avStyles.overflow, { marginLeft: -3 }]}>
-          <Text style={avStyles.overflowText}>+{overflow}</Text>
+          <Text style={avStyles.overflowText} adjustsFontSizeToFit numberOfLines={1}>+{overflow}</Text>
         </View>
       )}
     </View>
@@ -164,8 +202,10 @@ function GoingAvatars({ count, attendees }: { count: number; attendees?: Array<{
 const avStyles = StyleSheet.create({
   row: { flexDirection: 'row', alignItems: 'center', gap: 0 },
   circle: { width: 18, height: 18, borderRadius: 9, borderWidth: 1.5, borderColor: Colors.white },
-  overflow: { backgroundColor: '#888', alignItems: 'center', justifyContent: 'center' },
-  overflowText: { fontSize: 5, fontWeight: '800', color: Colors.white },
+  overflow: { backgroundColor: '#888', alignItems: 'center', justifyContent: 'center', minWidth: 18, width: 'auto', paddingHorizontal: 3 },
+  overflowText: { fontSize: 6, fontWeight: '800', color: Colors.white },
+  fallback: { backgroundColor: Colors.lime, alignItems: 'center', justifyContent: 'center' },
+  fallbackText: { fontSize: 7, fontWeight: '800', color: Colors.black },
 });
 
 function FeaturedContent({ event, isToday, dayName, dayNum, monthShort, priceLabel, isFree, clubName, goingCount, dark }: any) {
@@ -260,6 +300,7 @@ const styles = StyleSheet.create({
     gap: 0,
   },
   dateBlockToday: { backgroundColor: Colors.black },
+  dateBlockGoing: { backgroundColor: Colors.lime },
   dateBlockDay: { fontSize: 9, fontWeight: '700', color: Colors.gray, letterSpacing: 0.5 },
   dateBlockNum: { fontSize: 22, fontWeight: '800', color: Colors.black, lineHeight: 26, fontFamily: Fonts.extrabold },
   dateBlockMonth: { fontSize: 9, fontWeight: '600', color: Colors.gray, letterSpacing: 0.3 },
@@ -279,11 +320,9 @@ const styles = StyleSheet.create({
   pricePillFree: { backgroundColor: Colors.lime },
   pricePillText: { fontSize: 10, fontWeight: '700', color: Colors.gray },
   pricePillTextFree: { color: Colors.black },
+  goingBadge: { position: 'absolute', bottom: 4, right: 4, width: 20, height: 20, borderRadius: 10, backgroundColor: Colors.lime, alignItems: 'center', justifyContent: 'center' },
+  goingBadgeText: { fontSize: 9, fontWeight: '800', color: Colors.black },
 
-  rowThumb: {
-    width: 64,
-    height: 64,
-    borderRadius: 12,
-    overflow: 'hidden',
-  },
+  rowThumbWrap: { width: 64, height: 64, borderRadius: 12, overflow: 'hidden' },
+  rowThumb: { width: 64, height: 64 },
 });

@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Image } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Image, Alert } from 'react-native';
 import { useLocalSearchParams, useRouter, useFocusEffect } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Animated, { FadeInDown, FadeInUp } from 'react-native-reanimated';
@@ -17,6 +17,13 @@ import { useAuth } from '@/context/AuthContext';
 const COVER_HEIGHT = 340;
 const AVATAR_SIZE = 32;
 const AVATAR_OVERLAP = 10;
+
+const SAMPLE_AVATARS = [
+  require('@/assets/images/sample_av1.jpg'),
+  require('@/assets/images/sample_av2.jpg'),
+  require('@/assets/images/sample_av3.jpg'),
+  require('@/assets/images/sample_av4.jpg'),
+];
 
 export default function ClubDetailScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
@@ -130,16 +137,15 @@ export default function ClubDetailScreen() {
           {/* Members row */}
           <View style={styles.membersRow}>
             <View style={styles.avatarStack}>
-              {visibleMembers.map((m, i) => {
-                const profile = (m as any).profile;
+              {Array.from({ length: 3 }).map((_, i) => {
+                const m = visibleMembers[i];
+                const profile = (m as any)?.profile;
                 return (
-                  <View key={m.id} style={[styles.memberAvatar, { marginLeft: i === 0 ? 0 : -AVATAR_OVERLAP, zIndex: visibleMembers.length - i }]}>
+                  <View key={i} style={[styles.memberAvatar, { marginLeft: i === 0 ? 0 : -AVATAR_OVERLAP, zIndex: 3 - i }]}>
                     {profile?.avatar_url ? (
                       <Image source={{ uri: profile.avatar_url }} style={styles.memberAvatarImg} />
                     ) : (
-                      <View style={[styles.memberAvatarImg, styles.memberAvatarFallback]}>
-                        <Text style={styles.memberAvatarInitial}>{(profile?.name ?? '?').charAt(0).toUpperCase()}</Text>
-                      </View>
+                      <Image source={SAMPLE_AVATARS[i % SAMPLE_AVATARS.length]} style={styles.memberAvatarImg} />
                     )}
                   </View>
                 );
@@ -150,7 +156,7 @@ export default function ClubDetailScreen() {
                 </View>
               )}
             </View>
-            <Text style={styles.membersLabel}><Text style={styles.membersCount}>{club.member_count ?? members.length}</Text> members</Text>
+            <Text style={styles.membersLabel}><Text style={styles.membersCount}>{members.length || club.member_count || 0}</Text> members</Text>
             {(club.rating ?? 0) > 0 && (
               <View style={styles.ratingBadge}>
                 <Text style={styles.ratingText}>★ {club.rating?.toFixed(1)}</Text>
@@ -168,7 +174,7 @@ export default function ClubDetailScreen() {
             </View>
             <View style={styles.statDivider} />
             <View style={styles.statItem}>
-              <Text style={styles.statNum}>{club.member_count ?? members.length}</Text>
+              <Text style={styles.statNum}>{members.length || club.member_count || 0}</Text>
               <Text style={styles.statLabel}>Members</Text>
             </View>
             <View style={styles.statDivider} />
@@ -207,27 +213,25 @@ export default function ClubDetailScreen() {
             </>
           )}
 
-          {/* Member actions: chat + notifications */}
+          {/* Member: notifications toggle */}
           {isMember && (
             <>
               <View style={styles.divider} />
-              <TouchableOpacity style={styles.chatBtn} onPress={() => router.push(`/chat/club-${id}` as any)} activeOpacity={0.8}>
-                <Svg width={18} height={18} viewBox="0 0 24 24" fill="none">
-                  <Path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" stroke={Colors.black} strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" />
-                </Svg>
-                <Text style={styles.chatBtnText}>Club group chat</Text>
-              </TouchableOpacity>
-
               <TouchableOpacity
                 style={styles.notifRow}
                 activeOpacity={0.8}
                 onPress={() => setNotificationsOn(v => !v)}
               >
-                <Svg width={18} height={18} viewBox="0 0 24 24" fill="none">
-                  <Path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9" stroke={Colors.gray} strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" />
-                  <Path d="M13.73 21a2 2 0 0 1-3.46 0" stroke={Colors.gray} strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" />
-                </Svg>
-                <Text style={styles.notifLabel}>Notifications</Text>
+                <View style={styles.notifIcon}>
+                  <Svg width={16} height={16} viewBox="0 0 24 24" fill="none">
+                    <Path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9" stroke={Colors.black} strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" />
+                    <Path d="M13.73 21a2 2 0 0 1-3.46 0" stroke={Colors.black} strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" />
+                  </Svg>
+                </View>
+                <View style={styles.notifText}>
+                  <Text style={styles.notifLabel}>Event notifications</Text>
+                  <Text style={styles.notifSub}>Get notified when this club posts a new event</Text>
+                </View>
                 <View style={[styles.toggle, notificationsOn && styles.toggleOn]}>
                   <View style={[styles.toggleThumb, notificationsOn && styles.toggleThumbOn]} />
                 </View>
@@ -260,7 +264,21 @@ export default function ClubDetailScreen() {
       )}
       {isMember && !isAdmin && (
         <View style={[styles.footer, { paddingBottom: insets.bottom + 16 }]}>
-          <Button label="You're a member ✓" onPress={() => {}} variant="lime" disabled />
+          <Button
+            label="You're a member ✓"
+            variant="lime"
+            onPress={() => {
+              Alert.alert('Leave club', `Leave ${club?.name}?`, [
+                { text: 'Cancel', style: 'cancel' },
+                { text: 'Leave', style: 'destructive', onPress: async () => {
+                  await supabase.from('club_members').delete().eq('club_id', id).eq('user_id', user!.id);
+                  await supabase.from('clubs').update({ member_count: Math.max((club?.member_count ?? 1) - 1, 0) }).eq('id', id);
+                  setIsMember(false);
+                  router.back();
+                }},
+              ]);
+            }}
+          />
         </View>
       )}
     </View>
@@ -397,19 +415,14 @@ const styles = StyleSheet.create({
 
   footer: { paddingHorizontal: 20, paddingTop: 12, borderTopWidth: 1, borderColor: Colors.grayBorder, backgroundColor: Colors.white },
 
-  chatBtn: {
-    flexDirection: 'row', alignItems: 'center', gap: 10,
-    backgroundColor: Colors.grayLight, borderRadius: 14,
-    paddingHorizontal: 16, paddingVertical: 14, justifyContent: 'center',
-    marginBottom: 10,
-  },
-  chatBtnText: { fontSize: 15, fontWeight: '600', color: Colors.black, fontFamily: Fonts.semibold },
-
   notifRow: {
-    flexDirection: 'row', alignItems: 'center', gap: 12,
-    paddingVertical: 12,
+    flexDirection: 'row', alignItems: 'center', gap: 14,
+    backgroundColor: Colors.grayLight, borderRadius: 16, padding: 14,
   },
-  notifLabel: { flex: 1, fontSize: 15, fontWeight: '500', color: Colors.black, fontFamily: Fonts.medium },
+  notifIcon: { width: 38, height: 38, borderRadius: 12, backgroundColor: Colors.white, alignItems: 'center', justifyContent: 'center' },
+  notifText: { flex: 1 },
+  notifLabel: { fontSize: 15, fontWeight: '600', color: Colors.black, fontFamily: Fonts.semibold },
+  notifSub: { fontSize: 12, color: Colors.gray, fontFamily: Fonts.regular, marginTop: 2 },
   toggle: { width: 44, height: 26, borderRadius: 13, backgroundColor: Colors.grayBorder, justifyContent: 'center', padding: 2 },
   toggleOn: { backgroundColor: Colors.lime },
   toggleThumb: { width: 22, height: 22, borderRadius: 11, backgroundColor: Colors.white },

@@ -37,12 +37,24 @@ export default function EditProfileScreen() {
 
     let avatar_url = profile?.avatar_url ?? null;
     if (avatar && avatar !== profile?.avatar_url) {
-      const ext = avatar.split('.').pop();
+      const ext = avatar.split('.').pop()?.toLowerCase()?.replace('heic', 'jpg') ?? 'jpg';
+      const mime = ext === 'png' ? 'image/png' : 'image/jpeg';
       const path = `avatars/${user.id}.${ext}`;
-      const blob = await fetch(avatar).then(r => r.blob());
-      await supabase.storage.from('avatars').upload(path, blob, { upsert: true });
+
+      const formData = new FormData();
+      formData.append('file', { uri: avatar, name: `avatar.${ext}`, type: mime } as any);
+
+      const { error: uploadError } = await supabase.storage
+        .from('avatars')
+        .upload(path, formData, { upsert: true, contentType: mime });
+
+      if (uploadError) {
+        Alert.alert('Upload failed', uploadError.message);
+        setLoading(false);
+        return;
+      }
       const { data } = supabase.storage.from('avatars').getPublicUrl(path);
-      avatar_url = data.publicUrl;
+      avatar_url = `${data.publicUrl}?t=${Date.now()}`;
     }
 
     const { error } = await supabase.from('profiles').upsert({ id: user.id, name, bio, city, avatar_url });
@@ -189,7 +201,7 @@ const styles = StyleSheet.create({
     borderRadius: 14,
     paddingHorizontal: 16,
     paddingVertical: 14,
-    fontSize: 16,
+    fontSize: 14,
     fontFamily: Fonts.regular,
     color: Colors.black,
     backgroundColor: Colors.white,
@@ -197,8 +209,8 @@ const styles = StyleSheet.create({
   fieldInputFocused: { borderColor: Colors.black },
   fieldInputMulti: { height: 100, textAlignVertical: 'top' },
   fieldInputRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
-  fieldValue: { fontSize: 16, fontFamily: Fonts.regular, color: Colors.black },
-  fieldPlaceholder: { fontSize: 16, fontFamily: Fonts.regular, color: Colors.gray },
+  fieldValue: { fontSize: 14, fontFamily: Fonts.regular, color: Colors.black },
+  fieldPlaceholder: { fontSize: 14, fontFamily: Fonts.regular, color: Colors.gray },
   chevron: { fontSize: 13, color: Colors.gray },
   dropdown: {
     borderWidth: 1.5,

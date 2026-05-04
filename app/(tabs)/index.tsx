@@ -1,10 +1,11 @@
 import React, { useEffect, useState, useCallback } from 'react';
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity, RefreshControl, Image } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, TouchableOpacity, RefreshControl, Image, Modal, ImageBackground } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import { useFocusEffect } from 'expo-router';
 import Animated, { FadeInDown } from 'react-native-reanimated';
 import * as Location from 'expo-location';
+import Svg, { Path } from 'react-native-svg';
 import { WMark } from '@/components/ui/WMark';
 import { EventCard } from '@/components/ui/EventCard';
 import { Tag } from '@/components/ui/Tag';
@@ -16,17 +17,21 @@ import { useAuth } from '@/context/AuthContext';
 
 
 const FILTER_TAGS = ['All', 'Free', 'Coffee', 'Sport', 'Party', 'Music', 'Art', 'Yoga'];
+const CITIES = ['Bratislava', 'Košice', 'Prešov', 'Žilina', 'Nitra', 'Banská Bystrica', 'Trnava', 'Trenčín', 'Martin', 'Poprad'];
 
 export default function HomeScreen() {
   const insets = useSafeAreaInsets();
   const router = useRouter();
-  const { profile, user } = useAuth();
+  const { profile, user, refetchProfile } = useAuth();
   const avatarInitial = (profile?.name || (user as any)?.user_metadata?.full_name || '?').charAt(0).toUpperCase();
+  const [avatarError, setAvatarError] = useState(false);
   const [events, setEvents] = useState<Event[]>([]);
+  const [attendingIds, setAttendingIds] = useState<Set<string>>(new Set());
   const [filter, setFilter] = useState('All');
   const [refreshing, setRefreshing] = useState(false);
 
   const [city, setCity] = useState('');
+  const [showCityPicker, setShowCityPicker] = useState(false);
 
   useEffect(() => {
     (async () => {
@@ -45,7 +50,7 @@ export default function HomeScreen() {
     })();
   }, []);
 
-  useFocusEffect(useCallback(() => { loadEvents(); }, [filter]));
+  useFocusEffect(useCallback(() => { loadEvents(); refetchProfile(); }, [filter]));
 
   async function loadEvents() {
     let query = supabase.from('events').select('*, club:clubs(id, name, cover_url), attendees:event_attendees(profile:profiles(id, name, avatar_url))').order('date', { ascending: true }).limit(30);
@@ -53,12 +58,24 @@ export default function HomeScreen() {
     else if (filter !== 'All') query = query.eq('category', filter);
     const { data } = await query;
     setEvents((data ?? []) as any);
+
+    if (user) {
+      const { data: att } = await supabase.from('event_attendees').select('event_id').eq('user_id', user.id);
+      setAttendingIds(new Set((att ?? []).map((a: any) => a.event_id)));
+    }
   }
 
   async function onRefresh() {
     setRefreshing(true);
     await loadEvents();
     setRefreshing(false);
+  }
+
+  async function selectCity(c: string) {
+    setCity(c);
+    setShowCityPicker(false);
+    const { data: { user: u } } = await supabase.auth.getUser();
+    if (u) await supabase.from('profiles').upsert({ id: u.id, city: c });
   }
 
   const featured = events[0];
@@ -77,21 +94,27 @@ export default function HomeScreen() {
           <WMark size={34} color={Colors.lime} />
           <View style={styles.topBarSide}>
             <TouchableOpacity style={styles.avatar} onPress={() => router.push('/(tabs)/profile')}>
-              {profile?.avatar_url ? (
-                <Image source={{ uri: profile.avatar_url }} style={styles.avatarCircle} />
-              ) : (
-                <View style={[styles.avatarCircle, { alignItems: 'center', justifyContent: 'center' }]}>
-                  <Text style={styles.avatarInitial}>{avatarInitial}</Text>
-                </View>
-              )}
+              <View style={styles.avatarCircle}>
+                <Text style={styles.avatarInitial}>{avatarInitial}</Text>
+                {profile?.avatar_url ? (
+                  <Image
+                    source={{ uri: profile.avatar_url }}
+                    style={StyleSheet.absoluteFill}
+                    onError={() => {}}
+                  />
+                ) : null}
+              </View>
             </TouchableOpacity>
           </View>
         </View>
 
         {/* Header */}
         <View style={styles.header}>
-          <TouchableOpacity onPress={() => {}}>
-            <Text style={styles.cityLabel}>▾  {city}</Text>
+          <TouchableOpacity onPress={() => setShowCityPicker(true)} style={styles.cityRow}>
+            <Text style={styles.cityLabel}>{city || 'Select city'}</Text>
+            <Svg width={14} height={14} viewBox="0 0 24 24" fill="none">
+              <Path d="M6 9l6 6 6-6" stroke={Colors.gray} strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" />
+            </Svg>
           </TouchableOpacity>
           <Text style={styles.title}>Your city is moving</Text>
         </View>
@@ -117,7 +140,7 @@ export default function HomeScreen() {
         {/* Featured event */}
         {featured && (
           <Animated.View entering={FadeInDown.delay(100).springify()} style={styles.featured}>
-            <EventCard event={featured} featured />
+            <EventCard event={featured} featured attending={attendingIds.has(featured.id)} />
           </Animated.View>
         )}
 
@@ -125,7 +148,7 @@ export default function HomeScreen() {
         <View style={styles.list}>
           {rest.map((event, i) => (
             <Animated.View key={event.id} entering={FadeInDown.delay(i * 60 + 200).springify()}>
-              <EventCard event={event} />
+              <EventCard event={event} attending={attendingIds.has(event.id)} />
               {i < rest.length - 1 && <View style={styles.divider} />}
             </Animated.View>
           ))}
@@ -138,6 +161,26 @@ export default function HomeScreen() {
         </View>
       </ScrollView>
 
+      {/* City picker modal */}
+      <Modal visible={showCityPicker} transparent animationType="slide" onRequestClose={() => setShowCityPicker(false)}>
+        <TouchableOpacity style={styles.cityModalBg} activeOpacity={1} onPress={() => setShowCityPicker(false)}>
+          <View style={styles.cityModalSheet}>
+            <View style={styles.cityModalHandle} />
+            <Text style={styles.cityModalTitle}>Choose your city</Text>
+            {CITIES.map((c) => (
+              <TouchableOpacity
+                key={c}
+                style={[styles.cityModalRow, city === c && styles.cityModalRowActive]}
+                onPress={() => selectCity(c)}
+                activeOpacity={0.7}
+              >
+                <Text style={[styles.cityModalLabel, city === c && styles.cityModalLabelActive]}>{c}</Text>
+                {city === c && <Text style={styles.cityModalCheck}>✓</Text>}
+              </TouchableOpacity>
+            ))}
+          </View>
+        </TouchableOpacity>
+      </Modal>
     </View>
   );
 }
@@ -148,11 +191,12 @@ const styles = StyleSheet.create({
   topBar: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 20, paddingVertical: 10 },
   topBarSide: { flex: 1, alignItems: 'flex-end' },
   header: { paddingHorizontal: 20, marginBottom: 16 },
-  cityLabel: { fontSize: 18, color: Colors.gray, fontWeight: '500', fontFamily: Fonts.medium, marginBottom: 4 },
+  cityRow: { flexDirection: 'row', alignItems: 'center', gap: 4, marginBottom: 4 },
+  cityLabel: { fontSize: 18, color: Colors.gray, fontWeight: '500', fontFamily: Fonts.medium },
   title: { fontSize: 28, fontWeight: '700', color: Colors.black, letterSpacing: -0.5, fontFamily: Fonts.bold },
   avatar: { width: 36, height: 36, borderRadius: 18, overflow: 'hidden' },
-  avatarCircle: { width: 36, height: 36, borderRadius: 18, backgroundColor: Colors.lime },
-  avatarInitial: { fontSize: 15, fontWeight: '700', color: Colors.black },
+  avatarCircle: { width: 36, height: 36, borderRadius: 18, backgroundColor: Colors.lime, alignItems: 'center', justifyContent: 'center' },
+  avatarInitial: { fontSize: 15, fontWeight: '500', color: Colors.black, fontFamily: Fonts.medium },
   filters: { paddingHorizontal: 20, paddingBottom: 16, gap: 8 },
   featured: { marginHorizontal: 20, marginBottom: 20 },
   list: { paddingHorizontal: 20 },
@@ -160,4 +204,13 @@ const styles = StyleSheet.create({
   empty: { paddingVertical: 60, alignItems: 'center', gap: 8 },
   emptyTitle: { fontSize: 18, fontWeight: '600', color: Colors.black, fontFamily: Fonts.semibold },
   emptyText: { fontSize: 14, color: Colors.gray, textAlign: 'center', fontFamily: Fonts.regular },
+  cityModalBg: { flex: 1, backgroundColor: 'rgba(0,0,0,0.4)', justifyContent: 'flex-end' },
+  cityModalSheet: { backgroundColor: Colors.white, borderTopLeftRadius: 28, borderTopRightRadius: 28, paddingHorizontal: 24, paddingBottom: 40, paddingTop: 16 },
+  cityModalHandle: { width: 36, height: 4, borderRadius: 2, backgroundColor: Colors.grayBorder, alignSelf: 'center', marginBottom: 20 },
+  cityModalTitle: { fontSize: 18, fontWeight: '700', fontFamily: Fonts.bold, color: Colors.black, marginBottom: 12 },
+  cityModalRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingVertical: 14, borderBottomWidth: 1, borderBottomColor: Colors.grayBorder },
+  cityModalRowActive: { },
+  cityModalLabel: { fontSize: 16, fontFamily: Fonts.regular, color: Colors.black },
+  cityModalLabelActive: { fontWeight: '700', fontFamily: Fonts.bold },
+  cityModalCheck: { fontSize: 16, color: Colors.lime, fontWeight: '700' },
 });

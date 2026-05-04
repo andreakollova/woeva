@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Image } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Image, Alert } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import Svg, { Path, Circle } from 'react-native-svg';
@@ -11,16 +11,14 @@ import { useAuth } from '@/context/AuthContext';
 
 function SettingsIcon() {
   return (
-    <Svg width={24} height={24} viewBox="0 0 24 24" fill="none">
-      <Circle cx="12" cy="12" r="3" stroke="#0A0A0A" strokeWidth={1.6} />
-      <Path
-        d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"
-        stroke="#0A0A0A"
-        strokeWidth={1.6}
-        strokeLinecap="round"
-        strokeLinejoin="round"
-      />
-    </Svg>
+    <View style={{ width: 36, height: 36, borderRadius: 18, backgroundColor: '#F2F2F2', alignItems: 'center', justifyContent: 'center' }}>
+      <Svg width={17} height={17} viewBox="0 0 24 24" fill="none">
+        <Path d="M4 6h16M4 12h16M4 18h16" stroke="#0A0A0A" strokeWidth={2} strokeLinecap="round" />
+        <Circle cx="9" cy="6" r="2.2" fill="#fff" stroke="#0A0A0A" strokeWidth={1.8} />
+        <Circle cx="16" cy="12" r="2.2" fill="#fff" stroke="#0A0A0A" strokeWidth={1.8} />
+        <Circle cx="9" cy="18" r="2.2" fill="#fff" stroke="#0A0A0A" strokeWidth={1.8} />
+      </Svg>
+    </View>
   );
 }
 
@@ -30,11 +28,15 @@ export default function ProfileScreen() {
   const { user, profile } = useAuth();
   const [eventsCount, setEventsCount] = useState(0);
   const [clubsCount, setClubsCount] = useState(0);
+  const [clubs, setClubs] = useState<{ id: string; name: string; cover_url: string | null; category: string }[]>([]);
 
   useEffect(() => {
     if (!user) return;
     supabase.from('event_attendees').select('id', { count: 'exact' }).eq('user_id', user.id).then(({ count }) => setEventsCount(count ?? 0));
-    supabase.from('club_members').select('id', { count: 'exact' }).eq('user_id', user.id).eq('status', 'approved').then(({ count }) => setClubsCount(count ?? 0));
+    supabase.from('club_members').select('id, club:clubs(id, name, cover_url, category)').eq('user_id', user.id).eq('status', 'approved').then(({ data, count }) => {
+      setClubsCount(data?.length ?? 0);
+      setClubs((data ?? []).map((r: any) => r.club).filter(Boolean));
+    });
   }, [user]);
 
   const displayName = profile?.name || (user as any)?.user_metadata?.full_name || '';
@@ -50,7 +52,9 @@ export default function ProfileScreen() {
       <ScrollView contentContainerStyle={[styles.scroll, { paddingBottom: insets.bottom + 40 }]} showsVerticalScrollIndicator={false}>
         {/* Top bar */}
         <View style={styles.topBar}>
-          <WMark size={34} color={Colors.lime} />
+          <TouchableOpacity onPress={() => router.push('/(tabs)')} activeOpacity={0.7}>
+            <WMark size={34} color={Colors.lime} />
+          </TouchableOpacity>
           <TouchableOpacity onPress={() => router.push('/settings')}>
             <SettingsIcon />
           </TouchableOpacity>
@@ -59,7 +63,7 @@ export default function ProfileScreen() {
         <Text style={styles.pageTitle}>Profile</Text>
 
         {/* Avatar */}
-        <View style={styles.avatarWrap}>
+        <TouchableOpacity style={styles.avatarWrap} onPress={() => router.push('/settings/profile')} activeOpacity={0.85}>
           {profile?.avatar_url ? (
             <Image source={{ uri: profile.avatar_url }} style={styles.avatar} />
           ) : (
@@ -67,18 +71,16 @@ export default function ProfileScreen() {
               <Text style={styles.avatarText}>{initial}</Text>
             </View>
           )}
-        </View>
+          <View style={styles.avatarEditBadge}>
+            <Text style={styles.avatarEditIcon}>✎</Text>
+          </View>
+        </TouchableOpacity>
 
         {/* Name + subtitle */}
         <Text style={styles.name}>{displayName || 'Your name'}</Text>
         <Text style={styles.subtitle}>
           {city ? `${city}  ·  ` : ''}{joinedDate ? `joined ${joinedDate}` : ''}
         </Text>
-
-        {/* Edit profile */}
-        <TouchableOpacity style={styles.editBtn} onPress={() => router.push('/settings/profile')}>
-          <Text style={styles.editBtnText}>Edit profile</Text>
-        </TouchableOpacity>
 
         {/* Stats */}
         <View style={styles.stats}>
@@ -93,16 +95,18 @@ export default function ProfileScreen() {
         </View>
 
         {/* Bio */}
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Bio</Text>
-          {profile?.bio ? (
-            <Text style={styles.bioText}>{profile.bio}</Text>
-          ) : (
-            <TouchableOpacity onPress={() => router.push('/settings/profile')}>
-              <Text style={styles.bioEmpty}>Add a bio →</Text>
-            </TouchableOpacity>
-          )}
-        </View>
+        {(profile?.bio || true) && (
+          <View style={styles.section}>
+            <Text style={styles.sectionTitle}>Bio</Text>
+            {profile?.bio ? (
+              <Text style={styles.bioText}>{profile.bio}</Text>
+            ) : (
+              <TouchableOpacity onPress={() => router.push('/settings/profile')}>
+                <Text style={styles.bioEmpty}>Add a bio →</Text>
+              </TouchableOpacity>
+            )}
+          </View>
+        )}
 
         {/* Favorites / Interests */}
         {(profile?.interests?.length ?? 0) > 0 && (
@@ -113,6 +117,45 @@ export default function ProfileScreen() {
                 <View key={tag} style={styles.tag}>
                   <Text style={styles.tagText}>{tag}</Text>
                 </View>
+              ))}
+            </View>
+          </View>
+        )}
+
+        {/* My clubs */}
+        {clubs.length > 0 && (
+          <View style={styles.section}>
+            <Text style={styles.sectionTitle}>My clubs</Text>
+            <View style={styles.clubsList}>
+              {clubs.map(club => (
+                <TouchableOpacity
+                  key={club.id}
+                  style={styles.clubRow}
+                  onPress={() => router.push(`/club/${club.id}` as any)}
+                  onLongPress={() => {
+                    Alert.alert('Leave club', `Leave ${club.name}?`, [
+                      { text: 'Cancel', style: 'cancel' },
+                      { text: 'Leave', style: 'destructive', onPress: async () => {
+                        await supabase.from('club_members').delete().eq('club_id', club.id).eq('user_id', user!.id);
+                        setClubs(prev => prev.filter(c => c.id !== club.id));
+                        setClubsCount(prev => Math.max(prev - 1, 0));
+                      }},
+                    ]);
+                  }}
+                  activeOpacity={0.7}
+                >
+                  {club.cover_url
+                    ? <Image source={{ uri: club.cover_url }} style={styles.clubAvatar} />
+                    : <View style={[styles.clubAvatar, styles.clubAvatarFallback]}>
+                        <Text style={styles.clubAvatarInitial}>{club.name.charAt(0).toUpperCase()}</Text>
+                      </View>
+                  }
+                  <View style={{ flex: 1 }}>
+                    <Text style={styles.clubName}>{club.name}</Text>
+                    {club.category ? <Text style={styles.clubCategory}>{club.category}</Text> : null}
+                  </View>
+                  <Text style={styles.clubLeaveHint}>hold to leave</Text>
+                </TouchableOpacity>
               ))}
             </View>
           </View>
@@ -128,23 +171,31 @@ const styles = StyleSheet.create({
   topBar: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingVertical: 8, marginBottom: 4 },
   settingsIcon: { fontSize: 22, color: Colors.black }, // unused, kept for safety
   pageTitle: { fontSize: 32, fontWeight: '700', fontFamily: Fonts.bold, color: Colors.black, marginBottom: 24, letterSpacing: -0.5 },
-  avatarWrap: { alignItems: 'flex-start', marginBottom: 16 },
+  avatarWrap: { alignSelf: 'flex-start', marginBottom: 16, position: 'relative' },
   avatar: { width: 80, height: 80, borderRadius: 40, backgroundColor: Colors.lime, alignItems: 'center', justifyContent: 'center' },
   avatarText: { fontSize: 36, fontWeight: '700', fontFamily: Fonts.bold, color: Colors.black },
+  avatarEditBadge: { position: 'absolute', bottom: 0, right: 0, width: 26, height: 26, borderRadius: 13, backgroundColor: Colors.black, alignItems: 'center', justifyContent: 'center', borderWidth: 2, borderColor: Colors.white },
+  avatarEditIcon: { fontSize: 12, color: Colors.white },
   name: { fontSize: 26, fontWeight: '700', fontFamily: Fonts.bold, color: Colors.black, marginBottom: 4 },
-  subtitle: { fontSize: 14, color: Colors.gray, fontFamily: Fonts.regular, marginBottom: 24 },
-  stats: { flexDirection: 'row', gap: 10, marginBottom: 32 },
-  statCard: { flex: 1, backgroundColor: Colors.grayLight, borderRadius: 14, padding: 14, alignItems: 'center', gap: 2 },
+  subtitle: { fontSize: 12, color: Colors.gray, fontFamily: Fonts.regular, marginBottom: 24 },
+  stats: { flexDirection: 'row', gap: 10, marginBottom: 36 },
+  statCard: { flex: 1, backgroundColor: Colors.grayLight, borderRadius: 16, padding: 16, alignItems: 'center', gap: 2 },
   statCardLime: { backgroundColor: Colors.lime },
   statNum: { fontSize: 22, fontWeight: '700', fontFamily: Fonts.bold, color: Colors.black },
   statLabel: { fontSize: 12, color: Colors.gray, fontFamily: Fonts.regular },
-  section: { marginBottom: 24 },
-  sectionTitle: { fontSize: 18, fontWeight: '700', fontFamily: Fonts.bold, color: Colors.black, marginBottom: 12 },
-  bioText: { fontSize: 15, color: Colors.gray, fontFamily: Fonts.regular, lineHeight: 22 },
+  section: { marginBottom: 32, paddingTop: 24, borderTopWidth: 1, borderTopColor: Colors.grayBorder },
+  sectionTitle: { fontSize: 13, fontWeight: '700', fontFamily: Fonts.semibold, color: Colors.gray, letterSpacing: 0.8, textTransform: 'uppercase', marginBottom: 14 },
+  bioText: { fontSize: 15, color: Colors.black, fontFamily: Fonts.regular, lineHeight: 23 },
   bioEmpty: { fontSize: 15, color: Colors.gray, fontFamily: Fonts.regular },
-  editBtn: { alignSelf: 'flex-start', borderWidth: 1.5, borderColor: Colors.grayBorder, borderRadius: 50, paddingHorizontal: 18, paddingVertical: 8, marginBottom: 24 },
-  editBtnText: { fontSize: 14, fontWeight: '500', fontFamily: Fonts.medium, color: Colors.black },
+  clubsList: { gap: 4 },
+  clubRow: { flexDirection: 'row', alignItems: 'center', gap: 12, paddingVertical: 10, borderBottomWidth: 1, borderBottomColor: Colors.grayBorder },
+  clubAvatar: { width: 42, height: 42, borderRadius: 12 },
+  clubAvatarFallback: { backgroundColor: Colors.lime, alignItems: 'center', justifyContent: 'center' },
+  clubAvatarInitial: { fontSize: 18, fontWeight: '700', color: Colors.black, fontFamily: Fonts.bold },
+  clubName: { fontSize: 15, fontWeight: '600', color: Colors.black, fontFamily: Fonts.semibold },
+  clubCategory: { fontSize: 12, color: Colors.gray, fontFamily: Fonts.regular, marginTop: 1 },
+  clubLeaveHint: { fontSize: 11, color: Colors.grayBorder, fontFamily: Fonts.regular },
   tags: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
-  tag: { paddingHorizontal: 16, paddingVertical: 8, borderRadius: 50, borderWidth: 1.5, borderColor: Colors.grayBorder },
-  tagText: { fontSize: 14, fontFamily: Fonts.regular, color: Colors.black },
+  tag: { paddingHorizontal: 14, paddingVertical: 7, borderRadius: 50, backgroundColor: Colors.grayLight },
+  tagText: { fontSize: 13, fontFamily: Fonts.regular, color: Colors.black },
 });
