@@ -7,6 +7,7 @@ import { Colors } from '@/constants/colors';
 import { WMark } from '@/components/ui/WMark';
 import { Toast } from '@/components/ui/Toast';
 import { Input } from '@/components/ui/Input';
+import { VenueInput } from '@/components/ui/VenueInput';
 import { Button } from '@/components/ui/Button';
 import { supabase } from '@/lib/supabase';
 import { useAuth } from '@/hooks/useAuth';
@@ -21,6 +22,8 @@ export default function CreateStep3Screen() {
   const [time, setTime] = useState(new Date());
   const [duration, setDuration] = useState('2');
   const [venue, setVenue] = useState('');
+  const [venueLat, setVenueLat] = useState<number | undefined>();
+  const [venueLng, setVenueLng] = useState<number | undefined>();
   const [price, setPrice] = useState('0');
   const [loading, setLoading] = useState(false);
   const [showDate, setShowDate] = useState(false);
@@ -49,6 +52,8 @@ export default function CreateStep3Screen() {
       time: eventTime,
       duration: parseFloat(String(duration)) || 2,
       venue: venue.trim(),
+      lat: venueLat ?? null,
+      lng: venueLng ?? null,
       price: priceNum,
       is_free: priceNum === 0,
       going_count: 1,
@@ -128,11 +133,13 @@ export default function CreateStep3Screen() {
           </View>
 
           {/* Venue */}
-          <Input
-            label="Venue"
+          <VenueInput
             value={venue}
-            onChangeText={setVenue}
-            placeholder="Tap to set venue"
+            onChange={(v, lat, lng) => {
+              setVenue(v);
+              setVenueLat(lat);
+              setVenueLng(lng);
+            }}
           />
 
           {/* Price */}
