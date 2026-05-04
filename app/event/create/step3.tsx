@@ -28,19 +28,10 @@ export default function CreateStep3Screen() {
   const [toast, setToast] = useState(false);
 
   async function handleShare() {
-    if (!user) return;
-    if (!venue) { Alert.alert('Missing venue', 'Please enter a venue or location.'); return; }
+    if (!user) { Alert.alert('Not logged in', 'Please log in and try again.'); return; }
+    if (!venue.trim()) { Alert.alert('Missing venue', 'Please enter a venue or location.'); return; }
+    if (!params.title) { Alert.alert('Missing title', 'Go back and enter an event name.'); return; }
     setLoading(true);
-
-    let cover_url: string | null = null;
-    if (params.cover) {
-      const ext = params.cover.split('.').pop();
-      const path = `events/${Date.now()}.${ext}`;
-      const blob = await fetch(params.cover).then(r => r.blob());
-      await supabase.storage.from('event-covers').upload(path, blob);
-      const { data } = supabase.storage.from('event-covers').getPublicUrl(path);
-      cover_url = data.publicUrl;
-    }
 
     const eventDate = date.toISOString().split('T')[0];
     const eventTime = `${time.getHours().toString().padStart(2, '0')}:${time.getMinutes().toString().padStart(2, '0')}`;
@@ -48,14 +39,14 @@ export default function CreateStep3Screen() {
 
     const { data, error } = await supabase.from('events').insert({
       creator_id: user.id,
-      title: params.title,
-      tagline: params.tagline,
-      category: params.category,
-      cover_url,
+      title: String(params.title),
+      tagline: String(params.tagline || ''),
+      category: String(params.category || 'Other'),
+      cover_url: null,
       date: eventDate,
       time: eventTime,
-      duration: parseFloat(duration) || 2,
-      venue,
+      duration: parseFloat(String(duration)) || 2,
+      venue: venue.trim(),
       price: priceNum,
       is_free: priceNum === 0,
       going_count: 1,
@@ -63,7 +54,6 @@ export default function CreateStep3Screen() {
     }).select().single();
 
     if (!error && data) {
-      // Also add creator as attendee
       await supabase.from('event_attendees').insert({ event_id: data.id, user_id: user.id, paid: true });
     }
 

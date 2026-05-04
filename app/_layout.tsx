@@ -38,6 +38,7 @@ export default function RootLayout() {
             <Stack.Screen name="event/create/step1" options={{ animation: 'slide_from_bottom', presentation: 'modal' }} />
             <Stack.Screen name="event/create/step2" options={{ animation: 'slide_from_right' }} />
             <Stack.Screen name="event/create/step3" options={{ animation: 'slide_from_right' }} />
+            <Stack.Screen name="event/create/published" options={{ animation: 'fade', gestureEnabled: false }} />
             <Stack.Screen name="club/[id]" options={{ animation: 'slide_from_right' }} />
             <Stack.Screen name="club/create" options={{ animation: 'slide_from_right' }} />
             <Stack.Screen name="chat/[roomId]" options={{ animation: 'slide_from_right' }} />
