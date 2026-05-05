@@ -46,8 +46,8 @@ export default function BookedScreen() {
       .filter((e: any) => e?.id);
 
     const filtered = tab === 'upcoming'
-      ? allEvents.filter(e => e.date >= now)
-      : allEvents.filter(e => e.date < now);
+      ? allEvents.filter(e => e.date >= now && e.status !== 'cancelled')
+      : allEvents.filter(e => e.date < now && e.status !== 'cancelled');
 
     setEvents(filtered.sort((a, b) => a.date.localeCompare(b.date)));
 

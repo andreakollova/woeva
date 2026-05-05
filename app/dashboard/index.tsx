@@ -185,7 +185,7 @@ export default function DashboardScreen() {
   const [savingBilling, setSavingBilling] = useState(false);
 
   // Events tab
-  const [eventsFilter, setEventsFilter] = useState<'upcoming' | 'past'>('upcoming');
+  const [eventsFilter, setEventsFilter] = useState<'upcoming' | 'past' | 'cancelled'>('upcoming');
 
   // Stats tab
   const [statsRange, setStatsRange] = useState<'week' | 'month' | 'all'>('all');
@@ -340,9 +340,10 @@ export default function DashboardScreen() {
   const weekNet = events.filter(e => new Date(e.date) >= d7).reduce((s, e) => s + e.net, 0);
   const monthNet = events.filter(e => new Date(e.date) >= d30).reduce((s, e) => s + e.net, 0);
 
-  const upcomingEvents = events.filter(isUpcoming);
-  const pastEvents = events.filter(e => !isUpcoming(e));
-  const displayedEvents = eventsFilter === 'upcoming' ? upcomingEvents : pastEvents;
+  const upcomingEvents = events.filter(e => isUpcoming(e) && e.status !== 'cancelled');
+  const pastEvents = events.filter(e => !isUpcoming(e) && e.status !== 'cancelled');
+  const cancelledEvents = events.filter(e => e.status === 'cancelled');
+  const displayedEvents = eventsFilter === 'upcoming' ? upcomingEvents : eventsFilter === 'past' ? pastEvents : cancelledEvents;
 
   if (loading) {
     return (
@@ -557,12 +558,14 @@ export default function DashboardScreen() {
         {activeTab === 'events' && (
           <>
             <View style={s.segment}>
-              {(['upcoming', 'past'] as const).map(f => (
-                <TouchableOpacity key={f} style={[s.segmentItem, eventsFilter === f && s.segmentItemActive]}
-                  onPress={() => setEventsFilter(f)} activeOpacity={0.8}>
-                  <Text style={[s.segmentText, eventsFilter === f && s.segmentTextActive]}>
-                    {f === 'upcoming' ? `Upcoming (${upcomingEvents.length})` : `Past (${pastEvents.length})`}
-                  </Text>
+              {([
+                { key: 'upcoming', label: `Upcoming (${upcomingEvents.length})` },
+                { key: 'past', label: `Past (${pastEvents.length})` },
+                { key: 'cancelled', label: `Cancelled (${cancelledEvents.length})` },
+              ] as const).map(f => (
+                <TouchableOpacity key={f.key} style={[s.segmentItem, eventsFilter === f.key && s.segmentItemActive]}
+                  onPress={() => setEventsFilter(f.key)} activeOpacity={0.8}>
+                  <Text style={[s.segmentText, eventsFilter === f.key && s.segmentTextActive]}>{f.label}</Text>
                 </TouchableOpacity>
               ))}
             </View>
@@ -570,7 +573,9 @@ export default function DashboardScreen() {
             {displayedEvents.length === 0 ? (
               <View style={s.emptyBox}>
                 <Text style={s.emptyTitle}>No {eventsFilter} events</Text>
-                <Text style={s.emptySub}>{eventsFilter === 'upcoming' ? 'Create an event to see it here.' : 'Your past events will appear here.'}</Text>
+                <Text style={s.emptySub}>
+                  {eventsFilter === 'upcoming' ? 'Create an event to see it here.' : eventsFilter === 'past' ? 'Your past events will appear here.' : 'Cancelled events will appear here.'}
+                </Text>
               </View>
             ) : (
               <View style={s.listCard}>
