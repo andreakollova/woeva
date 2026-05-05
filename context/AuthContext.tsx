@@ -1,5 +1,7 @@
 import React, { createContext, useContext, useEffect, useState } from 'react';
+import { Platform } from 'react-native';
 import { Session, User } from '@supabase/supabase-js';
+import * as Notifications from 'expo-notifications';
 import { supabase } from '@/lib/supabase';
 import { Profile } from '@/types';
 
@@ -34,6 +36,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       setUser(session?.user ?? null);
       if (session?.user) {
         fetchProfile(session.user.id);
+        registerPushToken(session.user.id);
       } else {
         setProfile(null);
         setLoading(false);
@@ -47,6 +50,21 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     const { data } = await supabase.from('profiles').select('*').eq('id', userId).single();
     setProfile(data);
     setLoading(false);
+  }
+
+  async function registerPushToken(userId: string) {
+    if (Platform.OS === 'web') return;
+    try {
+      const { status: existing } = await Notifications.getPermissionsAsync();
+      let finalStatus = existing;
+      if (existing !== 'granted') {
+        const { status } = await Notifications.requestPermissionsAsync();
+        finalStatus = status;
+      }
+      if (finalStatus !== 'granted') return;
+      const token = (await Notifications.getExpoPushTokenAsync()).data;
+      await supabase.from('profiles').update({ push_token: token }).eq('id', userId);
+    } catch (_) {}
   }
 
   async function signOut() {

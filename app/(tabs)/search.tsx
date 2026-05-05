@@ -9,6 +9,8 @@ import { supabase } from '@/lib/supabase';
 import { Event } from '@/types';
 import { EventCard } from '@/components/ui/EventCard';
 import { Button } from '@/components/ui/Button';
+import { WMark } from '@/components/ui/WMark';
+import { Fonts } from '@/constants/fonts';
 
 export default function SearchScreen() {
   const insets = useSafeAreaInsets();
@@ -46,6 +48,11 @@ export default function SearchScreen() {
   return (
     <View style={[styles.container, { paddingTop: insets.top }]}>
       {/* Header */}
+      <View style={styles.topBar}>
+        <TouchableOpacity onPress={() => router.push('/(tabs)')} activeOpacity={0.7}>
+          <WMark size={34} color={Colors.lime} />
+        </TouchableOpacity>
+      </View>
       <View style={styles.header}>
         <Text style={styles.title}>Discover</Text>
         <View style={styles.searchBar}>
@@ -136,8 +143,9 @@ const mapStyle = [
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: Colors.white },
+  topBar: { alignItems: 'center', paddingVertical: 10 },
   header: { paddingHorizontal: 20, paddingBottom: 12 },
-  title: { fontSize: 28, fontWeight: '700', color: Colors.black, marginBottom: 12, letterSpacing: -0.5 },
+  title: { fontSize: 28, fontWeight: '700', fontFamily: Fonts.bold, color: Colors.black, marginBottom: 12, letterSpacing: -0.5 },
   searchBar: {
     backgroundColor: Colors.grayLight,
     borderRadius: 50,

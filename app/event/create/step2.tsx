@@ -1,22 +1,33 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, ScrollView, KeyboardAvoidingView, Platform, Image } from 'react-native';
 import { useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import * as ImagePicker from 'expo-image-picker';
 import { Colors } from '@/constants/colors';
+import { Fonts } from '@/constants/fonts';
 import { WMark } from '@/components/ui/WMark';
 import { Input } from '@/components/ui/Input';
 import { Button } from '@/components/ui/Button';
 import { CATEGORIES } from '@/types';
+import { supabase } from '@/lib/supabase';
+import { useAuth } from '@/context/AuthContext';
 
 export default function CreateStep2Screen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
+  const { user, profile } = useAuth();
   const [title, setTitle] = useState('');
   const [tagline, setTagline] = useState('');
   const [category, setCategory] = useState('');
   const [cover, setCover] = useState<string | null>(null);
   const [showCategories, setShowCategories] = useState(false);
+  const [clubName, setClubName] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!user) return;
+    supabase.from('clubs').select('name').eq('creator_id', user.id).limit(1).single()
+      .then(({ data }) => setClubName(data?.name ?? null));
+  }, [user]);
 
   async function pickImage() {
     const result = await ImagePicker.launchImageLibraryAsync({ mediaTypes: ['images'], quality: 0.8, aspect: [16, 9] });
@@ -27,6 +38,8 @@ export default function CreateStep2Screen() {
     if (!title) return;
     router.push({ pathname: '/event/create/step3', params: { title, tagline, category, cover: cover ?? '' } });
   }
+
+  const posterName = clubName ?? profile?.name ?? 'You';
 
   return (
     <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
@@ -50,6 +63,21 @@ export default function CreateStep2Screen() {
             onChangeText={setTitle}
             placeholder="Partička hokej turnaj"
           />
+
+          {/* Posted under */}
+          {title.length > 0 && (
+            <View style={styles.posterRow}>
+              <View style={styles.posterInfo}>
+                <Text style={styles.posterLabel}>Posted under</Text>
+                <Text style={styles.posterName}>{posterName}</Text>
+              </View>
+              {!clubName && (
+                <TouchableOpacity onPress={() => router.push('/club/create/index' as any)} activeOpacity={0.7}>
+                  <Text style={styles.createClubLink}>Create a club →</Text>
+                </TouchableOpacity>
+              )}
+            </View>
+          )}
           <Input
             label="Tagline"
             value={tagline}
@@ -127,4 +155,9 @@ const styles = StyleSheet.create({
   coverPlus: { fontSize: 32, color: Colors.gray },
   coverHint: { fontSize: 14, color: Colors.gray },
   footer: { paddingHorizontal: 24, paddingTop: 12, borderTopWidth: 1, borderColor: Colors.grayBorder, gap: 8, backgroundColor: Colors.white },
+  posterRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', backgroundColor: Colors.grayLight, borderRadius: 12, paddingHorizontal: 14, paddingVertical: 12 },
+  posterInfo: { gap: 2 },
+  posterLabel: { fontSize: 11, fontWeight: '600', color: Colors.gray, fontFamily: Fonts.medium, textTransform: 'uppercase', letterSpacing: 0.5 },
+  posterName: { fontSize: 15, fontWeight: '600', color: Colors.black, fontFamily: Fonts.semibold },
+  createClubLink: { fontSize: 13, fontWeight: '600', color: Colors.black, fontFamily: Fonts.semibold },
 });

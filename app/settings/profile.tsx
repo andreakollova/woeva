@@ -4,6 +4,7 @@ import { View, Text, StyleSheet, TouchableOpacity, ScrollView, KeyboardAvoidingV
 import { useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import * as ImagePicker from 'expo-image-picker';
+import * as FileSystem from 'expo-file-system';
 import { Colors } from '@/constants/colors';
 import { Fonts } from '@/constants/fonts';
 import { Button } from '@/components/ui/Button';
@@ -37,12 +38,20 @@ export default function EditProfileScreen() {
 
     let avatar_url = profile?.avatar_url ?? null;
     if (avatar && avatar !== profile?.avatar_url) {
-      const ext = avatar.split('.').pop()?.toLowerCase()?.replace('heic', 'jpg') ?? 'jpg';
+      // Convert ph:// (simulator) to file:// URI
+      let uploadUri = avatar;
+      if (avatar.startsWith('ph://')) {
+        const ext2 = avatar.split('.').pop()?.toLowerCase()?.replace('heic', 'jpg') ?? 'jpg';
+        const dest = FileSystem.cacheDirectory + `avatar_${Date.now()}.${ext2}`;
+        await FileSystem.copyAsync({ from: avatar, to: dest });
+        uploadUri = dest;
+      }
+      const ext = uploadUri.split('.').pop()?.toLowerCase()?.replace('heic', 'jpg') ?? 'jpg';
       const mime = ext === 'png' ? 'image/png' : 'image/jpeg';
       const path = `avatars/${user.id}.${ext}`;
 
       const formData = new FormData();
-      formData.append('file', { uri: avatar, name: `avatar.${ext}`, type: mime } as any);
+      formData.append('file', { uri: uploadUri, name: `avatar.${ext}`, type: mime } as any);
 
       const { error: uploadError } = await supabase.storage
         .from('avatars')

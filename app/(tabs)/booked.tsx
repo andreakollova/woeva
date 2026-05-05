@@ -43,7 +43,7 @@ export default function BookedScreen() {
 
     const allEvents: BookedEvent[] = (data ?? [])
       .map((r: any) => ({ ...r.event, attendee_id: r.id }))
-      .filter(Boolean);
+      .filter((e: any) => e && e.creator_id !== user.id);
 
     const filtered = tab === 'upcoming'
       ? allEvents.filter(e => e.date >= now)

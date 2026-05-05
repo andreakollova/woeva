@@ -29,13 +29,17 @@ export default function ProfileScreen() {
   const [eventsCount, setEventsCount] = useState(0);
   const [clubsCount, setClubsCount] = useState(0);
   const [clubs, setClubs] = useState<{ id: string; name: string; cover_url: string | null; category: string }[]>([]);
+  const [myEvents, setMyEvents] = useState<{ id: string; title: string; date: string; cover_url: string | null }[]>([]);
 
   useEffect(() => {
     if (!user) return;
     supabase.from('event_attendees').select('id', { count: 'exact' }).eq('user_id', user.id).then(({ count }) => setEventsCount(count ?? 0));
-    supabase.from('club_members').select('id, club:clubs(id, name, cover_url, category)').eq('user_id', user.id).eq('status', 'approved').then(({ data, count }) => {
+    supabase.from('club_members').select('id, club:clubs(id, name, cover_url, category)').eq('user_id', user.id).eq('status', 'approved').then(({ data }) => {
       setClubsCount(data?.length ?? 0);
       setClubs((data ?? []).map((r: any) => r.club).filter(Boolean));
+    });
+    supabase.from('events').select('id, title, date, cover_url').eq('creator_id', user.id).order('date', { ascending: true }).then(({ data }) => {
+      setMyEvents(data ?? []);
     });
   }, [user]);
 
@@ -118,6 +122,48 @@ export default function ProfileScreen() {
                   <Text style={styles.tagText}>{tag}</Text>
                 </View>
               ))}
+            </View>
+          </View>
+        )}
+
+        {/* My events */}
+        {myEvents.length > 0 && (
+          <View style={styles.section}>
+            <Text style={styles.sectionTitle}>My events</Text>
+            <View style={styles.clubsList}>
+              {myEvents.map(event => {
+                const d = new Date(event.date + 'T00:00:00');
+                const dateStr = d.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' });
+                return (
+                  <TouchableOpacity
+                    key={event.id}
+                    style={styles.clubRow}
+                    onPress={() => router.push(`/event/${event.id}` as any)}
+                    onLongPress={() => {
+                      Alert.alert('Delete event', `Delete "${event.title}"?`, [
+                        { text: 'Cancel', style: 'cancel' },
+                        { text: 'Delete', style: 'destructive', onPress: async () => {
+                          await supabase.from('events').delete().eq('id', event.id);
+                          setMyEvents(prev => prev.filter(e => e.id !== event.id));
+                        }},
+                      ]);
+                    }}
+                    activeOpacity={0.7}
+                  >
+                    {event.cover_url
+                      ? <Image source={{ uri: event.cover_url }} style={styles.clubAvatar} />
+                      : <View style={[styles.clubAvatar, styles.clubAvatarFallback]}>
+                          <Text style={styles.clubAvatarInitial}>{event.title.charAt(0).toUpperCase()}</Text>
+                        </View>
+                    }
+                    <View style={{ flex: 1 }}>
+                      <Text style={styles.clubName}>{event.title}</Text>
+                      <Text style={styles.clubCategory}>{dateStr}</Text>
+                    </View>
+                    <Text style={styles.clubLeaveHint}>hold to delete</Text>
+                  </TouchableOpacity>
+                );
+              })}
             </View>
           </View>
         )}

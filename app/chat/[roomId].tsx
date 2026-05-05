@@ -1,5 +1,6 @@
 import { BackButton } from '@/components/ui/BackButton';
 import React, { useEffect, useState, useRef } from 'react';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { View, Text, StyleSheet, FlatList, TextInput, TouchableOpacity, KeyboardAvoidingView, Platform } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -48,6 +49,8 @@ export default function ChatScreen() {
       .limit(100);
     setMessages(data ?? []);
     setTimeout(() => listRef.current?.scrollToEnd({ animated: false }), 100);
+    // Mark as read
+    await AsyncStorage.setItem(`chat_read_${roomId}`, new Date().toISOString());
   }
 
   async function loadEventTitle() {

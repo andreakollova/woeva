@@ -12,11 +12,12 @@ import { VenueInput } from '@/components/ui/VenueInput';
 import { Button } from '@/components/ui/Button';
 import { supabase } from '@/lib/supabase';
 import { useAuth } from '@/context/AuthContext';
+import * as FileSystem from 'expo-file-system';
 
 export default function CreateStep3Screen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
-  const { user } = useAuth();
+  const { user, profile } = useAuth();
   const params = useLocalSearchParams<{ title: string; tagline: string; category: string; cover: string }>();
 
   const [date, setDate] = useState(new Date());
@@ -51,10 +52,19 @@ export default function CreateStep3Screen() {
     let cover_url: string | null = null;
     if (params.cover) {
       try {
-        const blob = await fetch(params.cover).then(r => r.blob());
-        const ext = params.cover.split('.').pop() ?? 'jpg';
+        let uploadUri = params.cover;
+        if (uploadUri.startsWith('ph://')) {
+          const tmpExt = uploadUri.split('.').pop()?.toLowerCase()?.replace('heic', 'jpg') ?? 'jpg';
+          const dest = FileSystem.cacheDirectory + `cover_${Date.now()}.${tmpExt}`;
+          await FileSystem.copyAsync({ from: uploadUri, to: dest });
+          uploadUri = dest;
+        }
+        const ext = uploadUri.split('.').pop()?.toLowerCase()?.replace('heic', 'jpg') ?? 'jpg';
+        const mime = ext === 'png' ? 'image/png' : 'image/jpeg';
         const fileName = `${Date.now()}.${ext}`;
-        await supabase.storage.from('event-covers').upload(fileName, blob, { contentType: blob.type, upsert: true });
+        const formData = new FormData();
+        formData.append('file', { uri: uploadUri, name: `cover.${ext}`, type: mime } as any);
+        await supabase.storage.from('event-covers').upload(fileName, formData, { upsert: true, contentType: mime });
         const { data: urlData } = supabase.storage.from('event-covers').getPublicUrl(fileName);
         cover_url = urlData.publicUrl;
       } catch (_) {}
@@ -77,11 +87,38 @@ export default function CreateStep3Screen() {
       is_free: priceNum === 0,
       is_recurring: isRecurring,
       going_count: 1,
-      city: 'Bratislava',
+      city: profile?.city ?? 'Bratislava',
     }).select().single();
 
     if (!error && data) {
       await supabase.from('event_attendees').insert({ event_id: data.id, user_id: currentUser.id, paid: true });
+
+      // Send push notifications to club members
+      if (clubData?.id) {
+        const { data: members } = await supabase
+          .from('club_members')
+          .select('profile:profiles(push_token)')
+          .eq('club_id', clubData.id)
+          .eq('status', 'approved')
+          .neq('user_id', currentUser.id);
+
+        const tokens = (members ?? [])
+          .map((m: any) => m.profile?.push_token)
+          .filter(Boolean);
+
+        if (tokens.length > 0) {
+          fetch('https://exp.host/--/api/v2/push/send', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(tokens.map((token: string) => ({
+              to: token,
+              title: 'New event in your club',
+              body: String(params.title),
+              data: { eventId: data.id },
+            }))),
+          }).catch(() => {});
+        }
+      }
     }
 
     setLoading(false);
@@ -125,30 +162,37 @@ export default function CreateStep3Screen() {
             )}
           </View>
 
-          {/* Time + Duration */}
-          <View style={styles.row}>
-            <View style={{ flex: 1 }}>
-              <Text style={styles.label}>Time</Text>
-              <TouchableOpacity style={styles.field} onPress={() => setShowTime(true)}>
-                <Text style={styles.fieldValue}>{timeStr}</Text>
-              </TouchableOpacity>
-              {showTime && (
-                <DateTimePicker
-                  value={time}
-                  mode="time"
-                  display="spinner"
-                  onChange={(_, t) => { setShowTime(false); if (t) setTime(t); }}
-                />
-              )}
-            </View>
-            <View style={{ width: 80 }}>
-              <Text style={styles.label}>Duration</Text>
-              <Input
-                value={duration}
-                onChangeText={setDuration}
-                placeholder="2h"
-                keyboardType="numeric"
+          {/* Time */}
+          <View>
+            <Text style={styles.label}>Time</Text>
+            <TouchableOpacity style={styles.field} onPress={() => setShowTime(true)}>
+              <Text style={styles.fieldValue}>{timeStr}</Text>
+            </TouchableOpacity>
+            {showTime && (
+              <DateTimePicker
+                value={time}
+                mode="time"
+                display="spinner"
+                onChange={(_, t) => { setShowTime(false); if (t) setTime(t); }}
               />
+            )}
+          </View>
+
+          {/* Duration */}
+          <View>
+            <Text style={styles.label}>Duration</Text>
+            <View style={styles.durationRow}>
+              {['0.5', '1', '1.5', '2', '3', '4', '5', '6'].map(h => (
+                <TouchableOpacity
+                  key={h}
+                  style={[styles.durationChip, duration === h && styles.durationChipActive]}
+                  onPress={() => setDuration(h)}
+                >
+                  <Text style={[styles.durationChipText, duration === h && styles.durationChipTextActive]}>
+                    {h}h
+                  </Text>
+                </TouchableOpacity>
+              ))}
             </View>
           </View>
 
@@ -217,6 +261,11 @@ const styles = StyleSheet.create({
   field: { height: 52, borderWidth: 1.5, borderColor: Colors.grayBorder, borderRadius: 12, paddingHorizontal: 16, justifyContent: 'center' },
   fieldValue: { fontSize: 16, color: Colors.black },
   row: { flexDirection: 'row', gap: 12 },
+  durationRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
+  durationChip: { paddingHorizontal: 16, paddingVertical: 10, borderRadius: 50, backgroundColor: Colors.grayLight, borderWidth: 1.5, borderColor: 'transparent' },
+  durationChipActive: { backgroundColor: Colors.black, borderColor: Colors.black },
+  durationChipText: { fontSize: 14, fontWeight: '600', color: Colors.gray },
+  durationChipTextActive: { color: Colors.white },
   footer: { paddingHorizontal: 24, paddingTop: 12, borderTopWidth: 1, borderColor: Colors.grayBorder, gap: 8, backgroundColor: Colors.white },
   recurringRow: { flexDirection: 'row', alignItems: 'center', gap: 14, backgroundColor: Colors.grayLight, borderRadius: 12, padding: 14 },
   recurringText: { flex: 1 },
