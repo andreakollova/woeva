@@ -11,14 +11,14 @@ import { Input } from '@/components/ui/Input';
 import { VenueInput } from '@/components/ui/VenueInput';
 import { Button } from '@/components/ui/Button';
 import { supabase } from '@/lib/supabase';
+import { uploadImage } from '@/lib/uploadImage';
 import { useAuth } from '@/context/AuthContext';
-import * as FileSystem from 'expo-file-system';
 
 export default function CreateStep3Screen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const { user, profile } = useAuth();
-  const params = useLocalSearchParams<{ title: string; tagline: string; category: string; cover: string }>();
+  const params = useLocalSearchParams<{ title: string; tagline: string; category: string; cover: string; postAs: string }>();
 
   const [date, setDate] = useState(new Date());
   const [time, setTime] = useState(new Date());
@@ -45,29 +45,17 @@ export default function CreateStep3Screen() {
     const eventTime = `${time.getHours().toString().padStart(2, '0')}:${time.getMinutes().toString().padStart(2, '0')}`;
     const priceNum = parseFloat(price) || 0;
 
-    // Find creator's club
-    const { data: clubData } = await supabase.from('clubs').select('id').eq('creator_id', currentUser.id).limit(1).single();
+    // Find creator's club (only if posting as club)
+    const postAsClub = params.postAs !== 'individual';
+    const { data: clubData } = postAsClub
+      ? await supabase.from('clubs').select('id').eq('creator_id', currentUser.id).limit(1).single()
+      : { data: null };
 
     // Upload cover image if provided
     let cover_url: string | null = null;
     if (params.cover) {
-      try {
-        let uploadUri = params.cover;
-        if (uploadUri.startsWith('ph://')) {
-          const tmpExt = uploadUri.split('.').pop()?.toLowerCase()?.replace('heic', 'jpg') ?? 'jpg';
-          const dest = FileSystem.cacheDirectory + `cover_${Date.now()}.${tmpExt}`;
-          await FileSystem.copyAsync({ from: uploadUri, to: dest });
-          uploadUri = dest;
-        }
-        const ext = uploadUri.split('.').pop()?.toLowerCase()?.replace('heic', 'jpg') ?? 'jpg';
-        const mime = ext === 'png' ? 'image/png' : 'image/jpeg';
-        const fileName = `${Date.now()}.${ext}`;
-        const formData = new FormData();
-        formData.append('file', { uri: uploadUri, name: `cover.${ext}`, type: mime } as any);
-        await supabase.storage.from('event-covers').upload(fileName, formData, { upsert: true, contentType: mime });
-        const { data: urlData } = supabase.storage.from('event-covers').getPublicUrl(fileName);
-        cover_url = urlData.publicUrl;
-      } catch (_) {}
+      const ext = (params.cover.split('.').pop() ?? 'jpg').toLowerCase().replace('heic', 'jpg');
+      cover_url = await uploadImage(params.cover, 'event-covers', `${Date.now()}.${ext}`);
     }
 
     const { data, error } = await supabase.from('events').insert({
@@ -138,7 +126,9 @@ export default function CreateStep3Screen() {
         keyboardShouldPersistTaps="handled"
       >
         <View style={styles.stepRow}>
-          <WMark size={28} color={Colors.lime} />
+          <TouchableOpacity onPress={() => router.push('/(tabs)')} activeOpacity={0.7}>
+            <WMark size={28} color={Colors.lime} />
+          </TouchableOpacity>
           <View style={styles.stepBadge}><Text style={styles.stepText}>3 / 3</Text></View>
         </View>
 
@@ -257,9 +247,9 @@ const styles = StyleSheet.create({
   stepText: { fontSize: 13, fontWeight: '600', color: Colors.black },
   title: { fontSize: 28, fontWeight: '700', color: Colors.black, marginBottom: 28, letterSpacing: -0.5 },
   form: { gap: 20 },
-  label: { fontSize: 14, fontWeight: '500', color: Colors.black, marginBottom: 6 },
-  field: { height: 52, borderWidth: 1.5, borderColor: Colors.grayBorder, borderRadius: 12, paddingHorizontal: 16, justifyContent: 'center' },
-  fieldValue: { fontSize: 16, color: Colors.black },
+  label: { fontSize: 13, fontWeight: '500', color: Colors.black, marginBottom: 6 },
+  field: { height: 44, borderWidth: 1.5, borderColor: Colors.grayBorder, borderRadius: 12, paddingHorizontal: 14, justifyContent: 'center' },
+  fieldValue: { fontSize: 14, color: Colors.black },
   row: { flexDirection: 'row', gap: 12 },
   durationRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
   durationChip: { paddingHorizontal: 16, paddingVertical: 10, borderRadius: 50, backgroundColor: Colors.grayLight, borderWidth: 1.5, borderColor: 'transparent' },

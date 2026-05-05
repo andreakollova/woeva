@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { View, Text, StyleSheet, TouchableOpacity, Image, Alert, Dimensions, Modal, Share, Platform } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, Image, Alert, Dimensions, Modal, Share, Platform, TextInput, ScrollView as RNScrollView } from 'react-native';
 import QRCode from 'react-native-qrcode-svg';
 import { useLocalSearchParams, useRouter, useFocusEffect } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -31,6 +31,13 @@ const SAMPLE_AVATARS = [
   require('@/assets/images/sample_av4.jpg'),
 ];
 
+const CANCEL_REASONS = [
+  'Zdravotné problémy',
+  'Technické problémy',
+  'Rodinné dôvody',
+  'Iné',
+];
+
 type Attendee = { id: string; user_id: string; profile: { name: string | null; avatar_url: string | null } | null };
 
 export default function EventDetailScreen() {
@@ -48,6 +55,10 @@ export default function EventDetailScreen() {
   const [isMember, setIsMember] = useState(false);
   const [unreadCount, setUnreadCount] = useState(0);
   const [qrModal, setQrModal] = useState(false);
+  const [cancelModal, setCancelModal] = useState(false);
+  const [cancelReason, setCancelReason] = useState('');
+  const [cancelNote, setCancelNote] = useState('');
+  const [cancelling, setCancelling] = useState(false);
 
   const waveRot = useSharedValue(0);
   const waveStyle = useAnimatedStyle(() => ({
@@ -129,15 +140,47 @@ export default function EventDetailScreen() {
     }
   }
 
-  async function handleDelete() {
-    Alert.alert('Delete event', 'Are you sure?', [
-      { text: 'Cancel', style: 'cancel' },
-      { text: 'Delete', style: 'destructive', onPress: async () => {
-        await supabase.from('event_attendees').delete().eq('event_id', id);
-        await supabase.from('events').delete().eq('id', id);
-        router.replace('/(tabs)');
-      }},
-    ]);
+  async function handleCancel() {
+    if (!cancelReason || !event) return;
+    setCancelling(true);
+
+    const eventStart = new Date(`${event.date}T${event.time}`);
+    const hoursUntil = (eventStart.getTime() - Date.now()) / 3600000;
+    const refundEligible = hoursUntil >= 48;
+
+    await supabase.from('events').update({
+      status: 'cancelled',
+      cancelled_at: new Date().toISOString(),
+      cancellation_reason: cancelReason,
+      cancellation_note: cancelNote.trim() || null,
+    }).eq('id', id);
+
+    const { data: allAttendees } = await supabase
+      .from('event_attendees')
+      .select('user_id, paid, payment_intent_id')
+      .eq('event_id', id);
+
+    if (allAttendees && allAttendees.length > 0) {
+      const hasPaidWithIntent = allAttendees.some(a => a.paid && a.payment_intent_id);
+      const notifications = allAttendees.map(a => ({
+        user_id: a.user_id,
+        type: 'event_cancelled',
+        title: `${event.title} was cancelled`,
+        body: refundEligible && a.paid && a.payment_intent_id
+          ? 'A full refund will be processed to your original payment method.'
+          : 'Unfortunately no refund is available for this cancellation.',
+        data: { event_id: id },
+      }));
+      await supabase.from('notifications').insert(notifications);
+
+      if (refundEligible && !event.is_free && hasPaidWithIntent) {
+        await supabase.functions.invoke('refund-event', { body: { event_id: id } });
+      }
+    }
+
+    setCancelling(false);
+    setCancelModal(false);
+    setEvent(prev => prev ? { ...prev, status: 'cancelled' } : prev);
   }
 
   async function handleInvite() {
@@ -163,6 +206,7 @@ export default function EventDetailScreen() {
   const isCreator = !!user && event.creator_id === user.id;
   const isFree = event.is_free || event.price === 0;
   const priceLabel = isFree ? 'Free' : `€${event.price}`;
+  const eventPast = new Date(`${event.date}T${event.time}`) < new Date();
   const hostName = event.club?.name ?? creator?.name ?? '';
   const hostInitial = hostName.charAt(0).toUpperCase();
   const goingCount = Math.max(event.going_count ?? 0, attendees.length);
@@ -190,6 +234,54 @@ export default function EventDetailScreen() {
             </View>
             <Text style={s.qrModalHint}>Tap anywhere to close</Text>
           </View>
+        </TouchableOpacity>
+      </Modal>
+
+      {/* Cancel modal */}
+      <Modal visible={cancelModal} transparent animationType="slide" onRequestClose={() => setCancelModal(false)}>
+        <TouchableOpacity style={s.modalOverlay} activeOpacity={1} onPress={() => setCancelModal(false)}>
+          <TouchableOpacity activeOpacity={1} style={s.cancelSheet}>
+            <View style={s.cancelSheetHandle} />
+            <Text style={s.cancelSheetTitle}>Cancel event</Text>
+            <Text style={s.cancelSheetSub}>This cannot be undone. Attendees will be notified.</Text>
+
+            {CANCEL_REASONS.map(reason => (
+              <TouchableOpacity
+                key={reason}
+                style={[s.reasonRow, cancelReason === reason && s.reasonRowActive]}
+                onPress={() => setCancelReason(reason)}
+              >
+                <View style={[s.reasonRadio, cancelReason === reason && s.reasonRadioActive]}>
+                  {cancelReason === reason && <View style={s.reasonRadioDot} />}
+                </View>
+                <Text style={[s.reasonText, cancelReason === reason && s.reasonTextActive]}>{reason}</Text>
+              </TouchableOpacity>
+            ))}
+
+            {cancelReason === 'Iné' && (
+              <TextInput
+                style={s.cancelNoteInput}
+                value={cancelNote}
+                onChangeText={setCancelNote}
+                placeholder="Briefly explain the reason..."
+                placeholderTextColor={Colors.gray}
+                multiline
+                numberOfLines={2}
+                textAlignVertical="top"
+              />
+            )}
+
+            <View style={s.cancelActions}>
+              <Button label="Keep event" onPress={() => setCancelModal(false)} variant="ghost" />
+              <Button
+                label="Cancel event"
+                onPress={handleCancel}
+                loading={cancelling}
+                disabled={!cancelReason || cancelling}
+                variant="black"
+              />
+            </View>
+          </TouchableOpacity>
         </TouchableOpacity>
       </Modal>
 
@@ -227,19 +319,23 @@ export default function EventDetailScreen() {
           </View>
           {isCreator && (
             <View style={[s.topRight, { top: insets.top + 10 }]}>
-              <TouchableOpacity style={s.ctrlPill} onPress={() => router.push(`/event/${id}/edit` as any)}>
-                <Svg width={13} height={13} viewBox="0 0 24 24" fill="none">
-                  <Path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7" stroke="white" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" />
-                  <Path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z" stroke="white" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" />
-                </Svg>
-                <Text style={s.ctrlPillText}>Edit</Text>
-              </TouchableOpacity>
-              <TouchableOpacity style={s.ctrlPill} onPress={handleDelete}>
-                <Svg width={13} height={13} viewBox="0 0 24 24" fill="none">
-                  <Path d="M3 6h18M8 6V4h8v2M19 6l-1 14H6L5 6" stroke="#FF6B6B" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" />
-                </Svg>
-                <Text style={[s.ctrlPillText, s.ctrlPillDanger]}>Delete</Text>
-              </TouchableOpacity>
+              {event.status !== 'cancelled' && (
+                <TouchableOpacity style={s.ctrlPill} onPress={() => router.push(`/event/${id}/edit` as any)}>
+                  <Svg width={13} height={13} viewBox="0 0 24 24" fill="none">
+                    <Path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7" stroke="white" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" />
+                    <Path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z" stroke="white" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" />
+                  </Svg>
+                  <Text style={s.ctrlPillText}>Edit</Text>
+                </TouchableOpacity>
+              )}
+              {event.status !== 'cancelled' && (
+                <TouchableOpacity style={s.ctrlPill} onPress={() => { setCancelReason(''); setCancelNote(''); setCancelModal(true); }}>
+                  <Svg width={13} height={13} viewBox="0 0 24 24" fill="none">
+                    <Path d="M18 6L6 18M6 6l12 12" stroke="#FF6B6B" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" />
+                  </Svg>
+                  <Text style={[s.ctrlPillText, s.ctrlPillDanger]}>Cancel</Text>
+                </TouchableOpacity>
+              )}
             </View>
           )}
 
@@ -262,8 +358,21 @@ export default function EventDetailScreen() {
         {/* ── Body ── */}
         <Animated.View entering={FadeInDown.delay(60).springify()} style={s.body}>
 
+          {/* ── Cancelled banner ── */}
+          {event.status === 'cancelled' && (
+            <View style={s.cancelledBanner}>
+              <Svg width={16} height={16} viewBox="0 0 24 24" fill="none">
+                <Path d="M18 6L6 18M6 6l12 12" stroke="#FF6B6B" strokeWidth={2.5} strokeLinecap="round" />
+              </Svg>
+              <View style={{ flex: 1 }}>
+                <Text style={s.cancelledBannerTitle}>Event cancelled</Text>
+                {event.cancellation_reason ? <Text style={s.cancelledBannerSub}>{event.cancellation_reason}{event.cancellation_note ? ` — ${event.cancellation_note}` : ''}</Text> : null}
+              </View>
+            </View>
+          )}
+
           {/* ── You're going card ── */}
-          {isAttending && user && (
+          {isAttending && user && event.status !== 'cancelled' && (
             <TouchableOpacity style={s.goingBanner} onPress={() => router.push('/(tabs)/booked')} activeOpacity={0.85}>
               <View style={s.liveDot} />
               <Text style={s.goingBannerText}>You're going</Text>
@@ -420,33 +529,45 @@ export default function EventDetailScreen() {
       </Animated.ScrollView>
 
       {/* ── CTA ── */}
-      <View style={[s.cta, { paddingBottom: insets.bottom + 12 }]}>
-        {!authLoading && !user && (
-          <View style={s.guestRow}>
-            <Text style={s.guestText}>Join to attend events</Text>
-            <TouchableOpacity onPress={() => router.push('/(auth)/login')}>
-              <Text style={s.guestLink}>Log in</Text>
-            </TouchableOpacity>
-          </View>
-        )}
-        {user && isAttending
-          ? (
-            <View style={s.attendingRow}>
-              <Button label="✓  You're going" onPress={() => {}} variant="lime" disabled style={s.attendingBtn} textStyle={{ fontSize: 13 }} />
-              <TouchableOpacity style={s.ticketBtn} onPress={handleInvite} activeOpacity={0.8}>
-                <Animated.Text style={[s.ticketBtnEmoji, waveStyle]}>👋</Animated.Text>
-                <Text style={s.ticketBtnText}>Invite a friend</Text>
+      {event.status !== 'cancelled' && (
+        <View style={[s.cta, { paddingBottom: insets.bottom + 12 }]}>
+          {!authLoading && !user && (
+            <View style={s.guestRow}>
+              <Text style={s.guestText}>Join to attend events</Text>
+              <TouchableOpacity onPress={() => router.push('/(auth)/login')}>
+                <Text style={s.guestLink}>Log in</Text>
               </TouchableOpacity>
             </View>
-          )
-          : <Button
-              label={user ? (isFree ? 'Join — it\'s free' : `Buy ticket  ·  ${priceLabel}`) : 'Get Woeva — Join free'}
-              onPress={handleJoin}
-              loading={loading}
-              variant="lime"
-            />
-        }
-      </View>
+          )}
+          {user && isAttending && eventPast
+            ? (
+              <View style={s.attendingRow}>
+                <Button label="✓  You went" onPress={() => {}} variant="lime" disabled style={s.attendingBtn} textStyle={{ fontSize: 13 }} />
+                <TouchableOpacity style={s.ticketBtn} onPress={() => router.push(`/event/${id}/rate` as any)} activeOpacity={0.8}>
+                  <Text style={s.ticketBtnEmoji}>★</Text>
+                  <Text style={s.ticketBtnText}>Rate event</Text>
+                </TouchableOpacity>
+              </View>
+            )
+            : user && isAttending
+            ? (
+              <View style={s.attendingRow}>
+                <Button label="✓  You're going" onPress={() => {}} variant="lime" disabled style={s.attendingBtn} textStyle={{ fontSize: 13 }} />
+                <TouchableOpacity style={s.ticketBtn} onPress={handleInvite} activeOpacity={0.8}>
+                  <Animated.Text style={[s.ticketBtnEmoji, waveStyle]}>👋</Animated.Text>
+                  <Text style={s.ticketBtnText}>Invite a friend</Text>
+                </TouchableOpacity>
+              </View>
+            )
+            : <Button
+                label={user ? (isFree ? 'Join — it\'s free' : `Buy ticket  ·  ${priceLabel}`) : 'Get Woeva — Join free'}
+                onPress={handleJoin}
+                loading={loading}
+                variant="lime"
+              />
+          }
+        </View>
+      )}
     </View>
   );
 }
@@ -461,8 +582,8 @@ const s = StyleSheet.create({
   coverGradient: { position: 'absolute', top: 0, left: 0, right: 0, bottom: 0 },
   topLeft: { position: 'absolute', left: 16 },
   topRight: { position: 'absolute', right: 16, flexDirection: 'row', gap: 8 },
-  backBtn: { backgroundColor: 'rgba(0,0,0,0.52)', borderRadius: 20 },
-  ctrlPill: { backgroundColor: 'rgba(0,0,0,0.52)', borderRadius: 20, paddingHorizontal: 14, paddingVertical: 8, flexDirection: 'row', alignItems: 'center', gap: 5 },
+  backBtn: { backgroundColor: '#000', borderRadius: 20 },
+  ctrlPill: { backgroundColor: '#000', borderRadius: 20, paddingHorizontal: 14, paddingVertical: 8, flexDirection: 'row', alignItems: 'center', gap: 5 },
   ctrlPillText: { fontSize: 13, fontWeight: '600', color: Colors.white },
   ctrlPillDanger: { color: '#FF6B6B' },
 
@@ -546,6 +667,27 @@ const s = StyleSheet.create({
   unreadBadgeText: { fontSize: 11, fontWeight: '700', color: Colors.white },
 
   divider: { height: 1, backgroundColor: Colors.grayBorder },
+
+  // Cancelled banner
+  cancelledBanner: { flexDirection: 'row', alignItems: 'center', gap: 10, backgroundColor: '#FFF0F0', borderRadius: 14, padding: 14, marginBottom: 4, borderWidth: 1, borderColor: '#FFD0D0' },
+  cancelledBannerTitle: { fontSize: 14, fontWeight: '700', color: '#CC3333', fontFamily: Fonts.semibold },
+  cancelledBannerSub: { fontSize: 12, color: '#AA4444', fontFamily: Fonts.regular, marginTop: 2 },
+
+  // Cancel modal
+  modalOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'flex-end' },
+  cancelSheet: { backgroundColor: Colors.white, borderTopLeftRadius: 28, borderTopRightRadius: 28, paddingHorizontal: 24, paddingTop: 12, paddingBottom: 40, gap: 14 },
+  cancelSheetHandle: { width: 36, height: 4, borderRadius: 2, backgroundColor: Colors.grayBorder, alignSelf: 'center', marginBottom: 8 },
+  cancelSheetTitle: { fontSize: 18, fontWeight: '800', color: Colors.black, fontFamily: Fonts.extrabold },
+  cancelSheetSub: { fontSize: 13, color: Colors.gray, fontFamily: Fonts.regular, marginTop: -6 },
+  reasonRow: { flexDirection: 'row', alignItems: 'center', gap: 12, paddingVertical: 12, paddingHorizontal: 14, borderRadius: 12, borderWidth: 1.5, borderColor: Colors.grayBorder },
+  reasonRowActive: { borderColor: Colors.black, backgroundColor: '#F8F8F8' },
+  reasonRadio: { width: 20, height: 20, borderRadius: 10, borderWidth: 2, borderColor: Colors.grayBorder, alignItems: 'center', justifyContent: 'center' },
+  reasonRadioActive: { borderColor: Colors.black },
+  reasonRadioDot: { width: 10, height: 10, borderRadius: 5, backgroundColor: Colors.black },
+  reasonText: { fontSize: 14, color: Colors.gray, fontFamily: Fonts.regular },
+  reasonTextActive: { color: Colors.black, fontWeight: '600' },
+  cancelNoteInput: { borderWidth: 1.5, borderColor: Colors.grayBorder, borderRadius: 12, paddingHorizontal: 14, paddingVertical: 12, fontSize: 14, color: Colors.black, fontFamily: Fonts.regular, minHeight: 70 },
+  cancelActions: { flexDirection: 'row', gap: 10, marginTop: 4 },
 
   // QR modal
   qrModalBg: { flex: 1, backgroundColor: 'rgba(0,0,0,0.75)', alignItems: 'center', justifyContent: 'center' },

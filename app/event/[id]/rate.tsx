@@ -40,10 +40,9 @@ export default function RateScreen() {
     setLoading(true);
 
     // Insert rating
-    await supabase.from('event_ratings').insert({
+    await supabase.from('reviews').insert({
       event_id: id,
       user_id: user.id,
-      club_id: clubId,
       rating,
       comment: comment.trim() || null,
     });
@@ -51,9 +50,9 @@ export default function RateScreen() {
     // Recalculate club average rating
     if (clubId) {
       const { data } = await supabase
-        .from('event_ratings')
-        .select('rating')
-        .eq('club_id', clubId);
+        .from('reviews')
+        .select('rating, event:events!inner(club_id)')
+        .eq('event.club_id', clubId);
 
       if (data && data.length > 0) {
         const avg = data.reduce((sum, r) => sum + r.rating, 0) / data.length;

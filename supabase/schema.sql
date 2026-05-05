@@ -204,3 +204,37 @@ create policy "Auth upload club covers" on storage.objects for insert with check
 create policy "Public read avatars" on storage.objects for select using (bucket_id = 'avatars');
 create policy "Auth upload avatars" on storage.objects for insert with check (bucket_id = 'avatars' and auth.uid() is not null);
 create policy "Auth update avatars" on storage.objects for update using (bucket_id = 'avatars' and auth.uid() is not null);
+
+-- ─────────────────────────────────────────────
+-- MIGRATIONS
+-- ─────────────────────────────────────────────
+alter table clubs add column if not exists logo_url text;
+alter table clubs add column if not exists description text;
+alter table profiles add column if not exists notifications_enabled boolean default true;
+
+-- Event cancellation fields
+alter table events add column if not exists status text default 'active';
+alter table events add column if not exists cancelled_at timestamptz;
+alter table events add column if not exists cancellation_reason text;
+alter table events add column if not exists cancellation_note text;
+
+-- Notifications
+create table if not exists notifications (
+  id uuid primary key default uuid_generate_v4(),
+  user_id uuid references profiles(id) on delete cascade not null,
+  type text not null,
+  title text not null,
+  body text,
+  data jsonb,
+  read boolean default false,
+  created_at timestamptz default now()
+);
+alter table notifications enable row level security;
+create policy "Users see own notifications" on notifications for select using (auth.uid() = user_id);
+create policy "Service can insert notifications" on notifications for insert with check (true);
+create policy "Users can mark read" on notifications for update using (auth.uid() = user_id);
+
+insert into storage.buckets (id, name, public) values ('club-logos', 'club-logos', true) on conflict do nothing;
+create policy "Public read club logos" on storage.objects for select using (bucket_id = 'club-logos');
+create policy "Auth upload club logos" on storage.objects for insert with check (bucket_id = 'club-logos' and auth.uid() is not null);
+create policy "Auth update club logos" on storage.objects for update using (bucket_id = 'club-logos' and auth.uid() is not null);

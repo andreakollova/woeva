@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Image, Alert } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Image, Alert, Modal, FlatList } from 'react-native';
 import { useLocalSearchParams, useRouter, useFocusEffect } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Animated, { FadeInDown, FadeInUp } from 'react-native-reanimated';
@@ -14,16 +14,9 @@ import { Toast } from '@/components/ui/Toast';
 import { BackButton } from '@/components/ui/BackButton';
 import { useAuth } from '@/context/AuthContext';
 
-const COVER_HEIGHT = 340;
-const AVATAR_SIZE = 32;
+const COVER_HEIGHT = 260;
+const AVATAR_SIZE = 30;
 const AVATAR_OVERLAP = 10;
-
-const SAMPLE_AVATARS = [
-  require('@/assets/images/sample_av1.jpg'),
-  require('@/assets/images/sample_av2.jpg'),
-  require('@/assets/images/sample_av3.jpg'),
-  require('@/assets/images/sample_av4.jpg'),
-];
 
 export default function ClubDetailScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
@@ -35,10 +28,9 @@ export default function ClubDetailScreen() {
   const [events, setEvents] = useState<Event[]>([]);
   const [isMember, setIsMember] = useState(false);
   const [isAdmin, setIsAdmin] = useState(false);
-  const [joinRequests, setJoinRequests] = useState(0);
   const [loading, setLoading] = useState(false);
   const [toast, setToast] = useState(false);
-  const [notificationsOn, setNotificationsOn] = useState(true);
+  const [showMembersModal, setShowMembersModal] = useState(false);
 
   useFocusEffect(
     React.useCallback(() => { loadAll(); }, [id, user])
@@ -57,18 +49,21 @@ export default function ClubDetailScreen() {
     if (user) {
       const me = (membersData ?? []).find((m: ClubMember) => m.user_id === user.id);
       setIsMember(!!me);
-      const admin = me?.role === 'admin';
-      setIsAdmin(admin);
-
-      if (admin) {
-        const { count } = await supabase
-          .from('club_members')
-          .select('*', { count: 'exact' })
-          .eq('club_id', id)
-          .eq('status', 'pending');
-        setJoinRequests(count ?? 0);
-      }
+      setIsAdmin(me?.role === 'admin');
     }
+  }
+
+  async function handleRemoveMember(m: ClubMember) {
+    const name = (m as any).profile?.name ?? 'this member';
+    Alert.alert('Remove member', `Remove ${name} from ${club?.name}?`, [
+      { text: 'Cancel', style: 'cancel' },
+      { text: 'Remove', style: 'destructive', onPress: async () => {
+        await supabase.from('club_members').delete().eq('id', m.id);
+        await supabase.from('clubs').update({ member_count: Math.max((club?.member_count ?? 1) - 1, 0) }).eq('id', id);
+        setMembers(prev => prev.filter(x => x.id !== m.id));
+        setClub(prev => prev ? { ...prev, member_count: Math.max((prev.member_count ?? 1) - 1, 0) } : prev);
+      }},
+    ]);
   }
 
   async function handleJoin() {
@@ -84,26 +79,69 @@ export default function ClubDetailScreen() {
 
   if (!club) return <View style={{ flex: 1, backgroundColor: Colors.white }} />;
 
+  const initial = club.name.charAt(0).toUpperCase();
   const visibleMembers = members.slice(0, 4);
-  const overflowMembers = (club.member_count ?? members.length) - visibleMembers.length;
+  const memberCount = members.length || club.member_count || 0;
 
   return (
     <View style={styles.container}>
       <Toast visible={toast} title="You're in!" subtitle={`Welcome to ${club.name}`} onHide={() => setToast(false)} />
 
+      {/* Members modal */}
+      <Modal visible={showMembersModal} animationType="slide" transparent onRequestClose={() => setShowMembersModal(false)}>
+        <View style={styles.modalOverlay}>
+          <View style={styles.membersSheet}>
+            <View style={styles.membersSheetHandle} />
+            <View style={styles.membersSheetHeader}>
+              <Text style={styles.membersSheetTitle}>Members · {memberCount}</Text>
+              <TouchableOpacity onPress={() => setShowMembersModal(false)} hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}>
+                <Text style={styles.membersSheetClose}>✕</Text>
+              </TouchableOpacity>
+            </View>
+            <FlatList
+              data={members}
+              keyExtractor={m => m.id}
+              contentContainerStyle={{ paddingBottom: 40, paddingHorizontal: 20 }}
+              renderItem={({ item: m }) => {
+                const prof = (m as any)?.profile;
+                const firstName = (prof?.name ?? 'Member').split(' ')[0];
+                const mi = firstName.charAt(0).toUpperCase();
+                return (
+                  <View style={styles.memberModalRow}>
+                    <View style={styles.memberModalAv}>
+                      {prof?.avatar_url
+                        ? <Image source={{ uri: prof.avatar_url }} style={styles.memberModalAvImg} />
+                        : <Text style={styles.memberModalAvInitial}>{mi}</Text>
+                      }
+                    </View>
+                    <Text style={styles.memberModalName}>{firstName}</Text>
+                    {m.role === 'admin' && (
+                      <View style={styles.adminTag}><Text style={styles.adminTagText}>Admin</Text></View>
+                    )}
+                    {isAdmin && m.user_id !== user?.id && (
+                      <TouchableOpacity onPress={() => { setShowMembersModal(false); handleRemoveMember(m); }} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
+                        <Text style={styles.removeText}>Remove</Text>
+                      </TouchableOpacity>
+                    )}
+                  </View>
+                );
+              }}
+            />
+          </View>
+        </View>
+      </Modal>
+
       <ScrollView
         contentContainerStyle={{ paddingBottom: insets.bottom + 120 }}
         showsVerticalScrollIndicator={false}
       >
-        {/* ── Cover ── */}
+        {/* Cover */}
         <View style={styles.cover}>
           {club.cover_url ? (
-            <Image source={{ uri: club.cover_url }} style={styles.coverImage} />
+            <Image source={{ uri: club.cover_url }} style={styles.coverImage} resizeMode="cover" />
           ) : (
-            <View style={[styles.coverImage, { backgroundColor: '#111' }]} />
+            <View style={[styles.coverImage, styles.coverFallback]} />
           )}
-
-          {/* Dark scrim */}
           <View style={styles.coverScrim} />
 
           <View style={[styles.backWrap, { top: insets.top + 8 }]}>
@@ -111,60 +149,41 @@ export default function ClubDetailScreen() {
           </View>
 
           {isAdmin && (
-            <View style={[styles.adminBadge, { top: insets.top + 14 }]}>
-              <Text style={styles.adminText}>ADMIN</Text>
-            </View>
+            <TouchableOpacity
+              style={[styles.adminBadge, { top: insets.top + 14 }]}
+              onPress={() => router.push(`/club/${id}/edit` as any)}
+              activeOpacity={0.8}
+            >
+              <Text style={styles.adminText}>EDIT</Text>
+            </TouchableOpacity>
           )}
-
-          <View style={styles.coverContent}>
-            <Animated.View entering={FadeInUp.delay(80).springify()}>
-              {club.category ? (
-                <View style={styles.categoryPill}>
-                  <Text style={styles.categoryPillText}>{club.category.toUpperCase()}</Text>
-                </View>
-              ) : null}
-              <Text style={styles.coverTitle}>{club.name}</Text>
-              {club.tagline ? (
-                <Text style={styles.coverTagline} numberOfLines={2}>{club.tagline}</Text>
-              ) : null}
-            </Animated.View>
-          </View>
         </View>
 
-        {/* ── White card ── */}
+        {/* Card */}
         <Animated.View entering={FadeInDown.delay(80).springify()} style={styles.card}>
 
-          {/* Members row */}
-          <View style={styles.membersRow}>
-            <View style={styles.avatarStack}>
-              {Array.from({ length: 3 }).map((_, i) => {
-                const m = visibleMembers[i];
-                const profile = (m as any)?.profile;
-                return (
-                  <View key={i} style={[styles.memberAvatar, { marginLeft: i === 0 ? 0 : -AVATAR_OVERLAP, zIndex: 3 - i }]}>
-                    {profile?.avatar_url ? (
-                      <Image source={{ uri: profile.avatar_url }} style={styles.memberAvatarImg} />
-                    ) : (
-                      <Image source={SAMPLE_AVATARS[i % SAMPLE_AVATARS.length]} style={styles.memberAvatarImg} />
-                    )}
-                  </View>
-                );
-              })}
-              {overflowMembers > 0 && (
-                <View style={[styles.memberAvatar, styles.memberAvatarOverflow, { marginLeft: -AVATAR_OVERLAP }]}>
-                  <Text style={styles.memberAvatarOverflowText}>+{overflowMembers}</Text>
+          {/* Logo — floats up over cover boundary */}
+          <View style={styles.topRow}>
+            <View style={styles.logoWrap}>
+              {club.logo_url ? (
+                <Image source={{ uri: club.logo_url }} style={styles.logo} />
+              ) : (
+                <View style={[styles.logo, styles.logoFallback]}>
+                  <Text style={styles.logoInitial}>{initial}</Text>
                 </View>
               )}
             </View>
-            <Text style={styles.membersLabel}><Text style={styles.membersCount}>{members.length || club.member_count || 0}</Text> members</Text>
-            {(club.rating ?? 0) > 0 && (
-              <View style={styles.ratingBadge}>
-                <Text style={styles.ratingText}>★ {club.rating?.toFixed(1)}</Text>
-              </View>
-            )}
           </View>
 
-          <View style={styles.divider} />
+          {/* Club name + tagline + tags */}
+          <Text style={styles.clubName}>{club.name}</Text>
+          {club.tagline ? <Text style={styles.clubTagline}>{club.tagline}</Text> : null}
+          {(club.category || club.city) ? (
+            <View style={styles.tags}>
+              {club.category ? <View style={styles.tag}><Text style={styles.tagText}>{club.category}</Text></View> : null}
+              {club.city ? <View style={styles.tag}><Text style={styles.tagText}>{club.city}</Text></View> : null}
+            </View>
+          ) : null}
 
           {/* Stats */}
           <View style={styles.statsRow}>
@@ -174,68 +193,63 @@ export default function ClubDetailScreen() {
             </View>
             <View style={styles.statDivider} />
             <View style={styles.statItem}>
-              <Text style={styles.statNum}>{members.length || club.member_count || 0}</Text>
+              <Text style={styles.statNum}>{memberCount}</Text>
               <Text style={styles.statLabel}>Members</Text>
             </View>
-            <View style={styles.statDivider} />
-            <View style={styles.statItem}>
-              <Text style={styles.statNum}>{(club.rating ?? 0) > 0 ? club.rating?.toFixed(1) : '—'}</Text>
-              <Text style={styles.statLabel}>Rating</Text>
-            </View>
+            {(club.rating ?? 0) > 0 && (
+              <>
+                <View style={styles.statDivider} />
+                <View style={styles.statItem}>
+                  <Text style={styles.statNum}>{club.rating?.toFixed(1)}</Text>
+                  <Text style={styles.statLabel}>Rating</Text>
+                </View>
+              </>
+            )}
           </View>
 
-          {/* Admin manage */}
+          {/* About */}
+          {club.description ? (
+            <>
+              <View style={styles.divider} />
+              <Text style={styles.sectionTitle}>About</Text>
+              <Text style={styles.aboutText}>{club.description}</Text>
+            </>
+          ) : null}
+
+          {/* Members bubbles */}
+          <View style={styles.divider} />
+          <TouchableOpacity style={styles.membersBubbleRow} onPress={() => setShowMembersModal(true)} activeOpacity={0.8}>
+            {members.slice(0, 6).map((m, i) => {
+              const prof = (m as any)?.profile;
+              const firstName = (prof?.name ?? '?').split(' ')[0];
+              const mi = firstName.charAt(0).toUpperCase();
+              return (
+                <View key={m.id} style={[styles.memberBubble, { marginLeft: i === 0 ? 0 : -10, zIndex: 6 - i }]}>
+                  {prof?.avatar_url
+                    ? <Image source={{ uri: prof.avatar_url }} style={styles.memberBubbleImg} />
+                    : <Text style={styles.memberBubbleInitial}>{mi}</Text>
+                  }
+                </View>
+              );
+            })}
+            {memberCount > 6 && (
+              <View style={[styles.memberBubble, styles.memberBubbleMore, { marginLeft: -10, zIndex: 0 }]}>
+                <Text style={styles.memberBubbleMoreText}>+{memberCount - 6}</Text>
+              </View>
+            )}
+            <Text style={styles.membersClickLabel}>{memberCount} {memberCount === 1 ? 'member' : 'members'}</Text>
+          </TouchableOpacity>
+
+          {/* Admin: create event */}
           {isAdmin && (
             <>
               <View style={styles.divider} />
-              <Text style={styles.sectionTitle}>Manage</Text>
-              <View style={styles.manageList}>
-                <ManageRow
-                  icon="users"
-                  label="Members"
-                  value={`${club.member_count}`}
-                  onPress={() => router.push(`/club/${id}/members` as any)}
-                />
-                <ManageRow
-                  icon="inbox"
-                  label="Join requests"
-                  value={joinRequests > 0 ? `${joinRequests} new` : undefined}
-                  highlight={joinRequests > 0}
-                  onPress={() => router.push(`/club/${id}/members` as any)}
-                />
-                <ManageRow
-                  icon="plus"
-                  label="Create event"
-                  onPress={() => router.push('/event/create/step1')}
-                  last
-                />
-              </View>
-            </>
-          )}
-
-          {/* Member: notifications toggle */}
-          {isMember && (
-            <>
-              <View style={styles.divider} />
-              <TouchableOpacity
-                style={styles.notifRow}
-                activeOpacity={0.8}
-                onPress={() => setNotificationsOn(v => !v)}
-              >
-                <View style={styles.notifIcon}>
-                  <Svg width={16} height={16} viewBox="0 0 24 24" fill="none">
-                    <Path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9" stroke={Colors.black} strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" />
-                    <Path d="M13.73 21a2 2 0 0 1-3.46 0" stroke={Colors.black} strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" />
-                  </Svg>
-                </View>
-                <View style={styles.notifText}>
-                  <Text style={styles.notifLabel}>Event notifications</Text>
-                  <Text style={styles.notifSub}>Get notified when this club posts a new event</Text>
-                </View>
-                <View style={[styles.toggle, notificationsOn && styles.toggleOn]}>
-                  <View style={[styles.toggleThumb, notificationsOn && styles.toggleThumbOn]} />
-                </View>
-              </TouchableOpacity>
+              <ManageRow
+                icon="plus"
+                label="Create event for this club"
+                onPress={() => router.push('/event/create/step2')}
+                last
+              />
             </>
           )}
 
@@ -286,7 +300,7 @@ export default function ClubDetailScreen() {
 }
 
 function ManageRow({ icon, label, value, highlight, onPress, last }: {
-  icon: 'users' | 'inbox' | 'plus';
+  icon: 'users' | 'plus';
   label: string;
   value?: string;
   highlight?: boolean;
@@ -305,12 +319,6 @@ function ManageRow({ icon, label, value, highlight, onPress, last }: {
             <Path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2" stroke={Colors.gray} strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" />
             <Circle cx={9} cy={7} r={4} stroke={Colors.gray} strokeWidth={2} />
             <Path d="M23 21v-2a4 4 0 0 0-3-3.87M16 3.13a4 4 0 0 1 0 7.75" stroke={Colors.gray} strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" />
-          </Svg>
-        )}
-        {icon === 'inbox' && (
-          <Svg width={15} height={15} viewBox="0 0 24 24" fill="none">
-            <Path d="M22 12h-6l-2 3h-4l-2-3H2" stroke={Colors.gray} strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" />
-            <Path d="M5.45 5.11L2 12v6a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-6l-3.45-6.89A2 2 0 0 0 16.76 4H7.24a2 2 0 0 0-1.79 1.11z" stroke={Colors.gray} strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" />
           </Svg>
         )}
         {icon === 'plus' && (
@@ -347,84 +355,106 @@ const manageStyles = StyleSheet.create({
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: Colors.white },
 
+  // Cover
   cover: { height: COVER_HEIGHT, position: 'relative' },
   coverImage: { width: '100%', height: '100%' },
+  coverFallback: { backgroundColor: '#000' },
   coverScrim: {
-    position: 'absolute', bottom: 0, left: 0, right: 0, height: 220,
-    backgroundColor: 'rgba(0,0,0,0.52)',
+    position: 'absolute', top: 0, left: 0, right: 0, bottom: 0,
+    backgroundColor: 'rgba(0,0,0,0.38)',
   },
   backWrap: { position: 'absolute', left: 16 },
-  backCircle: { backgroundColor: 'rgba(0,0,0,0.35)', borderRadius: 20 },
+  backCircle: { backgroundColor: 'rgba(0,0,0,0.4)', borderRadius: 20 },
   adminBadge: {
     position: 'absolute', right: 16,
-    backgroundColor: Colors.black, borderRadius: 50,
-    paddingHorizontal: 12, paddingVertical: 5,
+    backgroundColor: 'rgba(0,0,0,0.55)', borderRadius: 50,
+    paddingHorizontal: 14, paddingVertical: 7,
+    borderWidth: 1, borderColor: 'rgba(255,255,255,0.2)',
   },
-  adminText: { fontSize: 11, fontWeight: '700', color: Colors.white, letterSpacing: 0.8 },
+  adminText: { fontSize: 12, fontWeight: '700', color: Colors.white, letterSpacing: 0.5 },
 
-  coverContent: {
-    position: 'absolute', bottom: 0, left: 0, right: 0,
-    paddingHorizontal: 20, paddingBottom: 40, paddingTop: 60,
-    backgroundColor: 'rgba(0,0,0,0.52)',
-  },
-  categoryPill: {
-    alignSelf: 'flex-start', backgroundColor: Colors.lime,
-    borderRadius: 50, paddingHorizontal: 10, paddingVertical: 4, marginBottom: 10,
-  },
-  categoryPillText: { fontSize: 10, fontWeight: '800', color: Colors.black, letterSpacing: 1 },
-  coverTitle: { fontSize: 30, fontWeight: '800', color: Colors.white, letterSpacing: -0.5, marginBottom: 6, fontFamily: Fonts.extrabold },
-  coverTagline: { fontSize: 14, color: 'rgba(255,255,255,0.75)', fontFamily: Fonts.regular, lineHeight: 20 },
-
+  // Card
   card: {
     backgroundColor: Colors.white,
     borderTopLeftRadius: 28,
     borderTopRightRadius: 28,
     marginTop: -28,
     paddingHorizontal: 20,
-    paddingTop: 24,
-    paddingBottom: 12,
+    paddingTop: 0,
+    paddingBottom: 16,
   },
 
-  // Members row
-  membersRow: { flexDirection: 'row', alignItems: 'center', gap: 12 },
-  avatarStack: { flexDirection: 'row', alignItems: 'center' },
-  memberAvatar: { width: AVATAR_SIZE, height: AVATAR_SIZE, borderRadius: AVATAR_SIZE / 2, borderWidth: 2, borderColor: Colors.white },
-  memberAvatarImg: { width: AVATAR_SIZE, height: AVATAR_SIZE, borderRadius: AVATAR_SIZE / 2 },
-  memberAvatarFallback: { backgroundColor: Colors.lime, alignItems: 'center', justifyContent: 'center' },
-  memberAvatarInitial: { fontSize: 12, fontWeight: '700', color: Colors.black },
-  memberAvatarOverflow: { backgroundColor: Colors.grayLight, alignItems: 'center', justifyContent: 'center' },
-  memberAvatarOverflowText: { fontSize: 10, fontWeight: '700', color: Colors.gray },
-  membersLabel: { flex: 1, fontSize: 14, color: Colors.gray, fontFamily: Fonts.regular },
-  membersCount: { fontSize: 14, fontWeight: '700', color: Colors.black, fontFamily: Fonts.semibold },
-  ratingBadge: { backgroundColor: Colors.grayLight, borderRadius: 50, paddingHorizontal: 10, paddingVertical: 5 },
-  ratingText: { fontSize: 13, fontWeight: '700', color: Colors.black },
+  // Logo + members top row — logo sticks out above card edge
+  topRow: {
+    flexDirection: 'row',
+    alignItems: 'flex-end',
+    justifyContent: 'space-between',
+    marginTop: -40,
+    marginBottom: 14,
+  },
+  logoWrap: {},
+  logo: {
+    width: 80,
+    height: 80,
+    borderRadius: 22,
+    borderWidth: 3,
+    borderColor: Colors.white,
+    overflow: 'hidden',
+  },
+  logoFallback: { backgroundColor: '#000', alignItems: 'center', justifyContent: 'center' },
+  logoInitial: { fontSize: 32, fontWeight: '800', color: Colors.white, fontFamily: Fonts.extrabold },
 
-  divider: { height: 1, backgroundColor: Colors.grayBorder, marginVertical: 20 },
+  // Members bubbles row
+  membersBubbleRow: { flexDirection: 'row', alignItems: 'center', marginBottom: 4 },
+  memberBubble: {
+    width: 36, height: 36, borderRadius: 18,
+    borderWidth: 2, borderColor: Colors.white,
+    backgroundColor: Colors.lime, alignItems: 'center', justifyContent: 'center', overflow: 'hidden',
+  },
+  memberBubbleImg: { width: 36, height: 36, borderRadius: 18 },
+  memberBubbleInitial: { fontSize: 13, fontWeight: '700', color: Colors.black },
+  memberBubbleMore: { backgroundColor: Colors.grayLight },
+  memberBubbleMoreText: { fontSize: 11, fontWeight: '700', color: Colors.gray },
+  membersClickLabel: { fontSize: 14, fontWeight: '600', color: Colors.black, fontFamily: Fonts.semibold, marginLeft: 12 },
+
+  // Name + tagline below logo
+  clubName: { fontSize: 24, fontWeight: '800', color: Colors.black, letterSpacing: -0.5, fontFamily: Fonts.extrabold, marginBottom: 4 },
+  clubTagline: { fontSize: 14, color: Colors.gray, fontFamily: Fonts.regular, lineHeight: 20, marginBottom: 10 },
+
+  divider: { height: 1, backgroundColor: Colors.grayBorder, marginVertical: 18 },
 
   // Stats
-  statsRow: { flexDirection: 'row', alignItems: 'center' },
+  statsRow: { flexDirection: 'row', alignItems: 'center', marginTop: 16, marginBottom: 2 },
   statItem: { flex: 1, alignItems: 'center', gap: 2 },
-  statDivider: { width: 1, height: 36, backgroundColor: Colors.grayBorder },
-  statNum: { fontSize: 22, fontWeight: '800', color: Colors.black, fontFamily: Fonts.extrabold },
-  statLabel: { fontSize: 12, color: Colors.gray, fontFamily: Fonts.regular },
+  statDivider: { width: 1, height: 32, backgroundColor: Colors.grayBorder },
+  statNum: { fontSize: 20, fontWeight: '800', color: Colors.black, fontFamily: Fonts.extrabold },
+  statLabel: { fontSize: 11, color: Colors.gray, fontFamily: Fonts.regular },
 
-  // Section title
-  sectionTitle: { fontSize: 13, fontWeight: '700', color: Colors.gray, letterSpacing: 0.5, textTransform: 'uppercase', marginBottom: 12 },
-  manageList: {},
+  // Section
+  sectionTitle: { fontSize: 12, fontWeight: '700', color: Colors.gray, letterSpacing: 0.8, textTransform: 'uppercase', marginBottom: 14 },
   eventsList: {},
 
-  footer: { paddingHorizontal: 20, paddingTop: 12, borderTopWidth: 1, borderColor: Colors.grayBorder, backgroundColor: Colors.white },
+  // About
+  aboutText: { fontSize: 14, color: '#555', fontFamily: Fonts.regular, lineHeight: 21, marginBottom: 0 },
+  tags: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginBottom: 2 },
+  tag: { paddingHorizontal: 12, paddingVertical: 6, borderRadius: 50, backgroundColor: Colors.grayLight },
+  tagText: { fontSize: 12, fontFamily: Fonts.medium, color: Colors.black, fontWeight: '500' },
 
-  notifRow: {
-    flexDirection: 'row', alignItems: 'center', gap: 14,
-    backgroundColor: Colors.grayLight, borderRadius: 16, padding: 14,
-  },
-  notifIcon: { width: 38, height: 38, borderRadius: 12, backgroundColor: Colors.white, alignItems: 'center', justifyContent: 'center' },
-  notifText: { flex: 1 },
-  notifLabel: { fontSize: 15, fontWeight: '600', color: Colors.black, fontFamily: Fonts.semibold },
-  notifSub: { fontSize: 12, color: Colors.gray, fontFamily: Fonts.regular, marginTop: 2 },
-  toggle: { width: 44, height: 26, borderRadius: 13, backgroundColor: Colors.grayBorder, justifyContent: 'center', padding: 2 },
-  toggleOn: { backgroundColor: Colors.lime },
-  toggleThumb: { width: 22, height: 22, borderRadius: 11, backgroundColor: Colors.white },
-  toggleThumbOn: { alignSelf: 'flex-end' },
+  // Members modal
+  modalOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.45)', justifyContent: 'flex-end' },
+  membersSheet: { backgroundColor: Colors.white, borderTopLeftRadius: 28, borderTopRightRadius: 28, maxHeight: '75%' },
+  membersSheetHandle: { width: 36, height: 4, borderRadius: 2, backgroundColor: Colors.grayBorder, alignSelf: 'center', marginTop: 12, marginBottom: 4 },
+  membersSheetHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingHorizontal: 20, paddingVertical: 14 },
+  membersSheetTitle: { fontSize: 17, fontWeight: '700', color: Colors.black, fontFamily: Fonts.bold },
+  membersSheetClose: { fontSize: 16, color: Colors.gray },
+  memberModalRow: { flexDirection: 'row', alignItems: 'center', gap: 12, paddingVertical: 10, borderBottomWidth: 1, borderBottomColor: Colors.grayBorder },
+  memberModalAv: { width: 44, height: 44, borderRadius: 22, backgroundColor: Colors.lime, alignItems: 'center', justifyContent: 'center', overflow: 'hidden' },
+  memberModalAvImg: { width: 44, height: 44, borderRadius: 22 },
+  memberModalAvInitial: { fontSize: 17, fontWeight: '700', color: Colors.black },
+  memberModalName: { flex: 1, fontSize: 16, fontWeight: '500', color: Colors.black, fontFamily: Fonts.medium },
+  adminTag: { backgroundColor: Colors.lime, borderRadius: 50, paddingHorizontal: 10, paddingVertical: 3 },
+  adminTagText: { fontSize: 11, fontWeight: '700', color: Colors.black },
+  removeText: { fontSize: 13, color: '#FF4444', fontWeight: '600', fontFamily: Fonts.semibold },
+
+  footer: { paddingHorizontal: 20, paddingTop: 12, borderTopWidth: 1, borderColor: Colors.grayBorder, backgroundColor: Colors.white },
 });

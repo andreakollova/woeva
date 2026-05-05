@@ -67,6 +67,16 @@ export default function AboutScreen() {
           ))}
         </View>
 
+        {/* Refund policy */}
+        <View style={styles.policyCard}>
+          <Text style={styles.policyTitle}>Cancellation & Refund Policy</Text>
+          <Text style={styles.policyText}>
+            If a paid event is cancelled by the organiser <Text style={styles.policyBold}>48 hours or more</Text> before it starts, all attendees receive a full automatic refund to their original payment method.{'\n\n'}
+            If the event is cancelled <Text style={styles.policyBold}>less than 48 hours</Text> before the start time, no refund is issued.{'\n\n'}
+            Refunds are processed via Stripe and may take 5–10 business days to appear on your statement.
+          </Text>
+        </View>
+
         <Text style={styles.footer}>Made by people for people.</Text>
       </ScrollView>
     </View>
@@ -90,5 +100,9 @@ const styles = StyleSheet.create({
   rowLast: { borderBottomWidth: 0 },
   rowLabel: { fontSize: 16, fontWeight: '500', color: Colors.black },
   rowArrow: { fontSize: 20, color: Colors.gray },
+  policyCard: { marginTop: 16, borderWidth: 1, borderColor: Colors.grayBorder, borderRadius: 16, padding: 16, gap: 8 },
+  policyTitle: { fontSize: 14, fontWeight: '700', color: Colors.black },
+  policyText: { fontSize: 13, color: Colors.gray, lineHeight: 20 },
+  policyBold: { fontWeight: '700', color: Colors.black },
   footer: { textAlign: 'center', fontSize: 13, color: Colors.gray, marginTop: 32 },
 });

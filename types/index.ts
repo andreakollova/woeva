@@ -6,6 +6,7 @@ export interface Profile {
   city: string | null;
   interests: string[];
   phone: string | null;
+  notifications_enabled: boolean;
 }
 
 export interface Event {
@@ -28,9 +29,24 @@ export interface Event {
   is_recurring: boolean;
   city: string;
   created_at: string;
+  status: 'active' | 'cancelled';
+  cancelled_at: string | null;
+  cancellation_reason: string | null;
+  cancellation_note: string | null;
   creator?: Profile;
   club?: { id: string; name: string; cover_url: string | null } | null;
   attendees?: Array<{ profile?: { id: string; name: string; avatar_url: string | null } | null }>;
+}
+
+export interface Notification {
+  id: string;
+  user_id: string;
+  type: 'event_cancelled' | 'new_event' | 'event_chat';
+  title: string;
+  body: string | null;
+  data: Record<string, any> | null;
+  read: boolean;
+  created_at: string;
 }
 
 export interface Club {
@@ -38,8 +54,10 @@ export interface Club {
   creator_id: string;
   name: string;
   tagline: string | null;
+  description: string | null;
   category: string;
   cover_url: string | null;
+  logo_url: string | null;
   member_count: number;
   rating: number;
   city: string;

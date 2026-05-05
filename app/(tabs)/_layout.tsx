@@ -63,14 +63,13 @@ function TabBar({ state, descriptors, navigation }: any) {
   const insets = useSafeAreaInsets();
   const router = useRouter();
   const { user, loading } = useAuth();
-  const [hasClub, setHasClub] = useState<boolean | null>(null);
+  const [myClub, setMyClub] = useState<{ id: string } | null>(null);
   const [showMenu, setShowMenu] = useState(false);
 
   useEffect(() => {
-    if (!user) { setHasClub(null); return; }
-    supabase.from('clubs').select('id').eq('creator_id', user.id).limit(1).then(({ data }) => {
-      setHasClub((data ?? []).length > 0);
-    });
+    if (!user) { setMyClub(null); return; }
+    supabase.from('clubs').select('id').eq('creator_id', user.id).limit(1).single()
+      .then(({ data }) => setMyClub(data ?? null));
   }, [user]);
 
   function handleCreatePress() {
@@ -85,41 +84,59 @@ function TabBar({ state, descriptors, navigation }: any) {
       <Modal visible={showMenu} transparent animationType="fade" onRequestClose={() => setShowMenu(false)}>
         <Pressable style={styles.modalOverlay} onPress={() => setShowMenu(false)}>
           <View style={[styles.menuSheet, { paddingBottom: insets.bottom + 16 }]}>
-            <Text style={styles.menuTitle}>Create</Text>
-
-            {/* New Club */}
+            {/* New Event — dominant */}
             <TouchableOpacity
-              style={styles.menuItem}
-              onPress={() => { setShowMenu(false); router.push('/club/create'); }}
-              activeOpacity={0.8}
+              style={styles.menuItemHero}
+              onPress={() => { setShowMenu(false); router.push('/event/create/step2'); }}
+              activeOpacity={0.88}
             >
-              <View style={styles.menuItemIcon}><Text style={styles.menuItemEmoji}>🏠</Text></View>
-              <View style={styles.menuItemText}>
-                <Text style={styles.menuItemTitle}>New club</Text>
-                <Text style={styles.menuItemSub}>Start your own community</Text>
+              <Text style={styles.menuItemHeroEmoji}>🎉</Text>
+              <View>
+                <Text style={styles.menuItemHeroTitle}>New event</Text>
+                <Text style={styles.menuItemHeroSub}>Party, run, brunch...</Text>
               </View>
             </TouchableOpacity>
 
-            {/* New Event */}
-            <TouchableOpacity
-              style={[styles.menuItem, !hasClub && styles.menuItemLocked]}
-              onPress={() => {
-                if (!hasClub) return;
-                setShowMenu(false);
-                router.push('/event/create/step1');
-              }}
-              activeOpacity={hasClub ? 0.8 : 1}
-            >
-              <View style={[styles.menuItemIcon, !hasClub && styles.menuItemIconLocked]}>
-                <Text style={styles.menuItemEmoji}>{hasClub ? '🎉' : '🔒'}</Text>
-              </View>
-              <View style={styles.menuItemText}>
-                <Text style={[styles.menuItemTitle, !hasClub && styles.menuItemTitleLocked]}>New event</Text>
-                <Text style={styles.menuItemSub}>
-                  {hasClub ? 'Add an event to your club' : 'Create a club first to add events'}
-                </Text>
-              </View>
-            </TouchableOpacity>
+            {/* Secondary row */}
+            <View style={styles.menuSecondaryRow}>
+              {/* Club: My club or New club */}
+              <TouchableOpacity
+                style={styles.menuSecondaryItem}
+                onPress={() => {
+                  setShowMenu(false);
+                  if (myClub) router.push(`/club/${myClub.id}` as any);
+                  else router.push('/club/create');
+                }}
+                activeOpacity={0.7}
+              >
+                <Svg width={16} height={16} viewBox="0 0 24 24" fill="none">
+                  <Path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2" stroke={Colors.gray} strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round" />
+                  <Circle cx={9} cy={7} r={4} stroke={Colors.gray} strokeWidth={1.8} />
+                  <Path d="M23 21v-2a4 4 0 0 0-3-3.87" stroke={Colors.gray} strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round" />
+                  <Path d="M16 3.13a4 4 0 0 1 0 7.75" stroke={Colors.gray} strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round" />
+                </Svg>
+                <Text style={styles.menuSecondaryTitle}>{myClub ? 'My club' : 'New club'}</Text>
+              </TouchableOpacity>
+
+              {/* My dashboard — only if has club */}
+              {myClub && (
+                <>
+                  <View style={styles.menuSecondaryDivider} />
+                  <TouchableOpacity
+                    style={styles.menuSecondaryItem}
+                    onPress={() => { setShowMenu(false); router.push('/dashboard'); }}
+                    activeOpacity={0.7}
+                  >
+                    <Svg width={16} height={16} viewBox="0 0 24 24" fill="none">
+                      <Rect x={3} y={12} width={4} height={9} rx={1} stroke={Colors.gray} strokeWidth={1.8} />
+                      <Rect x={10} y={7} width={4} height={14} rx={1} stroke={Colors.gray} strokeWidth={1.8} />
+                      <Rect x={17} y={3} width={4} height={18} rx={1} stroke={Colors.gray} strokeWidth={1.8} />
+                    </Svg>
+                    <Text style={styles.menuSecondaryTitle}>Dashboard</Text>
+                  </TouchableOpacity>
+                </>
+              )}
+            </View>
           </View>
         </Pressable>
       </Modal>
@@ -237,51 +254,57 @@ const styles = StyleSheet.create({
     borderTopRightRadius: 24,
     paddingTop: 20,
     paddingHorizontal: 20,
-    gap: 8,
+    gap: 10,
   },
-  menuTitle: {
-    fontSize: 13,
-    fontWeight: '600',
-    fontFamily: Fonts.semibold,
-    color: Colors.gray,
-    letterSpacing: 0.5,
-    textTransform: 'uppercase',
-    marginBottom: 8,
-  },
-  menuItem: {
+
+  // Hero item — New event
+  menuItemHero: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 14,
-    padding: 16,
-    backgroundColor: Colors.grayLight,
-    borderRadius: 16,
-  },
-  menuItemLocked: {
-    opacity: 0.5,
-  },
-  menuItemIcon: {
-    width: 48,
-    height: 48,
-    borderRadius: 14,
+    gap: 16,
+    padding: 20,
     backgroundColor: Colors.lime,
-    alignItems: 'center',
-    justifyContent: 'center',
+    borderRadius: 20,
   },
-  menuItemIconLocked: {
-    backgroundColor: Colors.grayBorder,
-  },
-  menuItemEmoji: { fontSize: 22 },
-  menuItemText: { flex: 1, gap: 2 },
-  menuItemTitle: {
-    fontSize: 16,
-    fontWeight: '600',
-    fontFamily: Fonts.semibold,
+  menuItemHeroEmoji: { fontSize: 28 },
+  menuItemHeroTitle: {
+    fontSize: 20,
+    fontWeight: '700',
+    fontFamily: Fonts.bold,
     color: Colors.black,
   },
-  menuItemTitleLocked: { color: Colors.gray },
-  menuItemSub: {
+  menuItemHeroSub: {
     fontSize: 13,
-    color: Colors.gray,
+    color: 'rgba(0,0,0,0.5)',
     fontFamily: Fonts.regular,
+    marginTop: 1,
+  },
+
+  // Secondary row
+  menuSecondaryRow: {
+    flexDirection: 'row',
+    borderTopWidth: 1,
+    borderTopColor: Colors.grayBorder,
+    paddingTop: 12,
+    marginTop: 2,
+  },
+  menuSecondaryItem: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 7,
+    paddingVertical: 4,
+  },
+  menuSecondaryDivider: {
+    width: 1,
+    backgroundColor: Colors.grayBorder,
+    marginVertical: 2,
+  },
+  menuSecondaryTitle: {
+    fontSize: 14,
+    fontWeight: '500',
+    fontFamily: Fonts.medium,
+    color: Colors.gray,
   },
 });

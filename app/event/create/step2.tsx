@@ -22,6 +22,7 @@ export default function CreateStep2Screen() {
   const [cover, setCover] = useState<string | null>(null);
   const [showCategories, setShowCategories] = useState(false);
   const [clubName, setClubName] = useState<string | null>(null);
+  const [postAs, setPostAs] = useState<'club' | 'individual'>('club');
 
   useEffect(() => {
     if (!user) return;
@@ -36,10 +37,8 @@ export default function CreateStep2Screen() {
 
   function handleNext() {
     if (!title) return;
-    router.push({ pathname: '/event/create/step3', params: { title, tagline, category, cover: cover ?? '' } });
+    router.push({ pathname: '/event/create/step3', params: { title, tagline, category, cover: cover ?? '', postAs } });
   }
-
-  const posterName = clubName ?? profile?.name ?? 'You';
 
   return (
     <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
@@ -50,7 +49,9 @@ export default function CreateStep2Screen() {
       >
         {/* Step indicator */}
         <View style={styles.stepRow}>
-          <WMark size={28} color={Colors.lime} />
+          <TouchableOpacity onPress={() => router.push('/(tabs)')} activeOpacity={0.7}>
+            <WMark size={28} color={Colors.lime} />
+          </TouchableOpacity>
           <View style={styles.stepBadge}><Text style={styles.stepText}>2 / 3</Text></View>
         </View>
 
@@ -64,18 +65,38 @@ export default function CreateStep2Screen() {
             placeholder="Partička hokej turnaj"
           />
 
-          {/* Posted under */}
-          {title.length > 0 && (
+          {/* Post as selector */}
+          {clubName ? (
+            <View>
+              <Text style={styles.label}>Post as</Text>
+              <View style={styles.postAsRow}>
+                <TouchableOpacity
+                  style={[styles.postAsOption, postAs === 'club' && styles.postAsOptionActive]}
+                  onPress={() => setPostAs('club')}
+                  activeOpacity={0.8}
+                >
+                  <Text style={[styles.postAsTitle, postAs === 'club' && styles.postAsTitleActive]}>{clubName}</Text>
+                  <Text style={[styles.postAsSub, postAs === 'club' && styles.postAsSubActive]}>Club</Text>
+                </TouchableOpacity>
+                <TouchableOpacity
+                  style={[styles.postAsOption, postAs === 'individual' && styles.postAsOptionActive]}
+                  onPress={() => setPostAs('individual')}
+                  activeOpacity={0.8}
+                >
+                  <Text style={[styles.postAsTitle, postAs === 'individual' && styles.postAsTitleActive]}>{profile?.name || 'You'}</Text>
+                  <Text style={[styles.postAsSub, postAs === 'individual' && styles.postAsSubActive]}>Individual</Text>
+                </TouchableOpacity>
+              </View>
+            </View>
+          ) : (
             <View style={styles.posterRow}>
               <View style={styles.posterInfo}>
-                <Text style={styles.posterLabel}>Posted under</Text>
-                <Text style={styles.posterName}>{posterName}</Text>
+                <Text style={styles.posterLabel}>Posted as</Text>
+                <Text style={styles.posterName}>{profile?.name || 'You'}</Text>
               </View>
-              {!clubName && (
-                <TouchableOpacity onPress={() => router.push('/club/create/index' as any)} activeOpacity={0.7}>
-                  <Text style={styles.createClubLink}>Create a club →</Text>
-                </TouchableOpacity>
-              )}
+              <TouchableOpacity onPress={() => router.push('/club/create/index' as any)} activeOpacity={0.7}>
+                <Text style={styles.createClubLink}>Create a club →</Text>
+              </TouchableOpacity>
             </View>
           )}
           <Input
@@ -141,10 +162,10 @@ const styles = StyleSheet.create({
   stepText: { fontSize: 13, fontWeight: '600', color: Colors.black },
   title: { fontSize: 28, fontWeight: '700', color: Colors.black, marginBottom: 28, letterSpacing: -0.5 },
   form: { gap: 20 },
-  label: { fontSize: 14, fontWeight: '500', color: Colors.black, marginBottom: 6 },
-  selector: { height: 52, borderWidth: 1.5, borderColor: Colors.grayBorder, borderRadius: 12, paddingHorizontal: 16, justifyContent: 'center' },
-  selectorValue: { fontSize: 16, color: Colors.black },
-  selectorPlaceholder: { fontSize: 16, color: Colors.gray },
+  label: { fontSize: 13, fontWeight: '500', color: Colors.black, marginBottom: 6 },
+  selector: { height: 44, borderWidth: 1.5, borderColor: Colors.grayBorder, borderRadius: 12, paddingHorizontal: 14, justifyContent: 'center' },
+  selectorValue: { fontSize: 14, color: Colors.black },
+  selectorPlaceholder: { fontSize: 14, color: Colors.gray },
   dropdown: { borderWidth: 1.5, borderColor: Colors.grayBorder, borderRadius: 12, marginTop: 4, overflow: 'hidden' },
   dropdownItem: { padding: 14, borderBottomWidth: 1, borderColor: Colors.grayBorder },
   dropdownText: { fontSize: 15, color: Colors.black },
@@ -160,4 +181,15 @@ const styles = StyleSheet.create({
   posterLabel: { fontSize: 11, fontWeight: '600', color: Colors.gray, fontFamily: Fonts.medium, textTransform: 'uppercase', letterSpacing: 0.5 },
   posterName: { fontSize: 15, fontWeight: '600', color: Colors.black, fontFamily: Fonts.semibold },
   createClubLink: { fontSize: 13, fontWeight: '600', color: Colors.black, fontFamily: Fonts.semibold },
+  postAsRow: { flexDirection: 'row', gap: 10 },
+  postAsOption: {
+    flex: 1, paddingVertical: 14, paddingHorizontal: 14,
+    borderRadius: 14, borderWidth: 1.5, borderColor: Colors.grayBorder,
+    backgroundColor: Colors.white,
+  },
+  postAsOptionActive: { borderColor: Colors.black, backgroundColor: Colors.black },
+  postAsTitle: { fontSize: 14, fontWeight: '600', fontFamily: Fonts.semibold, color: Colors.black, marginBottom: 2 },
+  postAsTitleActive: { color: Colors.white },
+  postAsSub: { fontSize: 11, color: Colors.gray, fontFamily: Fonts.regular, textTransform: 'uppercase', letterSpacing: 0.4 },
+  postAsSubActive: { color: 'rgba(255,255,255,0.6)' },
 });

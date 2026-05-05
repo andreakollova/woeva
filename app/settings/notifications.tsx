@@ -1,52 +1,46 @@
-import { BackButton } from '@/components/ui/BackButton';
 import React, { useState } from 'react';
-import { View, Text, StyleSheet, Switch, TouchableOpacity, ScrollView } from 'react-native';
-import { useRouter } from 'expo-router';
+import { View, Text, StyleSheet, TouchableOpacity, ScrollView } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Colors } from '@/constants/colors';
+import { Fonts } from '@/constants/fonts';
+import { BackButton } from '@/components/ui/BackButton';
+import { supabase } from '@/lib/supabase';
+import { useAuth } from '@/context/AuthContext';
 
 export default function NotificationsScreen() {
-  const router = useRouter();
   const insets = useSafeAreaInsets();
-  const [notifs, setNotifs] = useState({
-    newEvents: true,
-    eventReminders: true,
-    chatMessages: true,
-    clubUpdates: false,
-    promotions: false,
-  });
+  const { user, profile } = useAuth();
+  const [enabled, setEnabled] = useState(profile?.notifications_enabled ?? true);
 
-  const ITEMS: Array<{ key: keyof typeof notifs; label: string; sub: string }> = [
-    { key: 'newEvents', label: 'New events', sub: 'Events matching your interests' },
-    { key: 'eventReminders', label: 'Event reminders', sub: "You're going — we'll remind you" },
-    { key: 'chatMessages', label: 'Chat messages', sub: 'Group chat activity' },
-    { key: 'clubUpdates', label: 'Club updates', sub: 'New members and requests' },
-    { key: 'promotions', label: 'Promotions', sub: 'Offers and featured events' },
-  ];
+  async function toggle() {
+    if (!user) return;
+    const next = !enabled;
+    setEnabled(next);
+    await supabase.from('profiles').update({ notifications_enabled: next }).eq('id', user.id);
+  }
 
   return (
     <View style={[styles.container, { paddingTop: insets.top }]}>
       <View style={styles.header}>
         <BackButton />
         <Text style={styles.title}>Notifications</Text>
+        <View style={{ width: 36 }} />
       </View>
 
       <ScrollView contentContainerStyle={[styles.scroll, { paddingBottom: insets.bottom + 40 }]}>
-        <View style={styles.list}>
-          {ITEMS.map((item, i) => (
-            <View key={item.key} style={[styles.row, i === ITEMS.length - 1 && styles.rowLast]}>
+        <View style={styles.section}>
+          <Text style={styles.sectionTitle}>Push notifications</Text>
+          <View style={styles.list}>
+            <TouchableOpacity style={styles.row} onPress={toggle} activeOpacity={0.8}>
               <View style={styles.rowText}>
-                <Text style={styles.rowLabel}>{item.label}</Text>
-                <Text style={styles.rowSub}>{item.sub}</Text>
+                <Text style={styles.rowLabel}>Event notifications</Text>
+                <Text style={styles.rowSub}>New events from clubs you follow</Text>
               </View>
-              <Switch
-                value={notifs[item.key]}
-                onValueChange={val => setNotifs(n => ({ ...n, [item.key]: val }))}
-                trackColor={{ false: Colors.grayBorder, true: Colors.lime }}
-                thumbColor={Colors.white}
-              />
-            </View>
-          ))}
+              <View style={[styles.toggle, enabled && styles.toggleOn]}>
+                <View style={[styles.thumb, enabled && styles.thumbOn]} />
+              </View>
+            </TouchableOpacity>
+          </View>
         </View>
       </ScrollView>
     </View>
@@ -55,15 +49,18 @@ export default function NotificationsScreen() {
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: Colors.white },
-  header: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 20, paddingBottom: 16, gap: 12 },
-  backBtn: { padding: 4 },
-  backIcon: { fontSize: 20, color: Colors.black },
-  title: { fontSize: 20, fontWeight: '700', color: Colors.black },
-  scroll: { paddingHorizontal: 20 },
-  list: { borderWidth: 1, borderColor: Colors.grayBorder, borderRadius: 16, overflow: 'hidden', marginTop: 8 },
-  row: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', padding: 16, borderBottomWidth: 1, borderColor: Colors.grayBorder, gap: 12 },
-  rowLast: { borderBottomWidth: 0 },
-  rowText: { flex: 1, gap: 2 },
-  rowLabel: { fontSize: 16, fontWeight: '500', color: Colors.black },
-  rowSub: { fontSize: 13, color: Colors.gray },
+  header: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 20, paddingVertical: 16 },
+  title: { fontSize: 18, fontWeight: '700', fontFamily: Fonts.bold, color: Colors.black },
+  scroll: { paddingHorizontal: 20, paddingTop: 8 },
+  section: { marginBottom: 24 },
+  sectionTitle: { fontSize: 13, fontWeight: '600', fontFamily: Fonts.semibold, color: Colors.gray, letterSpacing: 0.3, marginBottom: 8, textTransform: 'uppercase' },
+  list: { borderWidth: 1, borderColor: Colors.grayBorder, borderRadius: 16, overflow: 'hidden' },
+  row: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 16, paddingVertical: 16 },
+  rowText: { flex: 1 },
+  rowLabel: { fontSize: 15, fontFamily: Fonts.medium, fontWeight: '500', color: Colors.black },
+  rowSub: { fontSize: 12, color: Colors.gray, fontFamily: Fonts.regular, marginTop: 2 },
+  toggle: { width: 44, height: 26, borderRadius: 13, backgroundColor: Colors.grayBorder, justifyContent: 'center', padding: 2 },
+  toggleOn: { backgroundColor: Colors.lime },
+  thumb: { width: 22, height: 22, borderRadius: 11, backgroundColor: Colors.white },
+  thumbOn: { alignSelf: 'flex-end' },
 });

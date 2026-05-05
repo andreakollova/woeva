@@ -28,19 +28,28 @@ export default function ProfileScreen() {
   const { user, profile } = useAuth();
   const [eventsCount, setEventsCount] = useState(0);
   const [clubsCount, setClubsCount] = useState(0);
-  const [clubs, setClubs] = useState<{ id: string; name: string; cover_url: string | null; category: string }[]>([]);
+  const [clubs, setClubs] = useState<{ id: string; name: string; cover_url: string | null; logo_url: string | null; category: string }[]>([]);
   const [myEvents, setMyEvents] = useState<{ id: string; title: string; date: string; cover_url: string | null }[]>([]);
+  const [latestEvents, setLatestEvents] = useState<{ id: string; title: string; date: string; cover_url: string | null }[]>([]);
 
   useEffect(() => {
     if (!user) return;
     supabase.from('event_attendees').select('id', { count: 'exact' }).eq('user_id', user.id).then(({ count }) => setEventsCount(count ?? 0));
-    supabase.from('club_members').select('id, club:clubs(id, name, cover_url, category)').eq('user_id', user.id).eq('status', 'approved').then(({ data }) => {
+    supabase.from('club_members').select('id, club:clubs(id, name, cover_url, logo_url, category)').eq('user_id', user.id).eq('status', 'approved').then(({ data }) => {
       setClubsCount(data?.length ?? 0);
       setClubs((data ?? []).map((r: any) => r.club).filter(Boolean));
     });
     supabase.from('events').select('id, title, date, cover_url').eq('creator_id', user.id).order('date', { ascending: true }).then(({ data }) => {
       setMyEvents(data ?? []);
     });
+    supabase.from('event_attendees')
+      .select('event:events(id, title, date, cover_url)')
+      .eq('user_id', user.id)
+      .order('created_at', { ascending: false })
+      .limit(5)
+      .then(({ data }) => {
+        setLatestEvents((data ?? []).map((r: any) => r.event).filter(Boolean));
+      });
   }, [user]);
 
   const displayName = profile?.name || (user as any)?.user_metadata?.full_name || '';
@@ -68,13 +77,12 @@ export default function ProfileScreen() {
 
         {/* Avatar */}
         <TouchableOpacity style={styles.avatarWrap} onPress={() => router.push('/settings/profile')} activeOpacity={0.85}>
-          {profile?.avatar_url ? (
-            <Image source={{ uri: profile.avatar_url }} style={styles.avatar} />
-          ) : (
-            <View style={styles.avatar}>
-              <Text style={styles.avatarText}>{initial}</Text>
-            </View>
-          )}
+          <View style={styles.avatar}>
+            <Text style={styles.avatarText}>{initial}</Text>
+            {profile?.avatar_url ? (
+              <Image source={{ uri: profile.avatar_url }} style={StyleSheet.absoluteFill as any} borderRadius={40} />
+            ) : null}
+          </View>
           <View style={styles.avatarEditBadge}>
             <Text style={styles.avatarEditIcon}>✎</Text>
           </View>
@@ -126,12 +134,12 @@ export default function ProfileScreen() {
           </View>
         )}
 
-        {/* My events */}
-        {myEvents.length > 0 && (
+        {/* Latest events (attended) — only visible to self */}
+        {latestEvents.length > 0 && (
           <View style={styles.section}>
-            <Text style={styles.sectionTitle}>My events</Text>
+            <Text style={styles.sectionTitle}>Latest events</Text>
             <View style={styles.clubsList}>
-              {myEvents.map(event => {
+              {latestEvents.map(event => {
                 const d = new Date(event.date + 'T00:00:00');
                 const dateStr = d.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' });
                 return (
@@ -139,15 +147,6 @@ export default function ProfileScreen() {
                     key={event.id}
                     style={styles.clubRow}
                     onPress={() => router.push(`/event/${event.id}` as any)}
-                    onLongPress={() => {
-                      Alert.alert('Delete event', `Delete "${event.title}"?`, [
-                        { text: 'Cancel', style: 'cancel' },
-                        { text: 'Delete', style: 'destructive', onPress: async () => {
-                          await supabase.from('events').delete().eq('id', event.id);
-                          setMyEvents(prev => prev.filter(e => e.id !== event.id));
-                        }},
-                      ]);
-                    }}
                     activeOpacity={0.7}
                   >
                     {event.cover_url
@@ -160,7 +159,6 @@ export default function ProfileScreen() {
                       <Text style={styles.clubName}>{event.title}</Text>
                       <Text style={styles.clubCategory}>{dateStr}</Text>
                     </View>
-                    <Text style={styles.clubLeaveHint}>hold to delete</Text>
                   </TouchableOpacity>
                 );
               })}
@@ -190,8 +188,8 @@ export default function ProfileScreen() {
                   }}
                   activeOpacity={0.7}
                 >
-                  {club.cover_url
-                    ? <Image source={{ uri: club.cover_url }} style={styles.clubAvatar} />
+                  {club.cover_url || club.logo_url
+                    ? <Image source={{ uri: (club.cover_url ?? club.logo_url)! }} style={styles.clubAvatar} />
                     : <View style={[styles.clubAvatar, styles.clubAvatarFallback]}>
                         <Text style={styles.clubAvatarInitial}>{club.name.charAt(0).toUpperCase()}</Text>
                       </View>
@@ -236,8 +234,8 @@ const styles = StyleSheet.create({
   clubsList: { gap: 4 },
   clubRow: { flexDirection: 'row', alignItems: 'center', gap: 12, paddingVertical: 10, borderBottomWidth: 1, borderBottomColor: Colors.grayBorder },
   clubAvatar: { width: 42, height: 42, borderRadius: 12 },
-  clubAvatarFallback: { backgroundColor: Colors.lime, alignItems: 'center', justifyContent: 'center' },
-  clubAvatarInitial: { fontSize: 18, fontWeight: '700', color: Colors.black, fontFamily: Fonts.bold },
+  clubAvatarFallback: { backgroundColor: '#000', alignItems: 'center', justifyContent: 'center' },
+  clubAvatarInitial: { fontSize: 18, fontWeight: '700', color: '#fff', fontFamily: Fonts.bold },
   clubName: { fontSize: 15, fontWeight: '600', color: Colors.black, fontFamily: Fonts.semibold },
   clubCategory: { fontSize: 12, color: Colors.gray, fontFamily: Fonts.regular, marginTop: 1 },
   clubLeaveHint: { fontSize: 11, color: Colors.grayBorder, fontFamily: Fonts.regular },

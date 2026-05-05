@@ -43,7 +43,7 @@ export default function BookedScreen() {
 
     const allEvents: BookedEvent[] = (data ?? [])
       .map((r: any) => ({ ...r.event, attendee_id: r.id }))
-      .filter((e: any) => e && e.creator_id !== user.id);
+      .filter((e: any) => e?.id);
 
     const filtered = tab === 'upcoming'
       ? allEvents.filter(e => e.date >= now)
@@ -101,7 +101,6 @@ export default function BookedScreen() {
       >
         {events.length === 0 ? (
           <Animated.View entering={FadeInDown} style={styles.empty}>
-            <View style={styles.emptyDot} />
             <Text style={styles.emptyTitle}>
               {tab === 'upcoming' ? 'No tickets yet' : 'No past events'}
             </Text>
@@ -309,7 +308,6 @@ const styles = StyleSheet.create({
   tabTextActive: { color: Colors.white },
   scroll: { paddingHorizontal: 20, paddingBottom: 40, gap: 16 },
   empty: { paddingTop: 60, alignItems: 'center', gap: 12 },
-  emptyDot: { width: 60, height: 60, borderRadius: 30, backgroundColor: Colors.white, marginBottom: 8 },
   emptyTitle: { fontSize: 22, fontWeight: '700', fontFamily: Fonts.extrabold, color: Colors.black },
   emptyText: { fontSize: 15, color: Colors.gray, textAlign: 'center', lineHeight: 22, fontFamily: Fonts.regular },
   cta: { marginTop: 8, width: '100%' },

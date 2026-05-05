@@ -5,7 +5,7 @@ import { useRouter } from 'expo-router';
 import { useFocusEffect } from 'expo-router';
 import Animated, { FadeInDown } from 'react-native-reanimated';
 import * as Location from 'expo-location';
-import Svg, { Path } from 'react-native-svg';
+import Svg, { Path, Circle } from 'react-native-svg';
 import { WMark } from '@/components/ui/WMark';
 import { EventCard } from '@/components/ui/EventCard';
 import { Tag } from '@/components/ui/Tag';
@@ -32,6 +32,7 @@ export default function HomeScreen() {
 
   const [city, setCity] = useState('');
   const [showCityPicker, setShowCityPicker] = useState(false);
+  const [unreadNotifs, setUnreadNotifs] = useState(0);
 
   useEffect(() => {
     (async () => {
@@ -50,7 +51,14 @@ export default function HomeScreen() {
     })();
   }, []);
 
-  useFocusEffect(useCallback(() => { loadEvents(); refetchProfile(); }, [filter]));
+  useFocusEffect(useCallback(() => {
+    loadEvents();
+    refetchProfile();
+    if (user) {
+      supabase.from('notifications').select('id', { count: 'exact', head: true }).eq('user_id', user.id).eq('read', false)
+        .then(({ count }) => setUnreadNotifs(count ?? 0));
+    }
+  }, [filter, user]));
 
   async function loadEvents() {
     let query = supabase.from('events').select('*, club:clubs(id, name, cover_url), attendees:event_attendees(profile:profiles(id, name, avatar_url))').order('date', { ascending: true }).limit(30);
@@ -93,6 +101,14 @@ export default function HomeScreen() {
           <View style={styles.topBarSide} />
           <WMark size={34} color={Colors.lime} />
           <View style={styles.topBarSide}>
+            {user && (
+              <TouchableOpacity style={styles.bellBtn} onPress={() => router.push('/notifications' as any)}>
+                <Svg width={22} height={22} viewBox="0 0 24 24" fill="none">
+                  <Path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9M13.73 21a2 2 0 0 1-3.46 0" stroke={Colors.black} strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" />
+                </Svg>
+                {unreadNotifs > 0 && <View style={styles.bellDot} />}
+              </TouchableOpacity>
+            )}
             <TouchableOpacity style={styles.avatar} onPress={() => router.push('/(tabs)/profile')}>
               <View style={styles.avatarCircle}>
                 <Text style={styles.avatarInitial}>{avatarInitial}</Text>
@@ -189,7 +205,9 @@ const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: Colors.white },
   scroll: { paddingBottom: 20 },
   topBar: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 20, paddingVertical: 10 },
-  topBarSide: { flex: 1, alignItems: 'flex-end' },
+  topBarSide: { flex: 1, alignItems: 'flex-end', flexDirection: 'row', justifyContent: 'flex-end', gap: 10 },
+  bellBtn: { width: 36, height: 36, borderRadius: 18, alignItems: 'center', justifyContent: 'center' },
+  bellDot: { position: 'absolute', top: 4, right: 4, width: 8, height: 8, borderRadius: 4, backgroundColor: '#FF3B30', borderWidth: 1.5, borderColor: Colors.white },
   header: { paddingHorizontal: 20, marginBottom: 16 },
   cityRow: { flexDirection: 'row', alignItems: 'center', gap: 4, marginBottom: 4 },
   cityLabel: { fontSize: 18, color: Colors.gray, fontWeight: '500', fontFamily: Fonts.medium },

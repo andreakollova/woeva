@@ -1,6 +1,7 @@
 import { BackButton } from '@/components/ui/BackButton';
 import React from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, ScrollView, Alert } from 'react-native';
+import { WMark } from '@/components/ui/WMark';
 import { useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Colors } from '@/constants/colors';
@@ -47,6 +48,7 @@ export default function SettingsScreen() {
       <View style={styles.header}>
         <BackButton />
         <Text style={styles.title}>Settings</Text>
+        <WMark size={28} color={Colors.lime} />
       </View>
 
       <ScrollView contentContainerStyle={[styles.scroll, { paddingBottom: insets.bottom + 40 }]} showsVerticalScrollIndicator={false}>
@@ -86,16 +88,16 @@ export default function SettingsScreen() {
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: Colors.white },
-  header: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 20, paddingVertical: 16, gap: 12 },
+  header: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 20, paddingVertical: 10, gap: 12 },
   backBtn: { padding: 4 },
   backIcon: { fontSize: 20, color: Colors.black },
-  title: { fontSize: 22, fontWeight: '700', fontFamily: Fonts.bold, color: Colors.black },
+  title: { fontSize: 18, fontWeight: '700', fontFamily: Fonts.bold, color: Colors.black },
   scroll: { paddingHorizontal: 20 },
-  section: { marginBottom: 24 },
-  sectionTitle: { fontSize: 13, fontWeight: '600', fontFamily: Fonts.semibold, color: Colors.gray, letterSpacing: 0.3, marginBottom: 8, textTransform: 'uppercase' },
-  list: { borderWidth: 1, borderColor: Colors.grayBorder, borderRadius: 16, overflow: 'hidden' },
-  row: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingHorizontal: 16, paddingVertical: 16, borderBottomWidth: 1, borderColor: Colors.grayBorder },
+  section: { marginBottom: 18 },
+  sectionTitle: { fontSize: 11, fontWeight: '600', fontFamily: Fonts.semibold, color: Colors.gray, letterSpacing: 0.5, marginBottom: 6, textTransform: 'uppercase' },
+  list: { borderWidth: 1, borderColor: Colors.grayBorder, borderRadius: 14, overflow: 'hidden' },
+  row: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingHorizontal: 14, paddingVertical: 11, borderBottomWidth: 1, borderColor: Colors.grayBorder },
   rowLast: { borderBottomWidth: 0 },
-  rowLabel: { fontSize: 16, fontFamily: Fonts.regular, color: Colors.black },
-  rowArrow: { fontSize: 20, color: Colors.gray },
+  rowLabel: { fontSize: 14, fontFamily: Fonts.regular, color: Colors.black },
+  rowArrow: { fontSize: 18, color: Colors.gray },
 });

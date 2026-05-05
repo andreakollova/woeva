@@ -52,6 +52,10 @@ export default function RootLayout() {
             <Stack.Screen name="settings/notifications" options={{ animation: 'slide_from_right' }} />
             <Stack.Screen name="settings/about" options={{ animation: 'slide_from_right' }} />
             <Stack.Screen name="settings/delete-account" options={{ animation: 'slide_from_right' }} />
+            <Stack.Screen name="notifications/index" options={{ animation: 'slide_from_right' }} />
+            <Stack.Screen name="event/[id]/rate" options={{ animation: 'slide_from_bottom', presentation: 'modal' }} />
+            <Stack.Screen name="dashboard/index" options={{ animation: 'slide_from_right' }} />
+            <Stack.Screen name="club/[id]/edit" options={{ animation: 'slide_from_right' }} />
           </Stack>
         </StripeProvider>
         </AuthProvider>

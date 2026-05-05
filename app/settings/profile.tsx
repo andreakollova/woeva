@@ -4,13 +4,14 @@ import { View, Text, StyleSheet, TouchableOpacity, ScrollView, KeyboardAvoidingV
 import { useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import * as ImagePicker from 'expo-image-picker';
-import * as FileSystem from 'expo-file-system';
+import { uploadImage } from '@/lib/uploadImage';
 import { Colors } from '@/constants/colors';
 import { Fonts } from '@/constants/fonts';
 import { Button } from '@/components/ui/Button';
 import { Toast } from '@/components/ui/Toast';
 import { supabase } from '@/lib/supabase';
 import { useAuth } from '@/context/AuthContext';
+import { CATEGORIES } from '@/types';
 
 const CITIES = ['Bratislava', 'Košice', 'Prešov', 'Žilina', 'Nitra', 'Banská Bystrica', 'Other'];
 
@@ -22,6 +23,7 @@ export default function EditProfileScreen() {
   const [bio, setBio] = useState(profile?.bio ?? '');
   const [city, setCity] = useState(profile?.city ?? '');
   const [avatar, setAvatar] = useState<string | null>(profile?.avatar_url ?? null);
+  const [interests, setInterests] = useState<string[]>(profile?.interests ?? []);
   const [loading, setLoading] = useState(false);
   const [showCities, setShowCities] = useState(false);
   const [saved, setSaved] = useState(false);
@@ -38,35 +40,17 @@ export default function EditProfileScreen() {
 
     let avatar_url = profile?.avatar_url ?? null;
     if (avatar && avatar !== profile?.avatar_url) {
-      // Convert ph:// (simulator) to file:// URI
-      let uploadUri = avatar;
-      if (avatar.startsWith('ph://')) {
-        const ext2 = avatar.split('.').pop()?.toLowerCase()?.replace('heic', 'jpg') ?? 'jpg';
-        const dest = FileSystem.cacheDirectory + `avatar_${Date.now()}.${ext2}`;
-        await FileSystem.copyAsync({ from: avatar, to: dest });
-        uploadUri = dest;
-      }
-      const ext = uploadUri.split('.').pop()?.toLowerCase()?.replace('heic', 'jpg') ?? 'jpg';
-      const mime = ext === 'png' ? 'image/png' : 'image/jpeg';
-      const path = `avatars/${user.id}.${ext}`;
-
-      const formData = new FormData();
-      formData.append('file', { uri: uploadUri, name: `avatar.${ext}`, type: mime } as any);
-
-      const { error: uploadError } = await supabase.storage
-        .from('avatars')
-        .upload(path, formData, { upsert: true, contentType: mime });
-
-      if (uploadError) {
-        Alert.alert('Upload failed', uploadError.message);
+      const ext = (avatar.split('.').pop() ?? 'jpg').toLowerCase().replace('heic', 'jpg');
+      const uploaded = await uploadImage(avatar, 'avatars', `avatars/${user.id}.${ext}`);
+      if (!uploaded) {
+        Alert.alert('Upload failed', 'Could not upload photo. Please try again.');
         setLoading(false);
         return;
       }
-      const { data } = supabase.storage.from('avatars').getPublicUrl(path);
-      avatar_url = `${data.publicUrl}?t=${Date.now()}`;
+      avatar_url = `${uploaded}?t=${Date.now()}`;
     }
 
-    const { error } = await supabase.from('profiles').upsert({ id: user.id, name, bio, city, avatar_url });
+    const { error } = await supabase.from('profiles').upsert({ id: user.id, name, bio, city, avatar_url, interests });
     setLoading(false);
     if (error) { Alert.alert('Error saving', error.message); return; }
     await refetchProfile?.();
@@ -168,6 +152,27 @@ export default function EditProfileScreen() {
               </View>
             )}
           </View>
+
+          {/* Interests */}
+          <View style={styles.fieldGroup}>
+            <Text style={styles.fieldLabel}>Interests</Text>
+            <Text style={styles.fieldHint}>Select what you're into — used to recommend events</Text>
+            <View style={styles.chipsWrap}>
+              {CATEGORIES.map(cat => {
+                const active = interests.includes(cat);
+                return (
+                  <TouchableOpacity
+                    key={cat}
+                    style={[styles.chip, active && styles.chipActive]}
+                    onPress={() => setInterests(prev => active ? prev.filter(i => i !== cat) : [...prev, cat])}
+                    activeOpacity={0.7}
+                  >
+                    <Text style={[styles.chipText, active && styles.chipTextActive]}>{cat}</Text>
+                  </TouchableOpacity>
+                );
+              })}
+            </View>
+          </View>
         </View>
       </ScrollView>
 
@@ -240,5 +245,11 @@ const styles = StyleSheet.create({
   dropdownText: { fontSize: 15, fontFamily: Fonts.regular, color: Colors.black },
   dropdownTextActive: { fontWeight: '600', fontFamily: Fonts.semibold, color: Colors.black },
   dropdownCheck: { fontSize: 15, color: Colors.lime, fontWeight: '700' },
+  fieldHint: { fontSize: 12, color: Colors.gray, fontFamily: Fonts.regular, marginTop: -4 },
+  chipsWrap: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginTop: 4 },
+  chip: { paddingHorizontal: 14, paddingVertical: 8, borderRadius: 50, backgroundColor: Colors.grayLight, borderWidth: 1.5, borderColor: 'transparent' },
+  chipActive: { backgroundColor: Colors.black, borderColor: Colors.black },
+  chipText: { fontSize: 13, fontFamily: Fonts.medium, color: Colors.black, fontWeight: '500' },
+  chipTextActive: { color: Colors.lime, fontWeight: '700', fontFamily: Fonts.bold },
   footer: { paddingHorizontal: 24, paddingTop: 12, borderTopWidth: 1, borderColor: Colors.grayBorder, backgroundColor: Colors.white },
 });
