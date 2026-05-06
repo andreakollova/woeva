@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity, RefreshControl, Image, ImageStyle, Modal } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, TouchableOpacity, RefreshControl, Image, ImageStyle, Modal, Alert } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import Animated, { FadeInDown } from 'react-native-reanimated';
@@ -29,6 +29,7 @@ export default function BookedScreen() {
   const [events, setEvents] = useState<BookedEvent[]>([]);
   const [ratedIds, setRatedIds] = useState<Set<string>>(new Set());
   const [refreshing, setRefreshing] = useState(false);
+  const [deletingId, setDeletingId] = useState<string | null>(null);
 
   useEffect(() => { loadEvents(); }, [tab, user]);
 
@@ -68,6 +69,39 @@ export default function BookedScreen() {
     setRefreshing(true);
     await loadEvents();
     setRefreshing(false);
+  }
+
+  function handleDeleteTicket(event: BookedEvent) {
+    Alert.alert(
+      'Remove ticket?',
+      `"${event.title}" will be permanently removed from your past tickets. This cannot be undone.`,
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Remove ticket',
+          style: 'destructive',
+          onPress: () => {
+            Alert.alert(
+              'Are you sure?',
+              'The ticket will be deleted. You will no longer have a record of this event.',
+              [
+                { text: 'Go back', style: 'cancel' },
+                {
+                  text: 'Yes, delete it',
+                  style: 'destructive',
+                  onPress: async () => {
+                    setDeletingId(event.id);
+                    await supabase.from('event_attendees').delete().eq('id', event.attendee_id!);
+                    setEvents(prev => prev.filter(e => e.id !== event.id));
+                    setDeletingId(null);
+                  },
+                },
+              ]
+            );
+          },
+        },
+      ]
+    );
   }
 
   return (
@@ -125,6 +159,7 @@ export default function BookedScreen() {
                 isRated={ratedIds.has(event.id)}
                 onPress={() => router.push(`/event/${event.id}`)}
                 onRate={() => router.push(`/event/${event.id}/rate`)}
+                onDelete={() => handleDeleteTicket(event)}
               />
             </Animated.View>
           ))
@@ -134,7 +169,7 @@ export default function BookedScreen() {
   );
 }
 
-function TicketCard({ event, userId, userAvatar, userName, isPast, isRated, onPress, onRate }: {
+function TicketCard({ event, userId, userAvatar, userName, isPast, isRated, onPress, onRate, onDelete }: {
   event: BookedEvent;
   userId: string;
   userAvatar: string | null;
@@ -143,6 +178,7 @@ function TicketCard({ event, userId, userAvatar, userName, isPast, isRated, onPr
   isRated: boolean;
   onPress: () => void;
   onRate: () => void;
+  onDelete?: () => void;
 }) {
   const [qrModal, setQrModal] = useState(false);
   const [goingCount, setGoingCount] = useState(event.going_count ?? 0);
@@ -188,6 +224,16 @@ function TicketCard({ event, userId, userAvatar, userName, isPast, isRated, onPr
           </View>
           <Text style={styles.ticketEventTitle} numberOfLines={2}>{event.title}</Text>
         </View>
+        {isPast && onDelete && (
+          <TouchableOpacity
+            style={styles.ticketDeleteBtn}
+            onPress={e => { e.stopPropagation(); onDelete(); }}
+            hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+            activeOpacity={0.7}
+          >
+            <Text style={styles.ticketDeleteIcon}>×</Text>
+          </TouchableOpacity>
+        )}
       </View>
 
       {/* Info section */}
@@ -329,6 +375,8 @@ const styles = StyleSheet.create({
   ticketCoverImg: { width: '100%', height: '100%' },
   ticketCoverOverlay: { ...StyleSheet.absoluteFillObject, backgroundColor: 'rgba(0,0,0,0.5)' },
   ticketCoverContent: { position: 'absolute', bottom: 0, left: 0, right: 0, padding: 18, gap: 6 },
+  ticketDeleteBtn: { position: 'absolute', top: 12, right: 12, width: 28, height: 28, borderRadius: 14, backgroundColor: 'rgba(0,0,0,0.5)', alignItems: 'center', justifyContent: 'center' },
+  ticketDeleteIcon: { fontSize: 18, color: Colors.white, lineHeight: 22, fontWeight: '300' },
   ticketStatusPill: { flexDirection: 'row', alignItems: 'center', gap: 6, alignSelf: 'flex-start', backgroundColor: 'rgba(255,255,255,0.15)', borderRadius: 50, paddingHorizontal: 10, paddingVertical: 5 },
   ticketStatusText: { fontSize: 9, fontWeight: '800', color: Colors.white, letterSpacing: 1.2 },
   ticketStatusDot: { width: 6, height: 6, borderRadius: 3 },
