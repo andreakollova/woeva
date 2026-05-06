@@ -42,11 +42,22 @@ export default function ChatScreen() {
         filter: `room_id=eq.${roomId}`,
       }, async payload => {
         const msg = payload.new as Message;
+        // Skip if already in list (optimistic update or own message)
+        setMessages(prev => {
+          if (prev.some(m => m.id === msg.id)) return prev;
+          // Replace temp optimistic message from same user if content matches
+          const tempIdx = prev.findIndex(m => m.id.startsWith('temp-') && m.sender_id === msg.sender_id && m.content === msg.content);
+          if (tempIdx !== -1) {
+            const next = [...prev];
+            next[tempIdx] = msg;
+            return next;
+          }
+          return [...prev, msg];
+        });
         if (msg.sender_id !== user?.id) {
           const { data } = await supabase.from('profiles').select('name, avatar_url').eq('id', msg.sender_id).single();
           if (data) setProfileCache(c => ({ ...c, [msg.sender_id]: data }));
         }
-        setMessages(prev => [...prev, msg]);
         setTimeout(() => listRef.current?.scrollToEnd({ animated: true }), 100);
       })
       .subscribe();
@@ -104,7 +115,28 @@ export default function ChatScreen() {
     const msg = (content ?? text).trim();
     if (!msg || !user) return;
     if (!content) setText('');
-    await supabase.from('messages').insert({ room_id: roomId, sender_id: user.id, content: msg });
+
+    // Optimistic update — show immediately
+    const tempMsg: Message = {
+      id: `temp-${Date.now()}`,
+      room_id: roomId,
+      sender_id: user.id,
+      content: msg,
+      created_at: new Date().toISOString(),
+    } as Message;
+    setMessages(prev => [...prev, tempMsg]);
+    setTimeout(() => listRef.current?.scrollToEnd({ animated: true }), 50);
+
+    const { data: inserted } = await supabase
+      .from('messages')
+      .insert({ room_id: roomId, sender_id: user.id, content: msg })
+      .select()
+      .single();
+
+    // Replace temp with real record
+    if (inserted) {
+      setMessages(prev => prev.map(m => m.id === tempMsg.id ? inserted : m));
+    }
 
     const { data: attendees } = await supabase
       .from('event_attendees').select('user_id')
