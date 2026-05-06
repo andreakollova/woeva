@@ -29,7 +29,6 @@ export default function SearchScreen() {
     const { data } = await supabase
       .from('events')
       .select('*')
-      .neq('status', 'cancelled')
       .limit(50);
     setMapEvents(data ?? []);
   }
@@ -40,9 +39,8 @@ export default function SearchScreen() {
       .from('events')
       .select('*')
       .or(`title.ilike.%${query}%,category.ilike.%${query}%,venue.ilike.%${query}%`)
-      .neq('status', 'cancelled')
       .limit(20);
-    setResults(data ?? []);
+    setResults(((data ?? []) as any).filter((e: any) => e.status !== 'cancelled'));
     setSearched(true);
     setMode('list');
   }

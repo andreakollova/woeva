@@ -58,14 +58,14 @@ export default function HomeScreen() {
       supabase.from('notifications').select('id', { count: 'exact', head: true }).eq('user_id', user.id).eq('read', false)
         .then(({ count }) => setUnreadNotifs(count ?? 0));
     }
-  }, [filter, user]));
+  }, [filter, user?.id]));
 
   async function loadEvents() {
-    let query = supabase.from('events').select('*, club:clubs(id, name, cover_url), attendees:event_attendees(profile:profiles(id, name, avatar_url))').neq('status', 'cancelled').order('date', { ascending: true }).limit(30);
+    let query = supabase.from('events').select('*, club:clubs(id, name, cover_url), attendees:event_attendees(profile:profiles(id, name, avatar_url))').order('date', { ascending: true }).limit(30);
     if (filter === 'Free') query = query.eq('is_free', true);
     else if (filter !== 'All') query = query.eq('category', filter);
     const { data } = await query;
-    setEvents((data ?? []) as any);
+    setEvents(((data ?? []) as any).filter((e: any) => e.status !== 'cancelled'));
 
     if (user) {
       const { data: att } = await supabase.from('event_attendees').select('event_id').eq('user_id', user.id);
