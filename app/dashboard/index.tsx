@@ -201,6 +201,13 @@ export default function DashboardScreen() {
   // Payouts intro gate
   const [showPayoutsSetup, setShowPayoutsSetup] = useState(false);
 
+  // Club settings sheet
+  const [showClubSettings, setShowClubSettings] = useState(false);
+  const [clubAdmins, setClubAdmins] = useState<{ user_id: string; name: string; avatar_url: string | null }[]>([]);
+  const [notifJoin, setNotifJoin] = useState(true);
+  const [notifLeave, setNotifLeave] = useState(true);
+  const [notifChat, setNotifChat] = useState(false);
+
   // Invite admin
   const [showInviteAdmin, setShowInviteAdmin] = useState(false);
   const [inviteQuery, setInviteQuery] = useState('');
@@ -224,6 +231,37 @@ export default function DashboardScreen() {
     if (id) loadMembers(id);
     else setMembers([]);
   }, [selectedClubId, clubs.length]);
+
+  async function openClubSettings() {
+    const targetClub = selectedClub ?? clubs[0];
+    if (!targetClub) return;
+    const { data } = await supabase
+      .from('club_members')
+      .select('user_id, profile:profiles(name, avatar_url)')
+      .eq('club_id', targetClub.id)
+      .eq('role', 'admin')
+      .eq('status', 'approved');
+    setClubAdmins(((data ?? []) as any[]).map(m => ({
+      user_id: m.user_id,
+      name: m.profile?.name ?? '',
+      avatar_url: m.profile?.avatar_url ?? null,
+    })));
+    setShowClubSettings(true);
+  }
+
+  async function removeAdmin(userId: string) {
+    const targetClub = selectedClub ?? clubs[0];
+    if (!targetClub || userId === user?.id) return;
+    Alert.alert('Remove admin', 'Remove this person as admin?', [
+      { text: 'Cancel', style: 'cancel' },
+      { text: 'Remove', style: 'destructive', onPress: async () => {
+        await supabase.from('club_members')
+          .update({ role: 'member' })
+          .eq('club_id', targetClub.id).eq('user_id', userId);
+        setClubAdmins(prev => prev.filter(a => a.user_id !== userId));
+      }},
+    ]);
+  }
 
   async function searchInvite(q: string) {
     setInviteQuery(q);
@@ -565,12 +603,22 @@ export default function DashboardScreen() {
             : <BackButton />
           }
           <Text style={s.pageTitle}>{activeTab === 'scan' ? 'Scan QR' : 'Dashboard'}</Text>
-          <TouchableOpacity style={s.bellBtn} onPress={() => router.push('/notifications' as any)}>
-            <Svg width={22} height={22} viewBox="0 0 24 24" fill="none">
-              <Path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9M13.73 21a2 2 0 0 1-3.46 0" stroke={Colors.black} strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round" />
-            </Svg>
-            {unreadNotifs > 0 && <View style={s.bellDot} />}
-          </TouchableOpacity>
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
+            {clubs.some(c => c.creator_id === user?.id) && activeTab !== 'scan' && (
+              <TouchableOpacity style={s.bellBtn} onPress={openClubSettings}>
+                <Svg width={20} height={20} viewBox="0 0 24 24" fill="none">
+                  <Path d="M12 15a3 3 0 1 0 0-6 3 3 0 0 0 0 6z" stroke={Colors.black} strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round" />
+                  <Path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z" stroke={Colors.black} strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round" />
+                </Svg>
+              </TouchableOpacity>
+            )}
+            <TouchableOpacity style={s.bellBtn} onPress={() => router.push('/notifications' as any)}>
+              <Svg width={22} height={22} viewBox="0 0 24 24" fill="none">
+                <Path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9M13.73 21a2 2 0 0 1-3.46 0" stroke={Colors.black} strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round" />
+              </Svg>
+              {unreadNotifs > 0 && <View style={s.bellDot} />}
+            </TouchableOpacity>
+          </View>
         </View>
 
         {/* Club switcher — only on relevant tabs, only if user has clubs */}
@@ -635,18 +683,11 @@ export default function DashboardScreen() {
                     <Text style={s.clubCardLabel}>{isOwner ? 'Your club' : 'Club admin'}</Text>
                     <Text style={s.clubCardName}>{displayClub.name}</Text>
                   </View>
-                  <View style={{ flexDirection: 'row', gap: 8 }}>
-                    {isOwner && (
-                      <TouchableOpacity style={s.clubEditBtn} onPress={e => { e.stopPropagation(); setShowInviteAdmin(true); }} activeOpacity={0.8}>
-                        <Text style={s.clubEditBtnText}>+ Admin</Text>
-                      </TouchableOpacity>
-                    )}
-                    {isOwner && (
-                      <TouchableOpacity style={s.clubEditBtn} onPress={e => { e.stopPropagation(); router.push(`/club/${displayClub.id}/edit` as any); }} activeOpacity={0.8}>
-                        <Text style={s.clubEditBtnText}>Edit</Text>
-                      </TouchableOpacity>
-                    )}
-                  </View>
+                  {isOwner && (
+                    <TouchableOpacity style={s.clubEditBtn} onPress={e => { e.stopPropagation(); router.push(`/club/${displayClub.id}/edit` as any); }} activeOpacity={0.8}>
+                      <Text style={s.clubEditBtnText}>Edit</Text>
+                    </TouchableOpacity>
+                  )}
                 </TouchableOpacity>
               );
             })()}
@@ -1151,6 +1192,73 @@ export default function DashboardScreen() {
         </View>
       )}
 
+      {/* ── Club Settings Modal ─────────────────────────────────────────────── */}
+      <Modal visible={showClubSettings} transparent animationType="slide" onRequestClose={() => setShowClubSettings(false)}>
+        <TouchableOpacity style={s.modalOverlay} activeOpacity={1} onPress={() => setShowClubSettings(false)}>
+          <View style={[s.attendeesSheet, { paddingBottom: insets.bottom + 24 }]}>
+            <View style={s.billingSheetHandle} />
+            <Text style={s.billingSheetTitle}>Club settings</Text>
+
+            {/* Edit club */}
+            <View style={s.settingsSection}>
+              <Text style={s.settingsSectionTitle}>CLUB</Text>
+              <TouchableOpacity style={s.settingsRow} onPress={() => {
+                setShowClubSettings(false);
+                const c = selectedClub ?? clubs[0];
+                if (c) router.push(`/club/${c.id}/edit` as any);
+              }} activeOpacity={0.7}>
+                <Text style={s.settingsRowLabel}>Edit name, photos, description</Text>
+                <Text style={s.settingsRowArrow}>›</Text>
+              </TouchableOpacity>
+            </View>
+
+            {/* Admins */}
+            <View style={s.settingsSection}>
+              <Text style={s.settingsSectionTitle}>ADMINS</Text>
+              {clubAdmins.map(a => (
+                <View key={a.user_id} style={s.settingsAdminRow}>
+                  <View style={s.attendeeAvatar}>
+                    {a.avatar_url ? <Image source={{ uri: a.avatar_url }} style={StyleSheet.absoluteFill as any} /> : null}
+                    {!a.avatar_url && <Text style={s.attendeeInitial}>{a.name.charAt(0).toUpperCase()}</Text>}
+                  </View>
+                  <Text style={[s.attendeeName, { flex: 1 }]}>{a.name}</Text>
+                  {a.user_id === user?.id
+                    ? <Text style={s.settingsOwnerBadge}>Owner</Text>
+                    : <TouchableOpacity onPress={() => removeAdmin(a.user_id)} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
+                        <Text style={s.settingsRemoveText}>Remove</Text>
+                      </TouchableOpacity>
+                  }
+                </View>
+              ))}
+              <TouchableOpacity style={s.settingsRow} onPress={() => { setShowInviteAdmin(true); }} activeOpacity={0.7}>
+                <Text style={[s.settingsRowLabel, { color: Colors.black, fontWeight: '600' }]}>+ Invite admin</Text>
+              </TouchableOpacity>
+            </View>
+
+            {/* Creator notifications */}
+            <View style={s.settingsSection}>
+              <Text style={s.settingsSectionTitle}>MY NOTIFICATIONS</Text>
+              {[
+                { label: 'Someone joins my event', val: notifJoin, set: setNotifJoin },
+                { label: 'Someone leaves my event', val: notifLeave, set: setNotifLeave },
+                { label: 'New chat messages', val: notifChat, set: setNotifChat },
+              ].map(item => (
+                <View key={item.label} style={s.settingsToggleRow}>
+                  <Text style={s.settingsRowLabel}>{item.label}</Text>
+                  <TouchableOpacity
+                    style={[s.toggle, item.val && s.toggleOn]}
+                    onPress={() => item.set(v => !v)}
+                    activeOpacity={0.8}
+                  >
+                    <View style={[s.toggleThumb, item.val && s.toggleThumbOn]} />
+                  </TouchableOpacity>
+                </View>
+              ))}
+            </View>
+          </View>
+        </TouchableOpacity>
+      </Modal>
+
       {/* ── Invite Admin Modal ──────────────────────────────────────────────── */}
       <Modal visible={showInviteAdmin} transparent animationType="slide" onRequestClose={() => setShowInviteAdmin(false)}>
         <TouchableOpacity style={s.modalOverlay} activeOpacity={1} onPress={() => setShowInviteAdmin(false)}>
@@ -1428,6 +1536,15 @@ const s = StyleSheet.create({
   viewFilterText: { fontSize: 12, fontWeight: '500', color: Colors.gray, fontFamily: Fonts.medium },
   viewFilterTextActive: { color: Colors.white, fontWeight: '700', fontFamily: Fonts.bold },
   inviteInput: { height: 44, borderWidth: 1.5, borderColor: Colors.grayBorder, borderRadius: 12, paddingHorizontal: 14, fontSize: 14, color: Colors.black, marginBottom: 12 },
+  settingsSection: { marginBottom: 20 },
+  settingsSectionTitle: { fontSize: 11, fontWeight: '600', color: Colors.gray, letterSpacing: 0.5, marginBottom: 8, textTransform: 'uppercase' },
+  settingsRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingVertical: 12, borderTopWidth: 1, borderColor: Colors.grayBorder },
+  settingsRowLabel: { fontSize: 14, color: Colors.black, fontFamily: Fonts.regular },
+  settingsRowArrow: { fontSize: 18, color: Colors.gray },
+  settingsToggleRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingVertical: 10, borderTopWidth: 1, borderColor: Colors.grayBorder },
+  settingsAdminRow: { flexDirection: 'row', alignItems: 'center', gap: 10, paddingVertical: 10, borderTopWidth: 1, borderColor: Colors.grayBorder },
+  settingsOwnerBadge: { fontSize: 12, color: Colors.gray, fontFamily: Fonts.regular },
+  settingsRemoveText: { fontSize: 13, color: '#CC3333', fontFamily: Fonts.medium },
 
   // Payouts intro
   payoutsIntro: { paddingTop: 12, gap: 16 },
