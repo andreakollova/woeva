@@ -61,7 +61,7 @@ export default function HomeScreen() {
   }, [filter, user]));
 
   async function loadEvents() {
-    let query = supabase.from('events').select('*, club:clubs(id, name, cover_url), attendees:event_attendees(profile:profiles(id, name, avatar_url))').order('date', { ascending: true }).limit(30);
+    let query = supabase.from('events').select('*, club:clubs(id, name, cover_url), attendees:event_attendees(profile:profiles(id, name, avatar_url))').neq('status', 'cancelled').order('date', { ascending: true }).limit(30);
     if (filter === 'Free') query = query.eq('is_free', true);
     else if (filter !== 'All') query = query.eq('category', filter);
     const { data } = await query;

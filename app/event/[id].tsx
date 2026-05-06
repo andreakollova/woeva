@@ -32,10 +32,11 @@ const SAMPLE_AVATARS = [
 ];
 
 const CANCEL_REASONS = [
-  'Zdravotné problémy',
-  'Technické problémy',
-  'Rodinné dôvody',
-  'Iné',
+  'Health issues',
+  'Technical problems',
+  'Family reasons',
+  'Venue unavailable',
+  'Other',
 ];
 
 type Attendee = { id: string; user_id: string; profile: { name: string | null; avatar_url: string | null } | null };
@@ -59,6 +60,7 @@ export default function EventDetailScreen() {
   const [cancelReason, setCancelReason] = useState('');
   const [cancelNote, setCancelNote] = useState('');
   const [cancelling, setCancelling] = useState(false);
+  const [confirmCancelModal, setConfirmCancelModal] = useState(false);
 
   const waveRot = useSharedValue(0);
   const waveStyle = useAnimatedStyle(() => ({
@@ -258,7 +260,7 @@ export default function EventDetailScreen() {
               </TouchableOpacity>
             ))}
 
-            {cancelReason === 'Iné' && (
+            {cancelReason === 'Other' && (
               <TextInput
                 style={s.cancelNoteInput}
                 value={cancelNote}
@@ -274,15 +276,39 @@ export default function EventDetailScreen() {
             <View style={s.cancelActions}>
               <Button label="Keep event" onPress={() => setCancelModal(false)} variant="ghost" />
               <Button
-                label="Cancel event"
-                onPress={handleCancel}
-                loading={cancelling}
-                disabled={!cancelReason || cancelling}
+                label="Continue →"
+                onPress={() => { setCancelModal(false); setConfirmCancelModal(true); }}
+                disabled={!cancelReason}
                 variant="black"
               />
             </View>
           </TouchableOpacity>
         </TouchableOpacity>
+      </Modal>
+
+      {/* Confirm cancel modal */}
+      <Modal visible={confirmCancelModal} transparent animationType="slide" onRequestClose={() => setConfirmCancelModal(false)}>
+        <View style={s.modalOverlay}>
+          <View style={s.cancelSheet}>
+            <View style={s.cancelSheetHandle} />
+            <Text style={s.cancelSheetTitle}>Are you sure?</Text>
+            <Text style={[s.cancelSheetSub, { marginBottom: 8 }]}>
+              You're about to cancel <Text style={{ fontWeight: '700', color: Colors.black }}>{event?.title}</Text>.
+            </Text>
+            <View style={s.confirmWarningBox}>
+              <Text style={s.confirmWarningText}>• All reservations will be cancelled{'\n'}• Attendees will be notified immediately{'\n'}• This action cannot be undone</Text>
+            </View>
+            <View style={[s.cancelActions, { marginTop: 20 }]}>
+              <Button label="Go back" onPress={() => { setConfirmCancelModal(false); setCancelModal(true); }} variant="ghost" />
+              <Button
+                label="Yes, cancel event"
+                onPress={() => { setConfirmCancelModal(false); handleCancel(); }}
+                loading={cancelling}
+                variant="black"
+              />
+            </View>
+          </View>
+        </View>
       </Modal>
 
       <Animated.ScrollView
@@ -687,6 +713,8 @@ const s = StyleSheet.create({
   reasonText: { fontSize: 14, color: Colors.gray, fontFamily: Fonts.regular },
   reasonTextActive: { color: Colors.black, fontWeight: '600' },
   cancelNoteInput: { borderWidth: 1.5, borderColor: Colors.grayBorder, borderRadius: 12, paddingHorizontal: 14, paddingVertical: 12, fontSize: 14, color: Colors.black, fontFamily: Fonts.regular, minHeight: 70 },
+  confirmWarningBox: { backgroundColor: '#FFF3F3', borderRadius: 12, padding: 16, borderLeftWidth: 3, borderLeftColor: '#CC3333' },
+  confirmWarningText: { fontSize: 14, color: '#CC3333', fontFamily: Fonts.regular, lineHeight: 22 },
   cancelActions: { flexDirection: 'row', gap: 10, marginTop: 4 },
 
   // QR modal
