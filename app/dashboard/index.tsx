@@ -223,6 +223,7 @@ export default function DashboardScreen() {
       s.add(userId);
       return { ...prev, [eventId]: s };
     });
+    supabase.from('check_ins').upsert({ event_id: eventId, user_id: userId }).then(() => {});
   }
 
   // Reload members when selected club changes
@@ -461,11 +462,24 @@ export default function DashboardScreen() {
   async function openAttendees(event: EventRow) {
     setAttendeesEvent(event);
     setLoadingAttendees(true);
-    const { data } = await supabase
-      .from('event_attendees')
-      .select('profile:profiles(id, name, avatar_url)')
-      .eq('event_id', event.id);
-    setAttendees(((data ?? []) as any).map((a: any) => a.profile).filter(Boolean));
+    const [{ data: attData }, { data: ciData }] = await Promise.all([
+      supabase.from('event_attendees')
+        .select('profile:profiles(id, name, avatar_url)')
+        .eq('event_id', event.id),
+      supabase.from('check_ins')
+        .select('user_id')
+        .eq('event_id', event.id),
+    ]);
+    setAttendees(((attData ?? []) as any).map((a: any) => a.profile).filter(Boolean));
+    // Merge DB check-ins into local state
+    const dbCheckedIn = new Set((ciData ?? []).map((c: any) => c.user_id));
+    if (dbCheckedIn.size > 0) {
+      setCheckedIn(prev => {
+        const existing = new Set(prev[event.id] ?? []);
+        dbCheckedIn.forEach(id => existing.add(id));
+        return { ...prev, [event.id]: existing };
+      });
+    }
     setLoadingAttendees(false);
   }
 
