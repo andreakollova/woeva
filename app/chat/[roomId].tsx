@@ -181,20 +181,23 @@ export default function ChatScreen() {
 
     return (
       <View style={[styles.msgRow, isMe && styles.msgRowMe]}>
-        {!isMe && Avatar}
-        <View style={[styles.bubble, isMe && styles.bubbleMe]}>
-          {!isMe && (
-            <View style={styles.senderNameRow}>
-              <Text style={styles.senderName}>{firstName}</Text>
-              {isAdmin && <View style={styles.adminBadge}><Text style={styles.adminBadgeText}>Admin</Text></View>}
-            </View>
-          )}
-          <Text style={[styles.msgText, isMe && styles.msgTextMe]}>{item.content}</Text>
-          <Text style={[styles.msgTime, isMe && styles.msgTimeMe]}>
-            {new Date(item.created_at).toLocaleTimeString('sk-SK', { hour: '2-digit', minute: '2-digit' })}
-          </Text>
+        {Avatar}
+        <View style={{ maxWidth: '72%' }}>
+          <View style={[styles.senderNameRow, isMe && styles.senderNameRowMe]}>
+            <Text style={styles.senderName}>{isMe ? 'You' : firstName}</Text>
+            {isAdmin && (
+              <View style={styles.adminBadge}>
+                <Text style={styles.adminBadgeText}>★ Admin</Text>
+              </View>
+            )}
+          </View>
+          <View style={[styles.bubble, isMe && styles.bubbleMe]}>
+            <Text style={[styles.msgText, isMe && styles.msgTextMe]}>{item.content}</Text>
+            <Text style={[styles.msgTime, isMe && styles.msgTimeMe]}>
+              {new Date(item.created_at).toLocaleTimeString('sk-SK', { hour: '2-digit', minute: '2-digit' })}
+            </Text>
+          </View>
         </View>
-        {isMe && Avatar}
       </View>
     );
   }
@@ -284,10 +287,11 @@ const styles = StyleSheet.create({
   senderInitial: { fontSize: 12, fontWeight: '700', color: Colors.black, fontFamily: Fonts.bold },
   bubble: { maxWidth: '75%', backgroundColor: Colors.grayLight, borderRadius: 18, borderBottomLeftRadius: 4, padding: 12, gap: 3 },
   bubbleMe: { backgroundColor: Colors.black, borderBottomLeftRadius: 18, borderBottomRightRadius: 4 },
-  senderNameRow: { flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 2 },
+  senderNameRow: { flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 3 },
+  senderNameRowMe: { justifyContent: 'flex-end' },
   senderName: { fontSize: 11, fontWeight: '600', color: Colors.gray, fontFamily: Fonts.semibold },
-  adminBadge: { backgroundColor: Colors.black, borderRadius: 4, paddingHorizontal: 5, paddingVertical: 1 },
-  adminBadgeText: { fontSize: 9, fontWeight: '700', color: Colors.white, fontFamily: Fonts.bold, letterSpacing: 0.3 },
+  adminBadge: { backgroundColor: '#FF9500', borderRadius: 4, paddingHorizontal: 5, paddingVertical: 1, flexDirection: 'row', alignItems: 'center' },
+  adminBadgeText: { fontSize: 9, fontWeight: '700', color: Colors.white, fontFamily: Fonts.bold, letterSpacing: 0.2 },
   msgText: { fontSize: 15, color: Colors.black, lineHeight: 20 },
   msgTextMe: { color: Colors.white },
   msgTime: { fontSize: 10, color: Colors.gray, alignSelf: 'flex-end' },
