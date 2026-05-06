@@ -18,9 +18,10 @@ const SECTIONS = [
     ],
   },
   {
-    title: 'Preferences',
+    title: 'Creator',
     items: [
       { label: 'Notifications', route: '/settings/notifications' },
+      { label: 'Payouts', route: '/dashboard' },
     ],
   },
   {

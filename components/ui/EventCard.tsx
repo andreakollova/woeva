@@ -109,7 +109,7 @@ export function EventCard({ event, featured, attending }: EventCardProps) {
           {event.venue ? (
             <>
               <Text style={styles.rowDot}>·</Text>
-              <Text style={styles.rowMeta} numberOfLines={1}>{event.venue}</Text>
+              <Text style={styles.rowMeta} numberOfLines={1}>{event.venue.split(',')[0].trim()}</Text>
             </>
           ) : null}
         </View>

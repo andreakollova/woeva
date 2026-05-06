@@ -122,18 +122,18 @@ export function VenueInput({ value, onChange }: VenueInputProps) {
 
 const styles = StyleSheet.create({
   label: {
-    fontSize: 14,
+    fontSize: 13,
     fontWeight: '500',
     fontFamily: Fonts.medium,
     color: Colors.black,
     marginBottom: 6,
   },
   inputWrap: {
-    height: 52,
+    height: 44,
     borderWidth: 1.5,
     borderColor: Colors.grayBorder,
     borderRadius: 12,
-    paddingHorizontal: 16,
+    paddingHorizontal: 14,
     flexDirection: 'row',
     alignItems: 'center',
   },
@@ -142,7 +142,7 @@ const styles = StyleSheet.create({
   },
   input: {
     flex: 1,
-    fontSize: 16,
+    fontSize: 14,
     color: Colors.black,
     fontFamily: Fonts.regular,
   },

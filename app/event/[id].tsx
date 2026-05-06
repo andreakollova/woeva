@@ -136,6 +136,15 @@ export default function EventDetailScreen() {
       setLoading(true);
       await supabase.from('event_attendees').insert({ event_id: id, user_id: user.id, paid: true });
       await supabase.from('events').update({ going_count: (event?.going_count ?? 0) + 1 }).eq('id', id);
+      if (event?.creator_id && event.creator_id !== user.id) {
+        await supabase.from('notifications').insert({
+          user_id: event.creator_id,
+          type: 'join',
+          title: `New attendee for ${event.title}`,
+          body: `${profile?.name ?? 'Someone'} joined your event.`,
+          data: { event_id: id },
+        });
+      }
       setIsAttending(true); setLoading(false); setToast(true); load();
     } else {
       router.push(`/event/${id}/payment`);

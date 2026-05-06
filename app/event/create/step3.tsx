@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, ScrollView, KeyboardAvoidingView, Platform, Alert } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, ScrollView, KeyboardAvoidingView, Platform, Alert, Modal, Pressable } from 'react-native';
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import DateTimePicker from '@react-native-community/datetimepicker';
@@ -31,6 +31,7 @@ export default function CreateStep3Screen() {
   const [loading, setLoading] = useState(false);
   const [showDate, setShowDate] = useState(false);
   const [showTime, setShowTime] = useState(false);
+  const [showDuration, setShowDuration] = useState(false);
   const [toast, setToast] = useState(false);
 
   async function handleShare() {
@@ -81,11 +82,11 @@ export default function CreateStep3Screen() {
     if (!error && data) {
       await supabase.from('event_attendees').insert({ event_id: data.id, user_id: currentUser.id, paid: true });
 
-      // Send push notifications to club members
+      // Send push + in-app notifications to club members
       if (clubData?.id) {
         const { data: members } = await supabase
           .from('club_members')
-          .select('profile:profiles(push_token)')
+          .select('user_id, profile:profiles(push_token)')
           .eq('club_id', clubData.id)
           .eq('status', 'approved')
           .neq('user_id', currentUser.id);
@@ -105,6 +106,18 @@ export default function CreateStep3Screen() {
               data: { eventId: data.id },
             }))),
           }).catch(() => {});
+        }
+
+        // In-app notifications
+        const inAppNotifs = (members ?? []).map((m: any) => ({
+          user_id: m.user_id,
+          type: 'club_event',
+          title: 'New event in your club',
+          body: String(params.title),
+          data: { event_id: data.id },
+        }));
+        if (inAppNotifs.length > 0) {
+          await supabase.from('notifications').insert(inAppNotifs);
         }
       }
     }
@@ -152,39 +165,52 @@ export default function CreateStep3Screen() {
             )}
           </View>
 
-          {/* Time */}
-          <View>
-            <Text style={styles.label}>Time</Text>
-            <TouchableOpacity style={styles.field} onPress={() => setShowTime(true)}>
-              <Text style={styles.fieldValue}>{timeStr}</Text>
-            </TouchableOpacity>
-            {showTime && (
-              <DateTimePicker
-                value={time}
-                mode="time"
-                display="spinner"
-                onChange={(_, t) => { setShowTime(false); if (t) setTime(t); }}
-              />
-            )}
-          </View>
+          {/* Time + Duration row */}
+          <View style={styles.halfRow}>
+            <View style={styles.halfCol}>
+              <Text style={styles.label}>Time</Text>
+              <TouchableOpacity style={styles.field} onPress={() => setShowTime(true)}>
+                <Text style={styles.fieldValue}>{timeStr}</Text>
+              </TouchableOpacity>
+              {showTime && (
+                <DateTimePicker
+                  value={time}
+                  mode="time"
+                  display="spinner"
+                  onChange={(_, t) => { setShowTime(false); if (t) setTime(t); }}
+                />
+              )}
+            </View>
 
-          {/* Duration */}
-          <View>
-            <Text style={styles.label}>Duration</Text>
-            <View style={styles.durationRow}>
-              {['0.5', '1', '1.5', '2', '3', '4', '5', '6'].map(h => (
-                <TouchableOpacity
-                  key={h}
-                  style={[styles.durationChip, duration === h && styles.durationChipActive]}
-                  onPress={() => setDuration(h)}
-                >
-                  <Text style={[styles.durationChipText, duration === h && styles.durationChipTextActive]}>
-                    {h}h
-                  </Text>
-                </TouchableOpacity>
-              ))}
+            <View style={styles.halfCol}>
+              <Text style={styles.label}>Duration</Text>
+              <TouchableOpacity style={styles.field} onPress={() => setShowDuration(true)}>
+                <Text style={styles.fieldValue}>{duration === '0.5' ? '30 min' : `${duration}h`}</Text>
+              </TouchableOpacity>
             </View>
           </View>
+
+          {/* Duration picker modal */}
+          <Modal visible={showDuration} transparent animationType="fade" onRequestClose={() => setShowDuration(false)}>
+            <Pressable style={styles.modalOverlay} onPress={() => setShowDuration(false)}>
+              <View style={styles.durationSheet}>
+                <Text style={styles.durationSheetTitle}>Duration</Text>
+                {(['0.5', '1', '1.5', '2', '3', '4', '5', '6', '8'] as const).map((h, i, arr) => (
+                  <TouchableOpacity
+                    key={h}
+                    style={[styles.durationOption, i < arr.length - 1 && styles.durationOptionBorder]}
+                    onPress={() => { setDuration(h); setShowDuration(false); }}
+                    activeOpacity={0.7}
+                  >
+                    <Text style={[styles.durationOptionText, duration === h && styles.durationOptionActive]}>
+                      {h === '0.5' ? '30 min' : `${h} hour${parseFloat(h) !== 1 ? 's' : ''}`}
+                    </Text>
+                    {duration === h && <Text style={styles.durationCheck}>✓</Text>}
+                  </TouchableOpacity>
+                ))}
+              </View>
+            </Pressable>
+          </Modal>
 
           {/* Venue */}
           <VenueInput
@@ -251,11 +277,16 @@ const styles = StyleSheet.create({
   field: { height: 44, borderWidth: 1.5, borderColor: Colors.grayBorder, borderRadius: 12, paddingHorizontal: 14, justifyContent: 'center' },
   fieldValue: { fontSize: 14, color: Colors.black },
   row: { flexDirection: 'row', gap: 12 },
-  durationRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
-  durationChip: { paddingHorizontal: 16, paddingVertical: 10, borderRadius: 50, backgroundColor: Colors.grayLight, borderWidth: 1.5, borderColor: 'transparent' },
-  durationChipActive: { backgroundColor: Colors.black, borderColor: Colors.black },
-  durationChipText: { fontSize: 14, fontWeight: '600', color: Colors.gray },
-  durationChipTextActive: { color: Colors.white },
+  halfRow: { flexDirection: 'row', gap: 12 },
+  halfCol: { flex: 1 },
+  modalOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.4)', justifyContent: 'flex-end' },
+  durationSheet: { backgroundColor: Colors.white, borderTopLeftRadius: 20, borderTopRightRadius: 20, paddingHorizontal: 20, paddingTop: 20, paddingBottom: 36 },
+  durationSheetTitle: { fontSize: 15, fontWeight: '700', color: Colors.black, marginBottom: 12 },
+  durationOption: { paddingVertical: 14, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
+  durationOptionBorder: { borderBottomWidth: 1, borderColor: Colors.grayBorder },
+  durationOptionText: { fontSize: 15, color: Colors.black },
+  durationOptionActive: { fontWeight: '600' },
+  durationCheck: { fontSize: 16, color: Colors.black, fontWeight: '600' },
   footer: { paddingHorizontal: 24, paddingTop: 12, borderTopWidth: 1, borderColor: Colors.grayBorder, gap: 8, backgroundColor: Colors.white },
   recurringRow: { flexDirection: 'row', alignItems: 'center', gap: 14, backgroundColor: Colors.grayLight, borderRadius: 12, padding: 14 },
   recurringText: { flex: 1 },

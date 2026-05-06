@@ -4,7 +4,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Svg, { Path, Circle, Rect } from 'react-native-svg';
 import { Colors } from '@/constants/colors';
 import { Fonts } from '@/constants/fonts';
-import { useRouter } from 'expo-router';
+import { useRouter, usePathname } from 'expo-router';
 import { useEffect, useState } from 'react';
 import { supabase } from '@/lib/supabase';
 import { useAuth } from '@/context/AuthContext';
@@ -45,11 +45,23 @@ function ProfileIcon({ color }: { color: string }) {
   );
 }
 
+function DashboardIcon({ color }: { color: string }) {
+  return (
+    <Svg width={22} height={22} viewBox="0 0 24 24" fill="none">
+      <Rect x="3" y="3" width="7" height="7" rx="2" stroke={color} strokeWidth={1.6} />
+      <Rect x="14" y="3" width="7" height="7" rx="2" stroke={color} strokeWidth={1.6} />
+      <Rect x="3" y="14" width="7" height="7" rx="2" stroke={color} strokeWidth={1.6} />
+      <Rect x="14" y="14" width="7" height="7" rx="2" stroke={color} strokeWidth={1.6} />
+    </Svg>
+  );
+}
+
 const TAB_ICONS: Record<string, (color: string) => React.ReactNode> = {
   index: (c) => <HomeIcon color={c} />,
   search: (c) => <SearchIcon color={c} />,
   booked: (c) => <BookedIcon color={c} />,
   profile: (c) => <ProfileIcon color={c} />,
+  dashboard: (c) => <DashboardIcon color={c} />,
 };
 
 const TAB_LABELS: Record<string, string> = {
@@ -57,19 +69,21 @@ const TAB_LABELS: Record<string, string> = {
   search: 'Search',
   booked: 'Booked',
   profile: 'Profile',
+  dashboard: 'Dashboard',
 };
 
 function TabBar({ state, descriptors, navigation }: any) {
   const insets = useSafeAreaInsets();
   const router = useRouter();
+  const pathname = usePathname();
   const { user, loading } = useAuth();
-  const [myClub, setMyClub] = useState<{ id: string } | null>(null);
+  const [myClubs, setMyClubs] = useState<{ id: string; name: string }[]>([]);
   const [showMenu, setShowMenu] = useState(false);
 
   useEffect(() => {
-    if (!user) { setMyClub(null); return; }
-    supabase.from('clubs').select('id').eq('creator_id', user.id).limit(1).single()
-      .then(({ data }) => setMyClub(data ?? null));
+    if (!user) { setMyClubs([]); return; }
+    supabase.from('clubs').select('id, name').eq('creator_id', user.id)
+      .then(({ data }) => setMyClubs(data ?? []));
   }, [user]);
 
   function handleCreatePress() {
@@ -99,27 +113,39 @@ function TabBar({ state, descriptors, navigation }: any) {
 
             {/* Secondary row */}
             <View style={styles.menuSecondaryRow}>
-              {/* Club: My club or New club */}
-              <TouchableOpacity
-                style={styles.menuSecondaryItem}
-                onPress={() => {
-                  setShowMenu(false);
-                  if (myClub) router.push(`/club/${myClub.id}` as any);
-                  else router.push('/club/create');
-                }}
-                activeOpacity={0.7}
-              >
-                <Svg width={16} height={16} viewBox="0 0 24 24" fill="none">
-                  <Path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2" stroke={Colors.gray} strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round" />
-                  <Circle cx={9} cy={7} r={4} stroke={Colors.gray} strokeWidth={1.8} />
-                  <Path d="M23 21v-2a4 4 0 0 0-3-3.87" stroke={Colors.gray} strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round" />
-                  <Path d="M16 3.13a4 4 0 0 1 0 7.75" stroke={Colors.gray} strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round" />
-                </Svg>
-                <Text style={styles.menuSecondaryTitle}>{myClub ? 'My club' : 'New club'}</Text>
-              </TouchableOpacity>
+              {/* Club(s) or New club */}
+              {myClubs.length === 0 ? (
+                <TouchableOpacity style={styles.menuSecondaryItem} onPress={() => { setShowMenu(false); router.push('/club/create'); }} activeOpacity={0.7}>
+                  <Svg width={16} height={16} viewBox="0 0 24 24" fill="none">
+                    <Path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2" stroke={Colors.gray} strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round" />
+                    <Circle cx={9} cy={7} r={4} stroke={Colors.gray} strokeWidth={1.8} />
+                    <Path d="M23 21v-2a4 4 0 0 0-3-3.87" stroke={Colors.gray} strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round" />
+                    <Path d="M16 3.13a4 4 0 0 1 0 7.75" stroke={Colors.gray} strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round" />
+                  </Svg>
+                  <Text style={styles.menuSecondaryTitle}>New club</Text>
+                </TouchableOpacity>
+              ) : myClubs.length === 1 ? (
+                <TouchableOpacity style={styles.menuSecondaryItem} onPress={() => { setShowMenu(false); router.push(`/club/${myClubs[0].id}` as any); }} activeOpacity={0.7}>
+                  <Svg width={16} height={16} viewBox="0 0 24 24" fill="none">
+                    <Path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2" stroke={Colors.gray} strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round" />
+                    <Circle cx={9} cy={7} r={4} stroke={Colors.gray} strokeWidth={1.8} />
+                    <Path d="M23 21v-2a4 4 0 0 0-3-3.87" stroke={Colors.gray} strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round" />
+                    <Path d="M16 3.13a4 4 0 0 1 0 7.75" stroke={Colors.gray} strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round" />
+                  </Svg>
+                  <Text style={styles.menuSecondaryTitle}>My club</Text>
+                </TouchableOpacity>
+              ) : (
+                <TouchableOpacity style={styles.menuSecondaryItem} onPress={() => { setShowMenu(false); router.push('/dashboard'); }} activeOpacity={0.7}>
+                  <Svg width={16} height={16} viewBox="0 0 24 24" fill="none">
+                    <Path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2" stroke={Colors.gray} strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round" />
+                    <Circle cx={9} cy={7} r={4} stroke={Colors.gray} strokeWidth={1.8} />
+                  </Svg>
+                  <Text style={styles.menuSecondaryTitle}>My clubs ({myClubs.length})</Text>
+                </TouchableOpacity>
+              )}
 
-              {/* My dashboard — only if has club */}
-              {myClub && (
+              {/* My dashboard — only if has club(s) */}
+              {myClubs.length > 0 && (
                 <>
                   <View style={styles.menuSecondaryDivider} />
                   <TouchableOpacity

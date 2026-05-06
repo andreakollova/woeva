@@ -1,7 +1,7 @@
 import { BackButton } from '@/components/ui/BackButton';
 import React, { useEffect, useState, useRef } from 'react';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { View, Text, StyleSheet, FlatList, TextInput, TouchableOpacity, KeyboardAvoidingView, Platform, Image } from 'react-native';
+import { View, Text, StyleSheet, FlatList, TextInput, TouchableOpacity, KeyboardAvoidingView, Platform, Image, Alert } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Colors } from '@/constants/colors';
@@ -95,6 +95,41 @@ export default function ChatScreen() {
     const msg = text.trim();
     setText('');
     await supabase.from('messages').insert({ room_id: roomId, sender_id: user.id, content: msg });
+
+    // Notify other attendees
+    const { data: attendees } = await supabase
+      .from('event_attendees')
+      .select('user_id')
+      .eq('event_id', roomId)
+      .neq('user_id', user.id);
+    const notifs = (attendees ?? []).map((a: any) => ({
+      user_id: a.user_id,
+      type: 'chat',
+      title: eventTitle || 'New message',
+      body: `${(profile?.name ?? 'Someone').split(' ')[0]}: ${msg.length > 60 ? msg.slice(0, 60) + '…' : msg}`,
+      data: { event_id: roomId },
+    }));
+    if (notifs.length > 0) {
+      supabase.from('notifications').insert(notifs).then(() => {});
+    }
+  }
+
+  function handleReport() {
+    Alert.alert('Report chat', 'Report this conversation for inappropriate content?', [
+      { text: 'Cancel', style: 'cancel' },
+      {
+        text: 'Report',
+        style: 'destructive',
+        onPress: async () => {
+          await supabase.from('reports').insert({
+            reporter_id: user?.id,
+            target_type: 'chat',
+            target_id: roomId,
+          }).then(() => {});
+          Alert.alert('Reported', 'Thank you. Our team will review this chat.');
+        },
+      },
+    ]);
   }
 
   function renderItem({ item }: { item: Message }) {
@@ -155,6 +190,9 @@ export default function ChatScreen() {
             <Text style={styles.headerSub}>Group chat</Text>
           )}
         </View>
+        <TouchableOpacity onPress={handleReport} style={styles.reportBtn}>
+          <Text style={styles.reportIcon}>⋯</Text>
+        </TouchableOpacity>
       </View>
 
       {/* Messages */}
@@ -204,6 +242,8 @@ const styles = StyleSheet.create({
   headerHostAvatarFallback: { backgroundColor: Colors.lime, alignItems: 'center', justifyContent: 'center' },
   headerHostInitial: { fontSize: 8, fontWeight: '700', color: Colors.black },
   headerSub: { fontSize: 12, color: Colors.gray },
+  reportBtn: { padding: 6 },
+  reportIcon: { fontSize: 20, color: Colors.gray, lineHeight: 22 },
   list: { padding: 16, gap: 8 },
   msgRow: { flexDirection: 'row', gap: 8, marginBottom: 10, alignItems: 'flex-end' },
   msgRowMe: { flexDirection: 'row-reverse' },

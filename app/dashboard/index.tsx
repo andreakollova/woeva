@@ -1,8 +1,19 @@
 import React, { useState, useCallback } from 'react';
 import {
   View, Text, StyleSheet, ScrollView, TouchableOpacity,
-  Image, Alert, ActivityIndicator, Modal, TextInput, Platform,
+  Image, Alert, ActivityIndicator, Modal, TextInput, Platform, FlatList,
 } from 'react-native';
+// expo-camera requires a native build — safe lazy import
+let _expoCamera: any = null;
+try { _expoCamera = require('expo-camera'); } catch {}
+const SafeCameraView: any = _expoCamera?.CameraView ?? null;
+function useSafeCameraPermissions(): [{ granted: boolean } | null, () => Promise<any>] {
+  if (_expoCamera?.useCameraPermissions) {
+    // eslint-disable-next-line react-hooks/rules-of-hooks
+    return _expoCamera.useCameraPermissions();
+  }
+  return [null, async () => {}];
+}
 import { useFocusEffect, useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import * as WebBrowser from 'expo-web-browser';
@@ -24,7 +35,7 @@ const STRIPE_FIXED = 0.30;
 const PLATFORM_FEE_PCT = 5;
 
 // ─── Types ────────────────────────────────────────────────────────────────────
-type DashTab = 'home' | 'events' | 'payouts' | 'stats';
+type DashTab = 'home' | 'events' | 'payouts' | 'stats' | 'scan';
 
 type Member = {
   id: string; user_id: string; created_at: string;
@@ -38,7 +49,7 @@ type EventRow = {
   paid_count: number; gross: number; stripe_fee: number; woeva_fee: number; net: number;
 };
 
-type Club = { id: string; name: string; cover_url: string | null; logo_url: string | null };
+type Club = { id: string; name: string; cover_url: string | null; logo_url: string | null; creator_id: string };
 
 type BillingInfo = {
   id: string; company_name: string; ico: string; dic: string | null;
@@ -68,84 +79,74 @@ function calcRevenue(price: number, count: number) {
 
 function isUpcoming(e: EventRow) { return new Date(`${e.date}T${e.time ?? '00:00'}`) >= new Date(); }
 
-function RevenueChart({ events, range, width }: { events: EventRow[]; range: 'week' | 'month' | 'all'; width: number }) {
+function EventChart({ events, range, width, getValue, color, gradId }: {
+  events: EventRow[]; range: 'week' | 'month' | 'all'; width: number;
+  getValue: (e: EventRow) => number; color: string; gradId: string;
+}) {
   const H = 110;
   const PAD = { t: 10, b: 24, l: 8, r: 8 };
   const W = width - PAD.l - PAD.r;
-
-  // Build buckets
   const now = new Date();
-  let buckets: { label: string; gross: number }[] = [];
+  let buckets: { label: string; val: number }[] = [];
 
   if (range === 'week') {
     for (let i = 6; i >= 0; i--) {
       const d = new Date(now); d.setDate(d.getDate() - i);
       const key = d.toISOString().slice(0, 10);
       const label = d.toLocaleDateString('sk-SK', { weekday: 'short' });
-      const gross = events.filter(e => e.date === key).reduce((s, e) => s + e.gross, 0);
-      buckets.push({ label, gross });
+      const val = events.filter(e => e.date === key).reduce((s, e) => s + getValue(e), 0);
+      buckets.push({ label, val });
     }
   } else if (range === 'month') {
     for (let i = 3; i >= 0; i--) {
       const start = new Date(now); start.setDate(start.getDate() - i * 7 - 6);
       const end = new Date(now); end.setDate(end.getDate() - i * 7);
-      const label = `W${4 - i}`;
-      const gross = events.filter(e => { const d = new Date(e.date); return d >= start && d <= end; }).reduce((s, e) => s + e.gross, 0);
-      buckets.push({ label, gross });
+      const val = events.filter(e => { const d = new Date(e.date); return d >= start && d <= end; }).reduce((s, e) => s + getValue(e), 0);
+      buckets.push({ label: `W${4 - i}`, val });
     }
   } else {
-    // Last 6 months
     for (let i = 5; i >= 0; i--) {
       const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
       const label = d.toLocaleDateString('sk-SK', { month: 'short' });
-      const gross = events.filter(e => {
+      const val = events.filter(e => {
         const ed = new Date(e.date);
         return ed.getFullYear() === d.getFullYear() && ed.getMonth() === d.getMonth();
-      }).reduce((s, e) => s + e.gross, 0);
-      buckets.push({ label, gross });
+      }).reduce((s, e) => s + getValue(e), 0);
+      buckets.push({ label, val });
     }
   }
 
-  const maxVal = Math.max(...buckets.map(b => b.gross), 1);
+  const maxVal = Math.max(...buckets.map(b => b.val), 1);
   const n = buckets.length;
   const step = W / (n - 1);
-
   const points = buckets.map((b, i) => ({
     x: PAD.l + i * step,
-    y: PAD.t + (H - PAD.t - PAD.b) * (1 - b.gross / maxVal),
+    y: PAD.t + (H - PAD.t - PAD.b) * (1 - b.val / maxVal),
   }));
-
   const linePoints = points.map(p => `${p.x},${p.y}`).join(' ');
-  const areaPoints = [
-    `${points[0].x},${H - PAD.b}`,
-    ...points.map(p => `${p.x},${p.y}`),
-    `${points[n - 1].x},${H - PAD.b}`,
-  ].join(' ');
-
-  const hasData = buckets.some(b => b.gross > 0);
+  const areaPoints = [`${points[0].x},${H - PAD.b}`, ...points.map(p => `${p.x},${p.y}`), `${points[n - 1].x},${H - PAD.b}`].join(' ');
+  const hasData = buckets.some(b => b.val > 0);
 
   return (
-    <View style={{ marginBottom: 20 }}>
+    <View style={{ marginBottom: 4 }}>
       <Svg width={width} height={H}>
         <Defs>
-          <SvgGrad id="chartGrad" x1="0" y1="0" x2="0" y2="1">
-            <Stop offset="0" stopColor={Colors.lime} stopOpacity="0.35" />
-            <Stop offset="1" stopColor={Colors.lime} stopOpacity="0" />
+          <SvgGrad id={gradId} x1="0" y1="0" x2="0" y2="1">
+            <Stop offset="0" stopColor={color} stopOpacity="0.3" />
+            <Stop offset="1" stopColor={color} stopOpacity="0" />
           </SvgGrad>
         </Defs>
         {hasData && (
           <>
-            <Polygon points={areaPoints} fill="url(#chartGrad)" />
-            <Polyline points={linePoints} fill="none" stroke={Colors.lime} strokeWidth="2.5" strokeLinejoin="round" strokeLinecap="round" />
-            {points.map((p, i) => buckets[i].gross > 0 && (
-              <Circle key={i} cx={p.x} cy={p.y} r="3.5" fill={Colors.lime} stroke={Colors.white} strokeWidth="1.5" />
+            <Polygon points={areaPoints} fill={`url(#${gradId})`} />
+            <Polyline points={linePoints} fill="none" stroke={color} strokeWidth="2.5" strokeLinejoin="round" strokeLinecap="round" />
+            {points.map((p, i) => buckets[i].val > 0 && (
+              <Circle key={i} cx={p.x} cy={p.y} r="3.5" fill={color} stroke={Colors.white} strokeWidth="1.5" />
             ))}
           </>
         )}
-        {/* Baseline */}
         <Polyline points={`${PAD.l},${H - PAD.b} ${PAD.l + W},${H - PAD.b}`} fill="none" stroke={Colors.grayBorder} strokeWidth="1" />
       </Svg>
-      {/* X labels */}
       <View style={{ flexDirection: 'row', justifyContent: 'space-between', paddingHorizontal: PAD.l }}>
         {buckets.map((b, i) => (
           <Text key={i} style={{ fontSize: 10, color: Colors.gray, textAlign: 'center', minWidth: 28 }}>{b.label}</Text>
@@ -164,8 +165,10 @@ export default function DashboardScreen() {
   const chartWidth = screenWidth - 40;
 
   const [activeTab, setActiveTab] = useState<DashTab>('home');
+  const [unreadNotifs, setUnreadNotifs] = useState(0);
   const [loading, setLoading] = useState(true);
-  const [club, setClub] = useState<Club | null>(null);
+  const [clubs, setClubs] = useState<Club[]>([]);
+  const [selectedClubId, setSelectedClubId] = useState<string | null>(null);
   const [members, setMembers] = useState<Member[]>([]);
   const [events, setEvents] = useState<EventRow[]>([]);
   const [billing, setBilling] = useState<BillingInfo | null>(null);
@@ -190,26 +193,142 @@ export default function DashboardScreen() {
   // Stats tab
   const [statsRange, setStatsRange] = useState<'week' | 'month' | 'all'>('all');
 
-  useFocusEffect(useCallback(() => { load(); }, [user]));
+  // Attendees modal
+  const [attendeesEvent, setAttendeesEvent] = useState<EventRow | null>(null);
+  const [attendees, setAttendees] = useState<{ id: string; name: string; avatar_url: string | null }[]>([]);
+  const [loadingAttendees, setLoadingAttendees] = useState(false);
+
+  // Payouts intro gate
+  const [showPayoutsSetup, setShowPayoutsSetup] = useState(false);
+
+  // Invite admin
+  const [showInviteAdmin, setShowInviteAdmin] = useState(false);
+  const [inviteQuery, setInviteQuery] = useState('');
+  const [inviteResults, setInviteResults] = useState<{ id: string; name: string; avatar_url: string | null }[]>([]);
+  const [invitingAdmin, setInvitingAdmin] = useState(false);
+
+  // Check-ins: eventId → Set of userId
+  const [checkedIn, setCheckedIn] = useState<Record<string, Set<string>>>({});
+
+  function markCheckedIn(eventId: string, userId: string) {
+    setCheckedIn(prev => {
+      const s = new Set(prev[eventId] ?? []);
+      s.add(userId);
+      return { ...prev, [eventId]: s };
+    });
+  }
+
+  // Reload members when selected club changes
+  React.useEffect(() => {
+    const id = selectedClubId ?? clubs[0]?.id;
+    if (id) loadMembers(id);
+    else setMembers([]);
+  }, [selectedClubId, clubs.length]);
+
+  async function searchInvite(q: string) {
+    setInviteQuery(q);
+    if (q.trim().length < 2) { setInviteResults([]); return; }
+    const { data } = await supabase.from('profiles').select('id, name, avatar_url')
+      .ilike('name', `%${q.trim()}%`).limit(6);
+    setInviteResults((data ?? []) as any[]);
+  }
+
+  async function inviteAdmin(profileId: string, profileName: string) {
+    const targetClub = clubs.find(c => c.id === selectedClubId) ?? clubs[0];
+    if (!targetClub) return;
+
+    Alert.alert(
+      `Add ${profileName} as admin?`,
+      `They will be able to:\n• Edit club name, photos, description\n• Create and manage events\n• Post in club chat\n\nThey will NOT be able to:\n• Access billing or payouts\n• Delete the club\n\nThey'll need to confirm the invite in their notifications.`,
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Send invite',
+          onPress: async () => {
+            setInvitingAdmin(true);
+            // Insert as pending — they must accept
+            await supabase.from('club_members').upsert({
+              club_id: targetClub.id, user_id: profileId, role: 'admin', status: 'pending',
+            }, { onConflict: 'club_id,user_id' });
+            await supabase.from('notifications').insert({
+              user_id: profileId, type: 'admin_invite',
+              title: `Admin invite: ${targetClub.name}`,
+              body: `You've been invited to co-manage ${targetClub.name}. Tap to accept or decline.`,
+              data: { club_id: targetClub.id, action: 'admin_invite' },
+            });
+            setInvitingAdmin(false);
+            setShowInviteAdmin(false);
+            setInviteQuery('');
+            setInviteResults([]);
+            Alert.alert('Invite sent', `${profileName} will receive a notification to accept.`);
+          },
+        },
+      ]
+    );
+  }
+
+  // QR scan
+  const [cameraPermission, requestCameraPermission] = useSafeCameraPermissions();
+  const [scannedTicket, setScannedTicket] = useState<{ eventTitle: string; userName: string; avatar_url: string | null; valid: boolean; eventId: string; userId: string } | null>(null);
+  const [scanProcessing, setScanProcessing] = useState(false);
+
+  useFocusEffect(useCallback(() => {
+    load();
+    if (user) {
+      supabase.from('notifications').select('id', { count: 'exact', head: true })
+        .eq('user_id', user.id).eq('read', false)
+        .then(({ count }) => setUnreadNotifs(count ?? 0));
+    }
+  }, [user]));
+
+  async function loadMembers(clubId: string) {
+    const { data: membersData } = await supabase
+      .from('club_members')
+      .select('id, user_id, created_at, profile:profiles(id, name, avatar_url)')
+      .eq('club_id', clubId).eq('status', 'approved')
+      .order('created_at', { ascending: false });
+    setMembers((membersData ?? []) as Member[]);
+  }
 
   async function load() {
     if (!user) return;
     setLoading(true);
 
-    const { data: clubData } = await supabase
-      .from('clubs').select('id, name, cover_url, logo_url')
-      .eq('creator_id', user.id).limit(1).maybeSingle();
+    // Fetch clubs user owns
+    const { data: ownedClubs } = await supabase
+      .from('clubs').select('id, name, cover_url, logo_url, creator_id')
+      .eq('creator_id', user.id);
 
-    setClub(clubData ?? null);
+    // Fetch clubs user is admin of (but didn't create)
+    const { data: adminMemberships } = await supabase
+      .from('club_members')
+      .select('club:clubs(id, name, cover_url, logo_url, creator_id)')
+      .eq('user_id', user.id).eq('role', 'admin').eq('status', 'approved');
+
+    const adminClubs: Club[] = ((adminMemberships ?? []) as any[])
+      .map(m => m.club).filter(Boolean);
+
+    const allClubs: Club[] = [...(ownedClubs ?? [])];
+    for (const ac of adminClubs) {
+      if (!allClubs.find(c => c.id === ac.id)) allClubs.push(ac);
+    }
+    setClubs(allClubs);
+
+    const clubIds = allClubs.map(c => c.id);
 
     const [
       { data: eventsData },
       { data: billingData },
       { data: stripeData },
     ] = await Promise.all([
-      supabase.from('events')
-        .select('id, title, date, time, going_count, cover_url, club_id, price, is_free, status')
-        .eq('creator_id', user.id).order('date', { ascending: false }),
+      clubIds.length > 0
+        ? supabase.from('events')
+            .select('id, title, date, time, going_count, cover_url, club_id, price, is_free, status')
+            .or(`creator_id.eq.${user.id},club_id.in.(${clubIds.join(',')})`)
+            .order('date', { ascending: false })
+        : supabase.from('events')
+            .select('id, title, date, time, going_count, cover_url, club_id, price, is_free, status')
+            .eq('creator_id', user.id).order('date', { ascending: false }),
       supabase.from('creator_billing').select('*').eq('user_id', user.id).maybeSingle(),
       supabase.from('stripe_accounts')
         .select('stripe_account_id, onboarding_complete, payouts_enabled')
@@ -227,14 +346,8 @@ export default function DashboardScreen() {
     }
     setStripeAccount(stripeData ?? null);
 
-    if (clubData?.id) {
-      const { data: membersData } = await supabase
-        .from('club_members')
-        .select('id, user_id, created_at, profile:profiles(id, name, avatar_url)')
-        .eq('club_id', clubData.id).eq('status', 'approved')
-        .order('created_at', { ascending: false });
-      setMembers((membersData ?? []) as Member[]);
-    }
+    const firstClubId = allClubs[0]?.id;
+    if (firstClubId) await loadMembers(firstClubId);
 
     if (eventsData && eventsData.length > 0) {
       const { data: paidAtts } = await supabase
@@ -307,6 +420,50 @@ export default function DashboardScreen() {
     setCheckingStatus(false);
   }
 
+  async function openAttendees(event: EventRow) {
+    setAttendeesEvent(event);
+    setLoadingAttendees(true);
+    const { data } = await supabase
+      .from('event_attendees')
+      .select('profile:profiles(id, name, avatar_url)')
+      .eq('event_id', event.id);
+    setAttendees(((data ?? []) as any).map((a: any) => a.profile).filter(Boolean));
+    setLoadingAttendees(false);
+  }
+
+  async function handleQrScan({ data: qrData }: { data: string }) {
+    if (scanProcessing) return;
+    setScanProcessing(true);
+    try {
+      const parts = qrData.split(':');
+      if (parts.length < 4 || parts[0] !== 'woeva' || parts[1] !== 'event') {
+        setScannedTicket({ eventTitle: 'Invalid QR', userName: '', avatar_url: null, valid: false, eventId: '', userId: '' });
+        return;
+      }
+      const eventId = parts[2];
+      const userId = parts[3];
+      const matchedEvent = events.find(e => e.id === eventId);
+      const { data: att } = await supabase
+        .from('event_attendees')
+        .select('profile:profiles(id, name, avatar_url)')
+        .eq('event_id', eventId)
+        .eq('user_id', userId)
+        .maybeSingle();
+      const profile = (att as any)?.profile;
+      setScannedTicket({
+        eventTitle: matchedEvent?.title ?? 'Event',
+        userName: profile?.name ?? 'Unknown',
+        avatar_url: profile?.avatar_url ?? null,
+        valid: !!att,
+        eventId,
+        userId,
+      });
+      if (att) markCheckedIn(eventId, userId);
+    } finally {
+      setScanProcessing(false);
+    }
+  }
+
   async function downloadInvoice() {
     if (!billing) return;
     const month = new Date().toLocaleDateString('sk-SK', { month: 'long', year: 'numeric' });
@@ -333,16 +490,19 @@ export default function DashboardScreen() {
   const new30d = members.filter(m => new Date(m.created_at) >= d30).length;
   const new1y = members.filter(m => new Date(m.created_at) >= d365).length;
 
-  const totalGross = events.reduce((s, e) => s + e.gross, 0);
-  const totalNet = events.reduce((s, e) => s + e.net, 0);
-  const weekGross = events.filter(e => new Date(e.date) >= d7).reduce((s, e) => s + e.gross, 0);
-  const monthGross = events.filter(e => new Date(e.date) >= d30).reduce((s, e) => s + e.gross, 0);
-  const weekNet = events.filter(e => new Date(e.date) >= d7).reduce((s, e) => s + e.net, 0);
-  const monthNet = events.filter(e => new Date(e.date) >= d30).reduce((s, e) => s + e.net, 0);
+  const selectedClub = clubs.find(c => c.id === selectedClubId) ?? null;
+  const viewEvents = selectedClubId ? events.filter(e => e.club_id === selectedClubId) : events;
 
-  const upcomingEvents = events.filter(e => isUpcoming(e) && e.status !== 'cancelled');
-  const pastEvents = events.filter(e => !isUpcoming(e) && e.status !== 'cancelled');
-  const cancelledEvents = events.filter(e => e.status === 'cancelled');
+  const totalGross = viewEvents.reduce((s, e) => s + e.gross, 0);
+  const totalNet = viewEvents.reduce((s, e) => s + e.net, 0);
+  const weekGross = viewEvents.filter(e => new Date(e.date) >= d7).reduce((s, e) => s + e.gross, 0);
+  const monthGross = viewEvents.filter(e => new Date(e.date) >= d30).reduce((s, e) => s + e.gross, 0);
+  const weekNet = viewEvents.filter(e => new Date(e.date) >= d7).reduce((s, e) => s + e.net, 0);
+  const monthNet = viewEvents.filter(e => new Date(e.date) >= d30).reduce((s, e) => s + e.net, 0);
+
+  const upcomingEvents = viewEvents.filter(e => isUpcoming(e) && e.status !== 'cancelled');
+  const pastEvents = viewEvents.filter(e => !isUpcoming(e) && e.status !== 'cancelled');
+  const cancelledEvents = viewEvents.filter(e => e.status === 'cancelled');
   const displayedEvents = eventsFilter === 'upcoming' ? upcomingEvents : eventsFilter === 'past' ? pastEvents : cancelledEvents;
 
   if (loading) {
@@ -391,15 +551,45 @@ export default function DashboardScreen() {
       {/* ── Tab Content ─────────────────────────────────────────────────────── */}
       <ScrollView
         key={activeTab}
-        contentContainerStyle={[s.scroll, { paddingBottom: insets.bottom + 80 }]}
+        contentContainerStyle={[s.scroll, { paddingBottom: insets.bottom + 100 }]}
         showsVerticalScrollIndicator={false}
       >
         {/* Top bar */}
         <View style={s.topBar}>
-          <BackButton />
-          <Text style={s.pageTitle}>Dashboard</Text>
-          <View style={{ width: 36 }} />
+          {activeTab === 'scan'
+            ? <TouchableOpacity onPress={() => setActiveTab('home')} style={s.backBtn} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
+                <Svg width={22} height={22} viewBox="0 0 24 24" fill="none">
+                  <Path d="M19 12H5M12 5l-7 7 7 7" stroke={Colors.black} strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" />
+                </Svg>
+              </TouchableOpacity>
+            : <BackButton />
+          }
+          <Text style={s.pageTitle}>{activeTab === 'scan' ? 'Scan QR' : 'Dashboard'}</Text>
+          <TouchableOpacity style={s.bellBtn} onPress={() => router.push('/notifications' as any)}>
+            <Svg width={22} height={22} viewBox="0 0 24 24" fill="none">
+              <Path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9M13.73 21a2 2 0 0 1-3.46 0" stroke={Colors.black} strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round" />
+            </Svg>
+            {unreadNotifs > 0 && <View style={s.bellDot} />}
+          </TouchableOpacity>
         </View>
+
+        {/* Club switcher — only on relevant tabs, only if user has clubs */}
+        {(activeTab === 'home' || activeTab === 'events' || activeTab === 'stats') && clubs.length > 0 && (
+          <View style={s.viewFilter}>
+            <TouchableOpacity
+              style={[s.viewFilterChip, !selectedClubId && s.viewFilterChipActive]}
+              onPress={() => setSelectedClubId(null)} activeOpacity={0.7}>
+              <Text style={[s.viewFilterText, !selectedClubId && s.viewFilterTextActive]}>All</Text>
+            </TouchableOpacity>
+            {clubs.map(c => (
+              <TouchableOpacity key={c.id}
+                style={[s.viewFilterChip, selectedClubId === c.id && s.viewFilterChipActive]}
+                onPress={() => setSelectedClubId(c.id)} activeOpacity={0.7}>
+                <Text style={[s.viewFilterText, selectedClubId === c.id && s.viewFilterTextActive]} numberOfLines={1}>{c.name}</Text>
+              </TouchableOpacity>
+            ))}
+          </View>
+        )}
 
         {/* ── HOME ──────────────────────────────────────────────────────────── */}
         {activeTab === 'home' && (
@@ -407,8 +597,8 @@ export default function DashboardScreen() {
             {/* Quick overview strip */}
             <View style={s.overviewStrip}>
               {[
-                { label: 'Events', val: events.length },
-                { label: 'Attendees', val: events.reduce((sum, e) => sum + e.going_count, 0) },
+                { label: 'Events', val: viewEvents.length },
+                { label: 'Attendees', val: viewEvents.reduce((sum, e) => sum + e.going_count, 0) },
                 { label: 'Members', val: members.length },
                 { label: 'Revenue', val: fmt(totalGross) },
               ].map(item => (
@@ -420,32 +610,46 @@ export default function DashboardScreen() {
             </View>
 
             {/* Club card */}
-            {club && (
-              <TouchableOpacity style={s.clubCard} onPress={() => router.push(`/club/${club.id}` as any)} activeOpacity={0.85}>
-                {club.cover_url
-                  ? <Image source={{ uri: club.cover_url }} style={StyleSheet.absoluteFill as any} resizeMode="cover" />
-                  : club.logo_url
-                    ? <View style={[StyleSheet.absoluteFill as any, { backgroundColor: '#000' }]}>
-                        <Image source={{ uri: club.logo_url }} style={[StyleSheet.absoluteFill as any, { opacity: 0.35 }]} resizeMode="cover" />
-                      </View>
-                    : <View style={[StyleSheet.absoluteFill as any, { backgroundColor: '#000' }]} />
-                }
-                <Svg style={StyleSheet.absoluteFill as any} preserveAspectRatio="none">
-                  <Defs><SvgGrad id="g1" x1="0" y1="0" x2="0" y2="1">
-                    <Stop offset="0" stopColor="#000" stopOpacity="0.05" />
-                    <Stop offset="1" stopColor="#000" stopOpacity="0.82" />
-                  </SvgGrad></Defs>
-                  <Rect x="0" y="0" width="100%" height="100%" fill="url(#g1)" />
-                </Svg>
-                <View style={s.clubCardContent}>
-                  <Text style={s.clubCardLabel}>Your club</Text>
-                  <Text style={s.clubCardName}>{club.name}</Text>
-                </View>
-                <TouchableOpacity style={s.clubEditBtn} onPress={() => router.push(`/club/${club.id}/edit` as any)} activeOpacity={0.8}>
-                  <Text style={s.clubEditBtnText}>Edit</Text>
+            {(() => {
+              const displayClub = selectedClub ?? clubs[0] ?? null;
+              if (!displayClub) return null;
+              const isOwner = displayClub.creator_id === user?.id;
+              return (
+                <TouchableOpacity style={s.clubCard} onPress={() => router.push(`/club/${displayClub.id}` as any)} activeOpacity={0.85}>
+                  {displayClub.cover_url
+                    ? <Image source={{ uri: displayClub.cover_url }} style={StyleSheet.absoluteFill as any} resizeMode="cover" />
+                    : displayClub.logo_url
+                      ? <View style={[StyleSheet.absoluteFill as any, { backgroundColor: '#000' }]}>
+                          <Image source={{ uri: displayClub.logo_url }} style={[StyleSheet.absoluteFill as any, { opacity: 0.35 }]} resizeMode="cover" />
+                        </View>
+                      : <View style={[StyleSheet.absoluteFill as any, { backgroundColor: '#000' }]} />
+                  }
+                  <Svg style={StyleSheet.absoluteFill as any} preserveAspectRatio="none">
+                    <Defs><SvgGrad id="g1" x1="0" y1="0" x2="0" y2="1">
+                      <Stop offset="0" stopColor="#000" stopOpacity="0.05" />
+                      <Stop offset="1" stopColor="#000" stopOpacity="0.82" />
+                    </SvgGrad></Defs>
+                    <Rect x="0" y="0" width="100%" height="100%" fill="url(#g1)" />
+                  </Svg>
+                  <View style={s.clubCardContent}>
+                    <Text style={s.clubCardLabel}>{isOwner ? 'Your club' : 'Club admin'}</Text>
+                    <Text style={s.clubCardName}>{displayClub.name}</Text>
+                  </View>
+                  <View style={{ flexDirection: 'row', gap: 8 }}>
+                    {isOwner && (
+                      <TouchableOpacity style={s.clubEditBtn} onPress={e => { e.stopPropagation(); setShowInviteAdmin(true); }} activeOpacity={0.8}>
+                        <Text style={s.clubEditBtnText}>+ Admin</Text>
+                      </TouchableOpacity>
+                    )}
+                    {isOwner && (
+                      <TouchableOpacity style={s.clubEditBtn} onPress={e => { e.stopPropagation(); router.push(`/club/${displayClub.id}/edit` as any); }} activeOpacity={0.8}>
+                        <Text style={s.clubEditBtnText}>Edit</Text>
+                      </TouchableOpacity>
+                    )}
+                  </View>
                 </TouchableOpacity>
-              </TouchableOpacity>
-            )}
+              );
+            })()}
 
             {/* Members overview */}
             {members.length > 0 && (
@@ -484,10 +688,20 @@ export default function DashboardScreen() {
               </>
             )}
 
+            {/* Empty state */}
+            {viewEvents.length === 0 && (
+              <View style={s.emptyBox}>
+                <Text style={s.emptyTitle}>No events yet</Text>
+                <Text style={s.emptySub}>
+                  {selectedClubId ? `No events for ${selectedClub?.name ?? 'this club'} yet.` : 'Create your first event to see it here.'}
+                </Text>
+              </View>
+            )}
+
             {/* Upcoming events */}
             {upcomingEvents.length > 0 && (
               <>
-                <Text style={[s.sectionTitle, { marginTop: 24 }]}>Upcoming events</Text>
+                <Text style={[s.sectionTitle, { marginTop: 12 }]}>Upcoming events</Text>
                 <View style={{ gap: 10 }}>
                   {upcomingEvents.slice(0, 5).map(e => (
                     <TouchableOpacity key={e.id} style={s.upcomingCard}
@@ -515,35 +729,13 @@ export default function DashboardScreen() {
                       <View style={s.upcomingActions}>
                         <TouchableOpacity style={s.upcomingActionBtn}
                           onPress={ev => { ev.stopPropagation(); router.push(`/event/${e.id}/edit` as any); }}
-                          hitSlop={{ top: 6, bottom: 6, left: 6, right: 6 }}>
+                          hitSlop={{ top: 4, bottom: 4, left: 4, right: 4 }}>
                           <Text style={s.upcomingActionEdit}>Edit</Text>
                         </TouchableOpacity>
-                        <TouchableOpacity style={[s.upcomingActionBtn, s.upcomingActionCancelBtn]}
-                          onPress={ev => {
-                            ev.stopPropagation();
-                            Alert.alert('Cancel event', `Cancel "${e.title}"?`, [
-                              { text: 'No', style: 'cancel' },
-                              { text: 'Cancel event', style: 'destructive', onPress: async () => {
-                                await supabase.from('events').update({ status: 'cancelled', cancelled_at: new Date().toISOString() }).eq('id', e.id);
-                                // Notify attendees
-                                const { data: attendees } = await supabase
-                                  .from('event_attendees').select('user_id').eq('event_id', e.id);
-                                if (attendees && attendees.length > 0) {
-                                  await supabase.from('notifications').insert(attendees.map(a => ({
-                                    user_id: a.user_id,
-                                    type: 'cancelled',
-                                    title: `${e.title} was cancelled`,
-                                    body: 'The creator cancelled this event.',
-                                    data: { event_id: e.id },
-                                    read: false,
-                                  })));
-                                }
-                                setEvents(prev => prev.map(x => x.id === e.id ? { ...x, status: 'cancelled' } : x));
-                              }},
-                            ]);
-                          }}
-                          hitSlop={{ top: 6, bottom: 6, left: 6, right: 6 }}>
-                          <Text style={s.upcomingActionCancel}>Cancel</Text>
+                        <TouchableOpacity style={[s.upcomingActionBtn, s.upcomingActionPeopleBtn]}
+                          onPress={ev => { ev.stopPropagation(); openAttendees(e); }}
+                          hitSlop={{ top: 4, bottom: 4, left: 4, right: 4 }}>
+                          <Text style={s.upcomingActionPeople}>People</Text>
                         </TouchableOpacity>
                       </View>
                     </TouchableOpacity>
@@ -584,7 +776,7 @@ export default function DashboardScreen() {
                   const dateStr = d.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' });
                   return (
                     <TouchableOpacity key={e.id} style={[s.listRow, i < displayedEvents.length - 1 && s.listRowBorder]}
-                      onPress={() => router.push(`/event/${e.id}` as any)} activeOpacity={0.7}>
+                      onPress={() => openAttendees(e)} activeOpacity={0.7}>
                       {e.cover_url
                         ? <Image source={{ uri: e.cover_url }} style={s.listAvatar} />
                         : <View style={[s.listAvatar, s.listAvatarFallback]}><Text style={s.listAvatarInitial}>{e.title.charAt(0).toUpperCase()}</Text></View>
@@ -616,7 +808,41 @@ export default function DashboardScreen() {
         )}
 
         {/* ── PAYOUTS ───────────────────────────────────────────────────────── */}
-        {activeTab === 'payouts' && (
+        {activeTab === 'payouts' && !showPayoutsSetup && (
+          <View style={s.payoutsIntro}>
+            <View style={s.payoutsIntroIcon}>
+              <Svg width={32} height={32} viewBox="0 0 24 24" fill="none">
+                <Path d="M12 19V5M5 12l7-7 7 7" stroke={Colors.black} strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" />
+                <Path d="M5 19h14" stroke={Colors.black} strokeWidth={2} strokeLinecap="round" />
+              </Svg>
+            </View>
+            <Text style={s.payoutsIntroTitle}>Get paid for your events</Text>
+            <Text style={s.payoutsIntroBody}>
+              To create paid events and receive payouts, you'll need two things:
+            </Text>
+            <View style={s.payoutsIntroSteps}>
+              <View style={s.payoutsIntroStep}>
+                <View style={s.payoutsIntroStepNum}><Text style={s.payoutsIntroStepNumText}>1</Text></View>
+                <View style={{ flex: 1 }}>
+                  <Text style={s.payoutsIntroStepTitle}>Billing info</Text>
+                  <Text style={s.payoutsIntroStepSub}>Your company or trade name, IČO, address — required for invoices.</Text>
+                </View>
+              </View>
+              <View style={s.payoutsIntroStep}>
+                <View style={s.payoutsIntroStepNum}><Text style={s.payoutsIntroStepNumText}>2</Text></View>
+                <View style={{ flex: 1 }}>
+                  <Text style={s.payoutsIntroStepTitle}>Stripe Connect</Text>
+                  <Text style={s.payoutsIntroStepSub}>Payments go directly to your bank account. Woeva charges 5% platform fee. Payouts every Monday.</Text>
+                </View>
+              </View>
+            </View>
+            <TouchableOpacity style={s.payoutsIntroBtn} onPress={() => setShowPayoutsSetup(true)} activeOpacity={0.85}>
+              <Text style={s.payoutsIntroBtnText}>Continue →</Text>
+            </TouchableOpacity>
+          </View>
+        )}
+
+        {activeTab === 'payouts' && showPayoutsSetup && (
           <>
             {/* Step 1: Billing info */}
             <View style={s.payoutSection}>
@@ -777,11 +1003,19 @@ export default function DashboardScreen() {
                 ))}
               </View>
 
-              {/* Revenue chart */}
+              {/* Attendance chart — primary */}
               <View style={s.chartCard}>
-                <Text style={s.chartTitle}>Revenue</Text>
-                <RevenueChart events={events} range={statsRange} width={chartWidth - 32} />
+                <Text style={s.chartTitle}>Attendance</Text>
+                <EventChart events={viewEvents} range={statsRange} width={chartWidth - 32} getValue={e => e.going_count} color={Colors.black} gradId="attGrad" />
               </View>
+
+              {/* Revenue chart — secondary, only if there's paid revenue */}
+              {viewEvents.some(e => e.gross > 0) && (
+                <View style={[s.chartCard, { marginTop: 12 }]}>
+                  <Text style={s.chartTitle}>Revenue</Text>
+                  <EventChart events={viewEvents} range={statsRange} width={chartWidth - 32} getValue={e => e.gross} color={Colors.lime} gradId="revGrad" />
+                </View>
+              )}
 
               <View style={s.statsOverview}>
                 {[
@@ -852,28 +1086,184 @@ export default function DashboardScreen() {
         })()}
       </ScrollView>
 
+      {/* ── SCAN ──────────────────────────────────────────────────────────── */}
+      {activeTab === 'scan' && (
+        <View style={[StyleSheet.absoluteFill, s.scanContainer, { top: insets.top + 60, bottom: 80 + insets.bottom }]}>
+          {!cameraPermission?.granted ? (
+            <View style={s.scanPermBox}>
+              <Text style={s.scanPermTitle}>Camera access needed</Text>
+              <Text style={s.scanPermSub}>To scan attendee QR codes at the door.</Text>
+              <TouchableOpacity style={s.scanPermBtn} onPress={requestCameraPermission}>
+                <Text style={s.scanPermBtnText}>Allow camera</Text>
+              </TouchableOpacity>
+            </View>
+          ) : (
+            <>
+              {SafeCameraView && (
+              <SafeCameraView
+                style={StyleSheet.absoluteFill}
+                facing="back"
+                onBarcodeScanned={scannedTicket || scanProcessing ? undefined : handleQrScan}
+                barcodeScannerSettings={{ barcodeTypes: ['qr'] }}
+              />
+            )}
+              <View style={s.scanFrame}>
+                <View style={s.scanCornerTL} /><View style={s.scanCornerTR} />
+                <View style={s.scanCornerBL} /><View style={s.scanCornerBR} />
+              </View>
+              <Text style={s.scanHint}>Point at attendee's QR code</Text>
+              {scannedTicket && (
+                <View style={s.scanResult}>
+                  <View style={s.scanResultTop}>
+                    <View style={[s.scanResultDot, { backgroundColor: scannedTicket.valid ? Colors.lime : '#FF3B30' }]} />
+                    <View style={s.scanResultAvatar}>
+                      {scannedTicket.avatar_url
+                        ? <Image source={{ uri: scannedTicket.avatar_url }} style={StyleSheet.absoluteFill as any} />
+                        : <Text style={s.scanResultInitial}>{scannedTicket.userName.charAt(0).toUpperCase()}</Text>
+                      }
+                    </View>
+                    <View style={{ flex: 1 }}>
+                      <Text style={s.scanResultName}>{scannedTicket.userName}</Text>
+                      <Text style={s.scanResultEvent} numberOfLines={1}>{scannedTicket.eventTitle}</Text>
+                      <Text style={[s.scanResultStatus, { color: scannedTicket.valid ? '#22C55E' : '#FF3B30' }]}>
+                        {scannedTicket.valid ? '✓  Valid ticket' : '✗  Not registered'}
+                      </Text>
+                    </View>
+                    <TouchableOpacity onPress={() => setScannedTicket(null)} style={s.scanResultClose}>
+                      <Text style={{ fontSize: 18, color: Colors.gray }}>✕</Text>
+                    </TouchableOpacity>
+                  </View>
+                  {scannedTicket.valid && (
+                    <TouchableOpacity
+                      style={[s.scanCheckInBtn, checkedIn[scannedTicket.eventId]?.has(scannedTicket.userId) && s.scanCheckInBtnDone]}
+                      onPress={() => markCheckedIn(scannedTicket.eventId, scannedTicket.userId)}
+                      activeOpacity={0.8}
+                    >
+                      <Text style={[s.scanCheckInBtnText, checkedIn[scannedTicket.eventId]?.has(scannedTicket.userId) && { color: Colors.black }]}>
+                        {checkedIn[scannedTicket.eventId]?.has(scannedTicket.userId) ? '✓ Checked in' : 'Confirm arrival'}
+                      </Text>
+                    </TouchableOpacity>
+                  )}
+                </View>
+              )}
+            </>
+          )}
+        </View>
+      )}
+
+      {/* ── Invite Admin Modal ──────────────────────────────────────────────── */}
+      <Modal visible={showInviteAdmin} transparent animationType="slide" onRequestClose={() => setShowInviteAdmin(false)}>
+        <TouchableOpacity style={s.modalOverlay} activeOpacity={1} onPress={() => setShowInviteAdmin(false)}>
+          <View style={[s.attendeesSheet, { paddingBottom: insets.bottom + 16 }]}>
+            <View style={s.billingSheetHandle} />
+            <Text style={s.billingSheetTitle}>Invite admin</Text>
+            <Text style={[s.listSub, { marginBottom: 12 }]}>Search by name to add a co-admin to {(selectedClub ?? clubs[0])?.name}</Text>
+            <TextInput
+              style={s.inviteInput}
+              value={inviteQuery}
+              onChangeText={searchInvite}
+              placeholder="Search by name..."
+              placeholderTextColor={Colors.gray}
+              autoFocus
+            />
+            {inviteResults.map((r, i) => (
+              <TouchableOpacity
+                key={r.id}
+                style={[s.attendeeRow, i < inviteResults.length - 1 && { borderBottomWidth: 1, borderColor: Colors.grayBorder }]}
+                onPress={() => inviteAdmin(r.id, r.name)}
+                activeOpacity={0.7}
+                disabled={invitingAdmin}
+              >
+                <View style={s.attendeeAvatar}>
+                  {r.avatar_url ? <Image source={{ uri: r.avatar_url }} style={StyleSheet.absoluteFill as any} /> : null}
+                  {!r.avatar_url && <Text style={s.attendeeInitial}>{r.name.charAt(0).toUpperCase()}</Text>}
+                </View>
+                <Text style={s.attendeeName}>{r.name}</Text>
+                <Text style={[s.listSub, { marginLeft: 'auto' }]}>Add →</Text>
+              </TouchableOpacity>
+            ))}
+            {inviteQuery.length >= 2 && inviteResults.length === 0 && (
+              <Text style={[s.emptySub, { marginTop: 12 }]}>No users found</Text>
+            )}
+          </View>
+        </TouchableOpacity>
+      </Modal>
+
+      {/* ── Attendees Modal ─────────────────────────────────────────────────── */}
+      <Modal visible={!!attendeesEvent} transparent animationType="slide" onRequestClose={() => setAttendeesEvent(null)}>
+        <TouchableOpacity style={s.modalOverlay} activeOpacity={1} onPress={() => setAttendeesEvent(null)}>
+          <View style={[s.attendeesSheet, { paddingBottom: insets.bottom + 16 }]}>
+            <View style={s.billingSheetHandle} />
+            <Text style={s.billingSheetTitle}>{attendeesEvent?.title}</Text>
+            <Text style={[s.listSub, { marginBottom: 12 }]}>{attendeesEvent?.going_count} going</Text>
+            {loadingAttendees
+              ? <ActivityIndicator color={Colors.black} />
+              : <FlatList
+                  data={attendees}
+                  keyExtractor={i => i.id}
+                  renderItem={({ item }) => {
+                    const isIn = checkedIn[attendeesEvent?.id ?? '']?.has(item.id);
+                    return (
+                      <View style={s.attendeeRow}>
+                        <View style={s.attendeeAvatar}>
+                          {item.avatar_url ? <Image source={{ uri: item.avatar_url }} style={StyleSheet.absoluteFill as any} /> : null}
+                          {!item.avatar_url && <Text style={s.attendeeInitial}>{item.name.charAt(0).toUpperCase()}</Text>}
+                        </View>
+                        <Text style={s.attendeeName}>{item.name.split(' ')[0]}</Text>
+                        {isIn
+                          ? <View style={s.checkedInBadge}><Text style={s.checkedInBadgeText}>✓ Checked in</Text></View>
+                          : <TouchableOpacity style={s.checkInBtn} onPress={() => markCheckedIn(attendeesEvent!.id, item.id)} activeOpacity={0.7}>
+                              <Text style={s.checkInBtnText}>Check in</Text>
+                            </TouchableOpacity>
+                        }
+                      </View>
+                    );
+                  }}
+                  ItemSeparatorComponent={() => <View style={{ height: 1, backgroundColor: Colors.grayBorder }} />}
+                  ListEmptyComponent={<Text style={s.emptySub}>No attendees yet</Text>}
+                />
+            }
+          </View>
+        </TouchableOpacity>
+      </Modal>
+
       {/* ── Bottom Nav ──────────────────────────────────────────────────────── */}
-      <View style={[s.bottomNav, { paddingBottom: insets.bottom + 4 }]}>
-        {([
-          { key: 'home', label: 'Home', icon: 'home' },
-          { key: 'events', label: 'Events', icon: 'calendar' },
-          { key: 'payouts', label: 'Payouts', icon: 'euro' },
-          { key: 'stats', label: 'Stats', icon: 'bar' },
-        ] as { key: DashTab; label: string; icon: string }[]).map(tab => {
-          const active = activeTab === tab.key;
-          const color = active ? Colors.black : Colors.gray;
-          return (
-            <TouchableOpacity key={tab.key} style={s.bottomNavItem} onPress={() => setActiveTab(tab.key)} activeOpacity={0.7}>
-              <Svg width={22} height={22} viewBox="0 0 24 24" fill="none">
-                {tab.icon === 'home' && <Path d="M3 9l9-7 9 7v11a2 2 0 01-2 2H5a2 2 0 01-2-2z M9 22V12h6v10" stroke={color} strokeWidth={active ? 2.5 : 1.8} strokeLinecap="round" strokeLinejoin="round" />}
-                {tab.icon === 'calendar' && <><Rect x="3" y="4" width="18" height="18" rx="2" stroke={color} strokeWidth={active ? 2.5 : 1.8} /><Path d="M16 2v4M8 2v4M3 10h18" stroke={color} strokeWidth={active ? 2.5 : 1.8} strokeLinecap="round" /></>}
-                {tab.icon === 'euro' && <><Circle cx="12" cy="12" r="9" stroke={color} strokeWidth={active ? 2.5 : 1.8} /><Path d="M15.5 8.5A5 5 0 1 0 15.5 15.5M7 10.5h6M7 13.5h6" stroke={color} strokeWidth={active ? 2.5 : 1.8} strokeLinecap="round" /></>}
-                {tab.icon === 'bar' && <Path d="M18 20V10M12 20V4M6 20v-6" stroke={color} strokeWidth={active ? 2.5 : 1.8} strokeLinecap="round" strokeLinejoin="round" />}
-              </Svg>
-              <Text style={[s.bottomNavLabel, active && s.bottomNavLabelActive]}>{tab.label}</Text>
-            </TouchableOpacity>
-          );
-        })}
+      <View style={[s.bottomNavWrapper, { paddingBottom: insets.bottom + 8 }]}>
+        <View style={s.bottomNavPill}>
+          {([
+            { key: 'home', label: 'Home', icon: 'home' },
+            { key: 'events', label: 'Events', icon: 'calendar' },
+            { key: 'scan', label: 'Scan', icon: 'scan', center: true },
+            { key: 'stats', label: 'Stats', icon: 'bar' },
+            { key: 'payouts', label: 'Payouts', icon: 'payout' },
+          ] as { key: DashTab; label: string; icon: string; center?: boolean }[]).map(tab => {
+            const active = activeTab === tab.key;
+            const color = active ? Colors.black : 'rgba(0,0,0,0.35)';
+            if (tab.center) {
+              return (
+                <TouchableOpacity key={tab.key} style={s.bottomNavScanBtn} onPress={() => setActiveTab(tab.key)} activeOpacity={0.85}>
+                  <Svg width={22} height={22} viewBox="0 0 24 24" fill="none">
+                    <Rect x="3" y="3" width="6" height="6" rx="1" stroke={activeTab === 'scan' ? Colors.black : Colors.gray} strokeWidth={2} />
+                    <Rect x="15" y="3" width="6" height="6" rx="1" stroke={activeTab === 'scan' ? Colors.black : Colors.gray} strokeWidth={2} />
+                    <Rect x="3" y="15" width="6" height="6" rx="1" stroke={activeTab === 'scan' ? Colors.black : Colors.gray} strokeWidth={2} />
+                    <Path d="M15 17h3M17 15v3" stroke={activeTab === 'scan' ? Colors.black : Colors.gray} strokeWidth={2} strokeLinecap="round" />
+                  </Svg>
+                </TouchableOpacity>
+              );
+            }
+            return (
+              <TouchableOpacity key={tab.key} style={s.bottomNavItem} onPress={() => setActiveTab(tab.key)} activeOpacity={0.7}>
+                <Svg width={22} height={22} viewBox="0 0 24 24" fill="none">
+                  {tab.icon === 'home' && <Path d="M3 9l9-7 9 7v11a2 2 0 01-2 2H5a2 2 0 01-2-2z M9 22V12h6v10" stroke={color} strokeWidth={active ? 2.5 : 1.8} strokeLinecap="round" strokeLinejoin="round" />}
+                  {tab.icon === 'calendar' && <><Rect x="3" y="4" width="18" height="18" rx="2" stroke={color} strokeWidth={active ? 2.5 : 1.8} /><Path d="M16 2v4M8 2v4M3 10h18" stroke={color} strokeWidth={active ? 2.5 : 1.8} strokeLinecap="round" /></>}
+                  {tab.icon === 'bar' && <Path d="M18 20V10M12 20V4M6 20v-6" stroke={color} strokeWidth={active ? 2.5 : 1.8} strokeLinecap="round" strokeLinejoin="round" />}
+                  {tab.icon === 'payout' && <><Path d="M12 19V5M5 12l7-7 7 7" stroke={color} strokeWidth={active ? 2.5 : 1.8} strokeLinecap="round" strokeLinejoin="round" /><Path d="M5 19h14" stroke={color} strokeWidth={active ? 2.5 : 1.8} strokeLinecap="round" /></>}
+                </Svg>
+                <Text style={[s.bottomNavLabel, active && s.bottomNavLabelActive]}>{tab.label}</Text>
+              </TouchableOpacity>
+            );
+          })}
+        </View>
       </View>
     </View>
   );
@@ -1023,8 +1413,81 @@ const s = StyleSheet.create({
   billingRow: { flexDirection: 'row', gap: 12 },
 
   // Bottom nav
-  bottomNav: { position: 'absolute', bottom: 0, left: 0, right: 0, flexDirection: 'row', backgroundColor: Colors.white, borderTopWidth: 1, borderTopColor: Colors.grayBorder, paddingTop: 10 },
-  bottomNavItem: { flex: 1, alignItems: 'center', gap: 3 },
-  bottomNavLabel: { fontSize: 10, color: Colors.gray, fontFamily: Fonts.regular },
+  bottomNavWrapper: { position: 'absolute', bottom: 0, left: 0, right: 0, paddingHorizontal: 16, paddingTop: 8, backgroundColor: Colors.white },
+  bottomNavPill: { backgroundColor: '#E8E8E8', borderRadius: 50, flexDirection: 'row', alignItems: 'center', paddingHorizontal: 16, height: 68 },
+  bottomNavItem: { flex: 1, alignItems: 'center', justifyContent: 'center', gap: 3 },
+  bottomNavScanBtn: { width: 52, height: 52, borderRadius: 26, backgroundColor: Colors.white, alignItems: 'center', justifyContent: 'center', marginHorizontal: 4 },
+  bottomNavLabel: { fontSize: 10, color: 'rgba(0,0,0,0.4)', fontFamily: Fonts.regular },
   bottomNavLabelActive: { color: Colors.black, fontWeight: '600', fontFamily: Fonts.semibold },
+
+  // View filter (All / Club / Individual)
+  viewFilter: { flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 20 },
+  viewFilterLabel: { fontSize: 12, color: Colors.gray, fontFamily: Fonts.medium, marginRight: 2 },
+  viewFilterChip: { paddingHorizontal: 12, paddingVertical: 6, borderRadius: 50, backgroundColor: Colors.grayLight },
+  viewFilterChipActive: { backgroundColor: Colors.black },
+  viewFilterText: { fontSize: 12, fontWeight: '500', color: Colors.gray, fontFamily: Fonts.medium },
+  viewFilterTextActive: { color: Colors.white, fontWeight: '700', fontFamily: Fonts.bold },
+  inviteInput: { height: 44, borderWidth: 1.5, borderColor: Colors.grayBorder, borderRadius: 12, paddingHorizontal: 14, fontSize: 14, color: Colors.black, marginBottom: 12 },
+
+  // Payouts intro
+  payoutsIntro: { paddingTop: 12, gap: 16 },
+  payoutsIntroIcon: { width: 64, height: 64, borderRadius: 32, backgroundColor: Colors.lime, alignItems: 'center', justifyContent: 'center' },
+  payoutsIntroTitle: { fontSize: 22, fontWeight: '800', color: Colors.black, fontFamily: Fonts.extrabold, letterSpacing: -0.3 },
+  payoutsIntroBody: { fontSize: 14, color: Colors.gray, fontFamily: Fonts.regular, lineHeight: 20 },
+  payoutsIntroSteps: { gap: 14, backgroundColor: Colors.grayLight, borderRadius: 18, padding: 16 },
+  payoutsIntroStep: { flexDirection: 'row', gap: 14, alignItems: 'flex-start' },
+  payoutsIntroStepNum: { width: 28, height: 28, borderRadius: 14, backgroundColor: Colors.black, alignItems: 'center', justifyContent: 'center', flexShrink: 0 },
+  payoutsIntroStepNumText: { fontSize: 13, fontWeight: '700', color: Colors.white },
+  payoutsIntroStepTitle: { fontSize: 14, fontWeight: '700', color: Colors.black, fontFamily: Fonts.bold, marginBottom: 3 },
+  payoutsIntroStepSub: { fontSize: 13, color: Colors.gray, fontFamily: Fonts.regular, lineHeight: 18 },
+  payoutsIntroBtn: { backgroundColor: Colors.black, borderRadius: 50, paddingVertical: 16, alignItems: 'center', marginTop: 4 },
+  payoutsIntroBtnText: { fontSize: 16, fontWeight: '700', color: Colors.white, fontFamily: Fonts.bold },
+
+  // Attendees modal
+  attendeesSheet: { backgroundColor: Colors.white, borderTopLeftRadius: 28, borderTopRightRadius: 28, paddingHorizontal: 24, paddingTop: 16, maxHeight: '70%' },
+  attendeeRow: { flexDirection: 'row', alignItems: 'center', gap: 12, paddingVertical: 12 },
+  attendeeAvatar: { width: 40, height: 40, borderRadius: 20, backgroundColor: Colors.lime, alignItems: 'center', justifyContent: 'center', overflow: 'hidden' },
+  attendeeInitial: { fontSize: 16, fontWeight: '700', color: Colors.black },
+  attendeeName: { fontSize: 15, fontWeight: '600', color: Colors.black, fontFamily: Fonts.semibold },
+
+  // People button (replaces Cancel)
+  upcomingActionPeopleBtn: { backgroundColor: Colors.grayLight },
+  upcomingActionPeople: { fontSize: 10, fontWeight: '600', color: Colors.black, fontFamily: Fonts.semibold },
+
+  // QR scan tab
+  scanContainer: { backgroundColor: '#000', overflow: 'hidden' },
+  scanPermBox: { flex: 1, alignItems: 'center', justifyContent: 'center', gap: 12, padding: 40 },
+  scanPermTitle: { fontSize: 18, fontWeight: '700', color: Colors.white, fontFamily: Fonts.bold },
+  scanPermSub: { fontSize: 14, color: 'rgba(255,255,255,0.6)', textAlign: 'center', fontFamily: Fonts.regular },
+  scanPermBtn: { backgroundColor: Colors.lime, borderRadius: 50, paddingHorizontal: 24, paddingVertical: 12, marginTop: 8 },
+  scanPermBtnText: { fontSize: 15, fontWeight: '700', color: Colors.black, fontFamily: Fonts.bold },
+  scanFrame: { position: 'absolute', top: '30%', left: '15%', right: '15%', bottom: '35%' },
+  scanCornerTL: { position: 'absolute', top: 0, left: 0, width: 30, height: 30, borderTopWidth: 3, borderLeftWidth: 3, borderColor: Colors.lime, borderTopLeftRadius: 8 },
+  scanCornerTR: { position: 'absolute', top: 0, right: 0, width: 30, height: 30, borderTopWidth: 3, borderRightWidth: 3, borderColor: Colors.lime, borderTopRightRadius: 8 },
+  scanCornerBL: { position: 'absolute', bottom: 0, left: 0, width: 30, height: 30, borderBottomWidth: 3, borderLeftWidth: 3, borderColor: Colors.lime, borderBottomLeftRadius: 8 },
+  scanCornerBR: { position: 'absolute', bottom: 0, right: 0, width: 30, height: 30, borderBottomWidth: 3, borderRightWidth: 3, borderColor: Colors.lime, borderBottomRightRadius: 8 },
+  scanHint: { position: 'absolute', bottom: 100, left: 0, right: 0, textAlign: 'center', color: 'rgba(255,255,255,0.7)', fontSize: 13, fontFamily: Fonts.regular },
+  scanResult: { position: 'absolute', bottom: 0, left: 0, right: 0, backgroundColor: Colors.white, borderTopLeftRadius: 24, borderTopRightRadius: 24, padding: 20, gap: 14 },
+  scanResultTop: { flexDirection: 'row', alignItems: 'center', gap: 14 },
+  scanResultDot: { width: 10, height: 10, borderRadius: 5, flexShrink: 0 },
+  scanResultAvatar: { width: 48, height: 48, borderRadius: 24, backgroundColor: Colors.grayLight, alignItems: 'center', justifyContent: 'center', overflow: 'hidden', flexShrink: 0 },
+  scanResultInitial: { fontSize: 20, fontWeight: '700', color: Colors.black },
+  scanResultName: { fontSize: 16, fontWeight: '700', color: Colors.black, fontFamily: Fonts.bold },
+  scanResultEvent: { fontSize: 12, color: Colors.gray, fontFamily: Fonts.regular, marginTop: 2 },
+  scanResultStatus: { fontSize: 13, fontWeight: '700', fontFamily: Fonts.semibold, marginTop: 4 },
+  scanResultClose: { padding: 8 },
+  scanCheckInBtn: { backgroundColor: Colors.black, borderRadius: 50, paddingVertical: 13, alignItems: 'center' },
+  scanCheckInBtnDone: { backgroundColor: Colors.lime },
+  scanCheckInBtnText: { fontSize: 15, fontWeight: '700', color: Colors.white, fontFamily: Fonts.bold },
+
+  // Attendees check-in
+  checkedInBadge: { backgroundColor: '#E8FAF0', borderRadius: 50, paddingHorizontal: 10, paddingVertical: 5 },
+  checkedInBadgeText: { fontSize: 11, fontWeight: '700', color: '#16A34A' },
+  checkInBtn: { backgroundColor: Colors.grayLight, borderRadius: 50, paddingHorizontal: 12, paddingVertical: 6 },
+  checkInBtnText: { fontSize: 11, fontWeight: '600', color: Colors.black, fontFamily: Fonts.semibold },
+
+  // Back button in topbar
+  backBtn: { width: 36, height: 36, alignItems: 'center', justifyContent: 'center' },
+  bellBtn: { width: 36, height: 36, borderRadius: 18, alignItems: 'center', justifyContent: 'center' },
+  bellDot: { position: 'absolute', top: 4, right: 4, width: 8, height: 8, borderRadius: 4, backgroundColor: '#FF3B30', borderWidth: 1.5, borderColor: Colors.white },
 });

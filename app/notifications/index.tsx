@@ -1,5 +1,5 @@
 import React, { useCallback, useState } from 'react';
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Alert } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useRouter, useFocusEffect } from 'expo-router';
 import Svg, { Path } from 'react-native-svg';
@@ -47,9 +47,16 @@ export default function NotificationsScreen() {
         <Path d="M18 6L6 18M6 6l12 12" stroke="#FF6B6B" strokeWidth={2.5} strokeLinecap="round" />
       </Svg>
     );
-    if (type === 'new_event') return (
+    if (type === 'new_event' || type === 'club_event') return (
       <Svg width={16} height={16} viewBox="0 0 24 24" fill="none">
         <Path d="M12 5v14M5 12h14" stroke={Colors.black} strokeWidth={2.5} strokeLinecap="round" />
+      </Svg>
+    );
+    if (type === 'admin_invite') return (
+      <Svg width={16} height={16} viewBox="0 0 24 24" fill="none">
+        <Path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2" stroke={Colors.black} strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" />
+        <Path d="M16 11h6m-3-3v6" stroke={Colors.black} strokeWidth={2} strokeLinecap="round" />
+        <Path d="M9 11a4 4 0 1 0 0-8 4 4 0 0 0 0 8z" stroke={Colors.black} strokeWidth={2} />
       </Svg>
     );
     return (
@@ -61,13 +68,40 @@ export default function NotificationsScreen() {
 
   function iconBgForType(type: Notification['type']) {
     if (type === 'event_cancelled') return '#FFF0F0';
-    if (type === 'new_event') return Colors.lime;
+    if (type === 'new_event' || type === 'club_event') return Colors.lime;
+    if (type === 'admin_invite') return '#E8F4FF';
     return Colors.grayLight;
   }
 
+  async function handleAdminInvite(n: Notification, accept: boolean) {
+    const clubId = n.data?.club_id;
+    if (!clubId || !user) return;
+    if (accept) {
+      await supabase.from('club_members')
+        .update({ status: 'approved' })
+        .eq('club_id', clubId).eq('user_id', user.id).eq('role', 'admin');
+      Alert.alert('Welcome aboard!', "You're now an admin. Open Dashboard from the + menu.");
+    } else {
+      await supabase.from('club_members')
+        .delete()
+        .eq('club_id', clubId).eq('user_id', user.id).eq('role', 'admin').eq('status', 'pending');
+    }
+    await supabase.from('notifications').update({ read: true }).eq('id', n.id);
+    setNotifications(prev => prev.map(x => x.id === n.id ? { ...x, read: true } : x));
+  }
+
   function handleTap(n: Notification) {
+    if (n.type === 'admin_invite' && n.data?.action === 'admin_invite') {
+      Alert.alert(n.title, n.body ?? '', [
+        { text: 'Decline', style: 'destructive', onPress: () => handleAdminInvite(n, false) },
+        { text: 'Accept', onPress: () => handleAdminInvite(n, true) },
+      ]);
+      return;
+    }
     const eventId = n.data?.event_id;
     if (eventId) router.push(`/event/${eventId}` as any);
+    const clubId = n.data?.club_id;
+    if (clubId && !eventId) router.push(`/club/${clubId}` as any);
   }
 
   return (
@@ -101,6 +135,9 @@ export default function NotificationsScreen() {
             <View style={styles.rowContent}>
               <Text style={styles.rowTitle}>{n.title}</Text>
               {n.body ? <Text style={styles.rowBody}>{n.body}</Text> : null}
+              {n.type === 'admin_invite' && !n.read && (
+                <Text style={styles.rowAction}>Tap to accept or decline →</Text>
+              )}
               <Text style={styles.rowTime}>{timeAgo(n.created_at)}</Text>
             </View>
             {!n.read && <View style={styles.unreadDot} />}
@@ -122,6 +159,7 @@ const styles = StyleSheet.create({
   rowTitle: { fontSize: 14, fontWeight: '600', color: Colors.black, fontFamily: Fonts.semibold, lineHeight: 20 },
   rowBody: { fontSize: 13, color: Colors.gray, fontFamily: Fonts.regular, lineHeight: 18 },
   rowTime: { fontSize: 11, color: Colors.gray, fontFamily: Fonts.regular, marginTop: 2 },
+  rowAction: { fontSize: 12, color: Colors.black, fontFamily: Fonts.medium, fontWeight: '600', marginTop: 4 },
   unreadDot: { width: 8, height: 8, borderRadius: 4, backgroundColor: Colors.lime, marginTop: 6, flexShrink: 0 },
   empty: { flex: 1, alignItems: 'center', justifyContent: 'center', paddingTop: 80, gap: 12 },
   emptyText: { fontSize: 15, color: Colors.gray, fontFamily: Fonts.regular },

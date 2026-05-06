@@ -361,7 +361,7 @@ const styles = StyleSheet.create({
 
   // Perforated line
   perfRow: { flexDirection: 'row', alignItems: 'center', marginBottom: 16 },
-  perfNub: { width: 20, height: 20, borderRadius: 10, backgroundColor: '#F5F5F5', marginHorizontal: -18 },
+  perfNub: { width: 28, height: 28, borderRadius: 14, backgroundColor: '#F5F5F5', marginHorizontal: -32 },
   perfLine: { flex: 1, flexDirection: 'row', justifyContent: 'space-between', paddingHorizontal: 8 },
   perfDash: { width: 8, height: 3, backgroundColor: 'rgba(255,255,255,0.18)', borderRadius: 2 },
 
@@ -374,7 +374,7 @@ const styles = StyleSheet.create({
   qrAvatarFallback: { backgroundColor: Colors.lime, alignItems: 'center', justifyContent: 'center' },
   qrAvatarInitial: { fontSize: 12, fontWeight: '700', color: Colors.black },
 
-  qrAttendeeName: { fontSize: 13, fontWeight: '600', color: Colors.white, fontFamily: Fonts.semibold, flex: 1 },
+  qrAttendeeName: { fontSize: 13, fontWeight: '600', color: Colors.white, fontFamily: Fonts.semibold },
   qrTitle: { fontSize: 13, fontWeight: '700', color: 'rgba(255,255,255,0.6)', fontFamily: Fonts.semibold },
   qrSub: { fontSize: 11, color: 'rgba(255,255,255,0.35)', fontFamily: Fonts.regular, lineHeight: 16 },
   qrClub: { fontSize: 11, color: 'rgba(255,255,255,0.35)', fontFamily: Fonts.medium, marginTop: 2 },
