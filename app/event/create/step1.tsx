@@ -4,10 +4,12 @@ import { useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Animated, { FadeInUp } from 'react-native-reanimated';
 import { Colors } from '@/constants/colors';
+import { useTranslations } from '@/context/LanguageContext';
 
 export default function CreateStep1Screen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
+  const { t } = useTranslations();
 
   return (
     <View style={[styles.container, { paddingBottom: insets.bottom + 24 }]}>
@@ -15,7 +17,7 @@ export default function CreateStep1Screen() {
 
       <Animated.View entering={FadeInUp.springify()} style={[styles.sheet, { paddingBottom: insets.bottom + 24 }]}>
         <View style={styles.sheetHeader}>
-          <Text style={styles.title}>Create</Text>
+          <Text style={styles.title}>{t.event.createEvent}</Text>
           <TouchableOpacity style={styles.closeBtn} onPress={() => router.dismiss()} hitSlop={8}>
             <Text style={styles.closeIcon}>✕</Text>
           </TouchableOpacity>
@@ -28,8 +30,8 @@ export default function CreateStep1Screen() {
         >
           <View style={styles.optionThumb} />
           <View style={styles.optionText}>
-            <Text style={styles.optionTitle}>New event</Text>
-            <Text style={styles.optionSub}>Run, party, brunch</Text>
+            <Text style={styles.optionTitle}>{t.event.newEvent}</Text>
+            <Text style={styles.optionSub}>{t.event.newEventSub}</Text>
           </View>
         </TouchableOpacity>
 
@@ -40,8 +42,8 @@ export default function CreateStep1Screen() {
         >
           <View style={[styles.optionThumb, { backgroundColor: Colors.grayBorder }]} />
           <View style={styles.optionText}>
-            <Text style={styles.optionTitle}>New club</Text>
-            <Text style={styles.optionSub}>Your community</Text>
+            <Text style={styles.optionTitle}>{t.club.createClub}</Text>
+            <Text style={styles.optionSub}>{t.club.newClubSub}</Text>
           </View>
         </TouchableOpacity>
       </Animated.View>

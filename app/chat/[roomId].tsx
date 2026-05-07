@@ -9,6 +9,7 @@ import { Fonts } from '@/constants/fonts';
 import { supabase } from '@/lib/supabase';
 import { Message } from '@/types';
 import { useAuth } from '@/context/AuthContext';
+import { useTranslations } from '@/context/LanguageContext';
 
 type ProfileCache = Record<string, { name: string; avatar_url: string | null }>;
 
@@ -18,6 +19,7 @@ export default function ChatScreen() {
   const { roomId } = useLocalSearchParams<{ roomId: string }>();
   const insets = useSafeAreaInsets();
   const { user, profile } = useAuth();
+  const { t: tr } = useTranslations();
   const [messages, setMessages] = useState<Message[]>([]);
   const [text, setText] = useState('');
   const [eventTitle, setEventTitle] = useState('');
@@ -151,11 +153,11 @@ export default function ChatScreen() {
   }
 
   function handleReport() {
-    Alert.alert('Report chat', 'Report this conversation for inappropriate content?', [
-      { text: 'Cancel', style: 'cancel' },
-      { text: 'Report', style: 'destructive', onPress: async () => {
+    Alert.alert(tr.chat.reportChat, tr.chat.reportChatMsg, [
+      { text: tr.common.cancel, style: 'cancel' },
+      { text: tr.chat.reportChat, style: 'destructive', onPress: async () => {
         await supabase.from('reports').insert({ reporter_id: user?.id, target_type: 'chat', target_id: roomId });
-        Alert.alert('Reported', 'Thank you. Our team will review this chat.');
+        Alert.alert(tr.chat.reported, tr.chat.reportedMsg);
       }},
     ]);
   }
@@ -163,9 +165,10 @@ export default function ChatScreen() {
   function renderItem({ item }: { item: Message }) {
     const isMe = item.sender_id === user?.id;
     const sender = profileCache[item.sender_id] ?? (item.sender as any) ?? null;
-    const firstName = (sender?.name ?? '').split(' ')[0] || '?';
+    const senderName = isMe ? (profile?.name ?? sender?.name ?? '') : (sender?.name ?? '');
+    const firstName = senderName.split(' ')[0] || '?';
     const initial = firstName.charAt(0).toUpperCase();
-    const avatarUrl = sender?.avatar_url ?? null;
+    const avatarUrl = isMe ? (profile?.avatar_url ?? sender?.avatar_url ?? null) : (sender?.avatar_url ?? null);
     const isAdmin = adminIds.has(item.sender_id);
 
     const Avatar = (
@@ -182,19 +185,19 @@ export default function ChatScreen() {
     return (
       <View style={[styles.msgRow, isMe && styles.msgRowMe]}>
         {Avatar}
-        <View style={{ maxWidth: '72%' }}>
+        <View style={{ maxWidth: '78%' }}>
           <View style={[styles.senderNameRow, isMe && styles.senderNameRowMe]}>
-            <Text style={styles.senderName}>{isMe ? 'You' : firstName}</Text>
+            <Text style={styles.senderName}>{isMe ? tr.chat.you : firstName}</Text>
             {isAdmin && (
               <View style={styles.adminBadge}>
-                <Text style={styles.adminBadgeText}>★ Admin</Text>
+                <Text style={styles.adminBadgeText}>★ {tr.chat.admin}</Text>
               </View>
             )}
           </View>
           <View style={[styles.bubble, isMe && styles.bubbleMe]}>
             <Text style={[styles.msgText, isMe && styles.msgTextMe]}>{item.content}</Text>
             <Text style={[styles.msgTime, isMe && styles.msgTimeMe]}>
-              {new Date(item.created_at).toLocaleTimeString('sk-SK', { hour: '2-digit', minute: '2-digit' })}
+              {new Date(item.created_at).toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' })}
             </Text>
           </View>
         </View>
@@ -213,7 +216,7 @@ export default function ChatScreen() {
         <BackButton />
         <View style={styles.headerText}>
           <Text style={styles.headerTitle} numberOfLines={1}>{eventTitle}</Text>
-          <Text style={styles.headerSub} numberOfLines={1}>{headerSub || 'Group chat'}</Text>
+          <Text style={styles.headerSub} numberOfLines={1}>{headerSub || tr.chat.groupChat}</Text>
         </View>
         <TouchableOpacity onPress={handleReport} style={styles.reportBtn}>
           <Text style={styles.reportIcon}>⋯</Text>
@@ -238,7 +241,7 @@ export default function ChatScreen() {
         contentContainerStyle={styles.emojiBarContent}
       >
         {QUICK_EMOJIS.map(e => (
-          <TouchableOpacity key={e} style={styles.emojiBtn} onPress={() => sendMessage(e)} activeOpacity={0.7}>
+          <TouchableOpacity key={e} style={styles.emojiBtn} onPress={() => setText(prev => prev + e)} activeOpacity={0.7}>
             <Text style={styles.emojiText}>{e}</Text>
           </TouchableOpacity>
         ))}
@@ -250,7 +253,7 @@ export default function ChatScreen() {
           style={styles.input}
           value={text}
           onChangeText={setText}
-          placeholder="Message..."
+          placeholder={tr.chat.messagePlaceholder}
           placeholderTextColor={Colors.gray}
           multiline
           maxLength={500}
@@ -282,16 +285,16 @@ const styles = StyleSheet.create({
   msgRowMe: { flexDirection: 'row-reverse' },
   senderAvatarWrap: { flexShrink: 0, alignSelf: 'flex-end' },
   senderAvatarImg: { width: 30, height: 30, borderRadius: 15 },
-  senderAvatarFallback: { backgroundColor: Colors.grayLight, alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderColor: Colors.grayBorder },
-  senderAvatarFallbackMe: { backgroundColor: Colors.lime, alignItems: 'center', justifyContent: 'center' },
+  senderAvatarFallback: { backgroundColor: Colors.grayLight, alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderColor: Colors.grayBorder, borderRadius: 15 },
+  senderAvatarFallbackMe: { backgroundColor: Colors.lime, alignItems: 'center', justifyContent: 'center', borderRadius: 15 },
   senderInitial: { fontSize: 12, fontWeight: '700', color: Colors.black, fontFamily: Fonts.bold },
-  bubble: { maxWidth: '75%', backgroundColor: Colors.grayLight, borderRadius: 18, borderBottomLeftRadius: 4, padding: 12, gap: 3 },
-  bubbleMe: { backgroundColor: Colors.black, borderBottomLeftRadius: 18, borderBottomRightRadius: 4 },
+  bubble: { alignSelf: 'flex-start', backgroundColor: Colors.grayLight, borderRadius: 18, borderBottomLeftRadius: 4, padding: 12, gap: 3 },
+  bubbleMe: { alignSelf: 'flex-end', backgroundColor: Colors.black, borderBottomLeftRadius: 18, borderBottomRightRadius: 4 },
   senderNameRow: { flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 3 },
   senderNameRowMe: { justifyContent: 'flex-end' },
   senderName: { fontSize: 11, fontWeight: '600', color: Colors.gray, fontFamily: Fonts.semibold },
-  adminBadge: { backgroundColor: '#FF9500', borderRadius: 4, paddingHorizontal: 5, paddingVertical: 1, flexDirection: 'row', alignItems: 'center' },
-  adminBadgeText: { fontSize: 9, fontWeight: '700', color: Colors.white, fontFamily: Fonts.bold, letterSpacing: 0.2 },
+  adminBadge: { backgroundColor: Colors.lime, borderRadius: 4, paddingHorizontal: 5, paddingVertical: 1, flexDirection: 'row', alignItems: 'center' },
+  adminBadgeText: { fontSize: 9, fontWeight: '700', color: Colors.black, fontFamily: Fonts.bold, letterSpacing: 0.2 },
   msgText: { fontSize: 15, color: Colors.black, lineHeight: 20 },
   msgTextMe: { color: Colors.white },
   msgTime: { fontSize: 10, color: Colors.gray, alignSelf: 'flex-end' },

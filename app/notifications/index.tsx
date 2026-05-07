@@ -9,11 +9,13 @@ import { supabase } from '@/lib/supabase';
 import { useAuth } from '@/context/AuthContext';
 import { Notification } from '@/types';
 import { BackButton } from '@/components/ui/BackButton';
+import { useTranslations } from '@/context/LanguageContext';
 
 export default function NotificationsScreen() {
   const insets = useSafeAreaInsets();
   const router = useRouter();
   const { user } = useAuth();
+  const { t } = useTranslations();
   const [notifications, setNotifications] = useState<Notification[]>([]);
 
   useFocusEffect(useCallback(() => {
@@ -34,11 +36,11 @@ export default function NotificationsScreen() {
   function timeAgo(dateStr: string) {
     const diff = Date.now() - new Date(dateStr).getTime();
     const mins = Math.floor(diff / 60000);
-    if (mins < 60) return `${mins}m ago`;
+    if (mins < 60) return t.notif.minutesAgo(mins);
     const hours = Math.floor(mins / 60);
-    if (hours < 24) return `${hours}h ago`;
+    if (hours < 24) return t.notif.hoursAgo(hours);
     const days = Math.floor(hours / 24);
-    return `${days}d ago`;
+    return t.notif.daysAgo(days);
   }
 
   function iconForType(type: Notification['type']) {
@@ -80,7 +82,7 @@ export default function NotificationsScreen() {
       await supabase.from('club_members')
         .update({ status: 'approved' })
         .eq('club_id', clubId).eq('user_id', user.id).eq('role', 'admin');
-      Alert.alert('Welcome aboard!', "You're now an admin. Open Dashboard from the + menu.");
+      Alert.alert(t.notif.welcomeAboard, t.notif.welcomeAboardMsg);
     } else {
       await supabase.from('club_members')
         .delete()
@@ -93,8 +95,8 @@ export default function NotificationsScreen() {
   function handleTap(n: Notification) {
     if (n.type === 'admin_invite' && n.data?.action === 'admin_invite') {
       Alert.alert(n.title, n.body ?? '', [
-        { text: 'Decline', style: 'destructive', onPress: () => handleAdminInvite(n, false) },
-        { text: 'Accept', onPress: () => handleAdminInvite(n, true) },
+        { text: t.common.decline, style: 'destructive', onPress: () => handleAdminInvite(n, false) },
+        { text: t.common.accept, onPress: () => handleAdminInvite(n, true) },
       ]);
       return;
     }
@@ -108,7 +110,7 @@ export default function NotificationsScreen() {
     <View style={[styles.container, { paddingTop: insets.top + 16 }]}>
       <View style={styles.topBar}>
         <BackButton />
-        <Text style={styles.title}>Notifications</Text>
+        <Text style={styles.title}>{t.notif.notifications}</Text>
         <View style={{ width: 36 }} />
       </View>
 
@@ -118,7 +120,7 @@ export default function NotificationsScreen() {
             <Svg width={40} height={40} viewBox="0 0 24 24" fill="none">
               <Path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9M13.73 21a2 2 0 0 1-3.46 0" stroke={Colors.grayBorder} strokeWidth={1.5} strokeLinecap="round" strokeLinejoin="round" />
             </Svg>
-            <Text style={styles.emptyText}>No notifications yet</Text>
+            <Text style={styles.emptyText}>{t.notif.noNotifications}</Text>
           </View>
         )}
 
@@ -136,7 +138,7 @@ export default function NotificationsScreen() {
               <Text style={styles.rowTitle}>{n.title}</Text>
               {n.body ? <Text style={styles.rowBody}>{n.body}</Text> : null}
               {n.type === 'admin_invite' && !n.read && (
-                <Text style={styles.rowAction}>Tap to accept or decline →</Text>
+                <Text style={styles.rowAction}>{t.notif.tapToAcceptDecline}</Text>
               )}
               <Text style={styles.rowTime}>{timeAgo(n.created_at)}</Text>
             </View>

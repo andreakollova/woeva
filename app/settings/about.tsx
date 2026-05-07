@@ -1,31 +1,45 @@
 import { BackButton } from '@/components/ui/BackButton';
 import React from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, ScrollView, Linking } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, ScrollView, Linking, Platform } from 'react-native';
 import { useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Colors } from '@/constants/colors';
 import { WMark } from '@/components/ui/WMark';
+import { useTranslations } from '@/context/LanguageContext';
 
 export default function AboutScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
+  const { t } = useTranslations();
+
+  const APP_STORE_ID = ''; // fill in after first App Store submission
+  const PLAY_STORE_ID = 'com.woeva.app';
 
   const LEGAL_ITEMS = [
-    { label: 'Terms of service', onPress: () => {} },
-    { label: 'Privacy policy', onPress: () => {} },
-    { label: 'Licenses', onPress: () => {} },
+    { label: t.about.privacyPolicy, onPress: () => router.push('/settings/legal?type=privacy' as any) },
+    { label: t.about.termsOfService, onPress: () => router.push('/settings/legal?type=terms' as any) },
+    { label: t.about.contactUs, onPress: () => Linking.openURL('mailto:hello@woeva.app').catch(() => {}) },
   ];
 
   const MORE_ITEMS = [
-    { label: 'Rate Woeva', onPress: () => {} },
-    { label: 'Follow @woevaapp', onPress: () => Linking.openURL('https://instagram.com/woevaapp').catch(() => {}) },
+    {
+      label: t.about.rateWoeva,
+      onPress: () => {
+        if (Platform.OS === 'ios' && APP_STORE_ID) {
+          Linking.openURL(`https://apps.apple.com/app/id${APP_STORE_ID}?action=write-review`).catch(() => {});
+        } else if (Platform.OS === 'android') {
+          Linking.openURL(`https://play.google.com/store/apps/details?id=${PLAY_STORE_ID}`).catch(() => {});
+        }
+      },
+    },
+    { label: t.about.followInstagram, onPress: () => Linking.openURL('https://instagram.com/woevaapp').catch(() => {}) },
   ];
 
   return (
     <View style={[styles.container, { paddingTop: insets.top }]}>
       <View style={styles.header}>
         <BackButton />
-        <Text style={styles.title}>About</Text>
+        <Text style={styles.title}>{t.about.about}</Text>
       </View>
 
       <ScrollView contentContainerStyle={[styles.scroll, { paddingBottom: insets.bottom + 40 }]}>
@@ -36,7 +50,7 @@ export default function AboutScreen() {
           </View>
           <Text style={styles.appName}>Woeva</Text>
           <Text style={styles.appVersion}>Version 1.0.0 · build 1</Text>
-          <Text style={styles.appTagline}>Your people are already out.</Text>
+          <Text style={styles.appTagline}>{t.about.appTagline}</Text>
         </View>
 
         {/* Legal */}
@@ -69,15 +83,11 @@ export default function AboutScreen() {
 
         {/* Refund policy */}
         <View style={styles.policyCard}>
-          <Text style={styles.policyTitle}>Cancellation & Refund Policy</Text>
-          <Text style={styles.policyText}>
-            If a paid event is cancelled by the organiser <Text style={styles.policyBold}>48 hours or more</Text> before it starts, all attendees receive a full automatic refund to their original payment method.{'\n\n'}
-            If the event is cancelled <Text style={styles.policyBold}>less than 48 hours</Text> before the start time, no refund is issued.{'\n\n'}
-            Refunds are processed via Stripe and may take 5–10 business days to appear on your statement.
-          </Text>
+          <Text style={styles.policyTitle}>{t.about.cancellationPolicy}</Text>
+          <Text style={styles.policyText}>{t.about.cancellationText}</Text>
         </View>
 
-        <Text style={styles.footer}>Made by people for people.</Text>
+        <Text style={styles.footer}>{t.about.madeBy}</Text>
       </ScrollView>
     </View>
   );

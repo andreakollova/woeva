@@ -14,6 +14,7 @@ import { Fonts } from '@/constants/fonts';
 import { supabase } from '@/lib/supabase';
 import { Event } from '@/types';
 import { useAuth } from '@/context/AuthContext';
+import { useTranslations } from '@/context/LanguageContext';
 
 
 const FILTER_TAGS = ['All', 'Free', 'Coffee', 'Sport', 'Party', 'Music', 'Art', 'Yoga'];
@@ -23,6 +24,7 @@ export default function HomeScreen() {
   const insets = useSafeAreaInsets();
   const router = useRouter();
   const { profile, user, refetchProfile } = useAuth();
+  const { t } = useTranslations();
   const avatarInitial = (profile?.name || (user as any)?.user_metadata?.full_name || '?').charAt(0).toUpperCase();
   const [avatarError, setAvatarError] = useState(false);
   const [events, setEvents] = useState<Event[]>([]);
@@ -58,12 +60,13 @@ export default function HomeScreen() {
       supabase.from('notifications').select('id', { count: 'exact', head: true }).eq('user_id', user.id).eq('read', false)
         .then(({ count }) => setUnreadNotifs(count ?? 0));
     }
-  }, [filter, user?.id]));
+  }, [filter, city, user?.id]));
 
   async function loadEvents() {
-    let query = supabase.from('events').select('*, club:clubs(id, name, cover_url), attendees:event_attendees(profile:profiles(id, name, avatar_url))').order('date', { ascending: true }).limit(30);
+    let query = supabase.from('events').select('*, club:clubs(id, name, cover_url), attendees:event_attendees(profile:profiles(id, name, avatar_url))').order('date', { ascending: true }).limit(50);
     if (filter === 'Free') query = query.eq('is_free', true);
     else if (filter !== 'All') query = query.eq('category', filter);
+    if (city && city !== 'Your city' && city !== 'Select city') query = query.eq('city', city);
     const { data } = await query;
     setEvents(((data ?? []) as any).filter((e: any) => e.status !== 'cancelled'));
 
@@ -127,12 +130,12 @@ export default function HomeScreen() {
         {/* Header */}
         <View style={styles.header}>
           <TouchableOpacity onPress={() => setShowCityPicker(true)} style={styles.cityRow}>
-            <Text style={styles.cityLabel}>{city || 'Select city'}</Text>
+            <Text style={styles.cityLabel}>{city || t.home.selectCity}</Text>
             <Svg width={14} height={14} viewBox="0 0 24 24" fill="none">
               <Path d="M6 9l6 6 6-6" stroke={Colors.gray} strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" />
             </Svg>
           </TouchableOpacity>
-          <Text style={styles.title}>Your city is moving</Text>
+          <Text style={styles.title}>{t.home.yourCityMoving}</Text>
         </View>
 
         {/* Filter chips */}
@@ -144,7 +147,7 @@ export default function HomeScreen() {
           {FILTER_TAGS.map(tag => (
             <Tag
               key={tag}
-              label={tag}
+              label={tag === 'All' ? t.home.all : tag === 'Free' ? t.home.free : tag}
               selected={filter === tag}
               onPress={() => setFilter(tag)}
               small
@@ -170,8 +173,8 @@ export default function HomeScreen() {
           ))}
           {events.length === 0 && (
             <View style={styles.empty}>
-              <Text style={styles.emptyTitle}>Nothing here yet</Text>
-              <Text style={styles.emptyText}>Be the first to create an event in {city}.</Text>
+              <Text style={styles.emptyTitle}>{t.home.noEvents}</Text>
+              <Text style={styles.emptyText}>{t.home.noEventsInCity(city)}</Text>
             </View>
           )}
         </View>
@@ -182,7 +185,7 @@ export default function HomeScreen() {
         <TouchableOpacity style={styles.cityModalBg} activeOpacity={1} onPress={() => setShowCityPicker(false)}>
           <View style={styles.cityModalSheet}>
             <View style={styles.cityModalHandle} />
-            <Text style={styles.cityModalTitle}>Choose your city</Text>
+            <Text style={styles.cityModalTitle}>{t.home.selectCity}</Text>
             {CITIES.map((c) => (
               <TouchableOpacity
                 key={c}

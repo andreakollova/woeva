@@ -13,11 +13,14 @@ import { Button } from '@/components/ui/Button';
 import { supabase } from '@/lib/supabase';
 import { uploadImage } from '@/lib/uploadImage';
 import { useAuth } from '@/context/AuthContext';
+import { notify } from '@/lib/notify';
+import { useTranslations } from '@/context/LanguageContext';
 
 export default function CreateStep3Screen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const { user, profile } = useAuth();
+  const { t } = useTranslations();
   const params = useLocalSearchParams<{ title: string; tagline: string; category: string; cover: string; postAs: string }>();
 
   const [date, setDate] = useState(new Date());
@@ -35,12 +38,12 @@ export default function CreateStep3Screen() {
   const [toast, setToast] = useState(false);
 
   async function handleShare() {
-    if (!venue.trim()) { Alert.alert('Missing venue', 'Please enter a venue or location.'); return; }
-    if (!params.title) { Alert.alert('Missing title', 'Go back and enter an event name.'); return; }
+    if (!venue.trim()) { Alert.alert(t.event.missingVenue, t.event.missingVenueMsg); return; }
+    if (!params.title) { Alert.alert(t.event.missingTitle, t.event.missingTitleMsg); return; }
     setLoading(true);
 
     const currentUser = user;
-    if (!currentUser) { setLoading(false); Alert.alert('Not logged in', 'Please log in and try again.'); return; }
+    if (!currentUser) { setLoading(false); Alert.alert(t.event.notLoggedIn, t.event.notLoggedInMsg); return; }
 
     const eventDate = date.toISOString().split('T')[0];
     const eventTime = `${time.getHours().toString().padStart(2, '0')}:${time.getMinutes().toString().padStart(2, '0')}`;
@@ -49,7 +52,7 @@ export default function CreateStep3Screen() {
     // Find creator's club (only if posting as club)
     const postAsClub = params.postAs !== 'individual';
     const { data: clubData } = postAsClub
-      ? await supabase.from('clubs').select('id').eq('creator_id', currentUser.id).limit(1).single()
+      ? await supabase.from('clubs').select('id, name').eq('creator_id', currentUser.id).limit(1).single()
       : { data: null };
 
     // Upload cover image if provided
@@ -91,44 +94,45 @@ export default function CreateStep3Screen() {
           .eq('status', 'approved')
           .neq('user_id', currentUser.id);
 
-        const tokens = (members ?? [])
-          .map((m: any) => m.profile?.push_token)
-          .filter(Boolean);
+        const memberTokens = (members ?? []).map((m: any) => m.profile?.push_token).filter(Boolean);
+        const memberUserIds = (members ?? []).map((m: any) => m.user_id);
 
-        if (tokens.length > 0) {
-          fetch('https://exp.host/--/api/v2/push/send', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(tokens.map((token: string) => ({
-              to: token,
-              title: 'New event in your club',
-              body: String(params.title),
-              data: { eventId: data.id },
-            }))),
-          }).catch(() => {});
-        }
+        const { data: memberProfiles } = await supabase
+          .from('profiles').select('email').in('id', memberUserIds);
+        const memberEmails = (memberProfiles ?? []).map((p: any) => p.email).filter(Boolean);
 
         // In-app notifications
         const inAppNotifs = (members ?? []).map((m: any) => ({
-          user_id: m.user_id,
-          type: 'club_event',
-          title: 'New event in your club',
+          user_id: m.user_id, type: 'club_event',
+          title: `New event in ${clubData.name ?? 'your club'}`,
           body: String(params.title),
           data: { event_id: data.id },
         }));
         if (inAppNotifs.length > 0) {
           await supabase.from('notifications').insert(inAppNotifs);
         }
+
+        // Push + email via notify helper
+        notify.newClubEvent({
+          clubName: clubData.name ?? 'your club',
+          eventId: data.id,
+          eventTitle: String(params.title),
+          eventDate: date.toLocaleDateString('en-US', { weekday: 'short', day: 'numeric', month: 'short' }),
+          eventTime: `${time.getHours().toString().padStart(2, '0')}:${time.getMinutes().toString().padStart(2, '0')}`,
+          venue: venue.trim() || undefined,
+          memberTokens,
+          memberEmails,
+        });
       }
     }
 
     setLoading(false);
-    if (error) { Alert.alert('Could not create event', error.message); return; }
+    if (error) { Alert.alert(t.event.couldNotCreate, error.message); return; }
     setToast(true);
     setTimeout(() => router.replace('/event/create/published'), 1000);
   }
 
-  const dateStr = date.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' });
+  const dateStr = date.toLocaleDateString(undefined, { weekday: 'short', month: 'short', day: 'numeric' });
   const timeStr = `${time.getHours().toString().padStart(2, '0')}:${time.getMinutes().toString().padStart(2, '0')}`;
 
   return (
@@ -142,15 +146,15 @@ export default function CreateStep3Screen() {
           <TouchableOpacity onPress={() => router.push('/(tabs)')} activeOpacity={0.7}>
             <WMark size={28} color={Colors.lime} />
           </TouchableOpacity>
-          <View style={styles.stepBadge}><Text style={styles.stepText}>3 / 3</Text></View>
+          <View style={styles.stepBadge}><Text style={styles.stepText}>{t.event.step(3, 3)}</Text></View>
         </View>
 
-        <Text style={styles.title}>When & where?</Text>
+        <Text style={styles.title}>{t.event.whenWhere}</Text>
 
         <View style={styles.form}>
           {/* Date */}
           <View>
-            <Text style={styles.label}>Date</Text>
+            <Text style={styles.label}>{t.event.date}</Text>
             <TouchableOpacity style={styles.field} onPress={() => setShowDate(true)}>
               <Text style={styles.fieldValue}>{dateStr}</Text>
             </TouchableOpacity>
@@ -168,7 +172,7 @@ export default function CreateStep3Screen() {
           {/* Time + Duration row */}
           <View style={styles.halfRow}>
             <View style={styles.halfCol}>
-              <Text style={styles.label}>Time</Text>
+              <Text style={styles.label}>{t.event.time}</Text>
               <TouchableOpacity style={styles.field} onPress={() => setShowTime(true)}>
                 <Text style={styles.fieldValue}>{timeStr}</Text>
               </TouchableOpacity>
@@ -183,7 +187,7 @@ export default function CreateStep3Screen() {
             </View>
 
             <View style={styles.halfCol}>
-              <Text style={styles.label}>Duration</Text>
+              <Text style={styles.label}>{t.event.duration}</Text>
               <TouchableOpacity style={styles.field} onPress={() => setShowDuration(true)}>
                 <Text style={styles.fieldValue}>{duration === '0.5' ? '30 min' : `${duration}h`}</Text>
               </TouchableOpacity>
@@ -194,7 +198,7 @@ export default function CreateStep3Screen() {
           <Modal visible={showDuration} transparent animationType="fade" onRequestClose={() => setShowDuration(false)}>
             <Pressable style={styles.modalOverlay} onPress={() => setShowDuration(false)}>
               <View style={styles.durationSheet}>
-                <Text style={styles.durationSheetTitle}>Duration</Text>
+                <Text style={styles.durationSheetTitle}>{t.event.duration}</Text>
                 {(['0.5', '1', '1.5', '2', '3', '4', '5', '6', '8'] as const).map((h, i, arr) => (
                   <TouchableOpacity
                     key={h}
@@ -224,7 +228,7 @@ export default function CreateStep3Screen() {
 
           {/* Price */}
           <Input
-            label="Price (€) — leave 0 for free"
+            label={t.event.price}
             value={price}
             onChangeText={setPrice}
             placeholder="0"
@@ -234,10 +238,10 @@ export default function CreateStep3Screen() {
             <View style={styles.stripeNotice}>
               <Text style={styles.stripeIcon}>💳</Text>
               <View style={styles.stripeText}>
-                <Text style={styles.stripeTitle}>Stripe account required</Text>
-                <Text style={styles.stripeSub}>Connect your Stripe account to collect payments.</Text>
+                <Text style={styles.stripeTitle}>{t.event.stripeRequired}</Text>
+                <Text style={styles.stripeSub}>{t.event.stripeRequiredSub}</Text>
                 <TouchableOpacity onPress={() => router.push('/settings/payment-methods' as any)} activeOpacity={0.7}>
-                  <Text style={styles.stripeLink}>Set up payments →</Text>
+                  <Text style={styles.stripeLink}>{t.event.setUpPayments}</Text>
                 </TouchableOpacity>
               </View>
             </View>
@@ -246,8 +250,8 @@ export default function CreateStep3Screen() {
           {/* Recurring toggle */}
           <TouchableOpacity style={styles.recurringRow} onPress={() => setIsRecurring(r => !r)} activeOpacity={0.7}>
             <View style={styles.recurringText}>
-              <Text style={styles.recurringTitle}>Repeat every week</Text>
-              <Text style={styles.recurringSub}>Same day, time and venue each week</Text>
+              <Text style={styles.recurringTitle}>{t.event.repeatWeekly}</Text>
+              <Text style={styles.recurringSub}>{t.event.repeatSub}</Text>
             </View>
             <View style={[styles.toggle, isRecurring && styles.toggleOn]}>
               <View style={[styles.toggleThumb, isRecurring && styles.toggleThumbOn]} />
@@ -257,10 +261,10 @@ export default function CreateStep3Screen() {
       </ScrollView>
 
       <View style={[styles.footer, { paddingBottom: insets.bottom + 16 }]}>
-        <Button label="Share event" onPress={handleShare} loading={loading} variant="black" />
-        <Button label="Back" onPress={() => router.back()} variant="ghost" />
+        <Button label={t.event.shareEvent} onPress={handleShare} loading={loading} variant="black" />
+        <Button label={t.common.back} onPress={() => router.back()} variant="ghost" />
       </View>
-      <Toast visible={toast} title="Event created!" subtitle="Your people will find it." onHide={() => setToast(false)} />
+      <Toast visible={toast} title={t.event.eventCreated} subtitle={t.event.eventCreatedSub} onHide={() => setToast(false)} />
     </KeyboardAvoidingView>
   );
 }

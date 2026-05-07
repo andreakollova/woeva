@@ -11,12 +11,15 @@ import { Button } from '@/components/ui/Button';
 import { supabase } from '@/lib/supabase';
 import { uploadImage } from '@/lib/uploadImage';
 import { useAuth } from '@/context/AuthContext';
-import { CATEGORIES } from '@/types';
+import { useCategories } from '@/hooks/useCategories';
+import { useTranslations } from '@/context/LanguageContext';
 
 export default function CreateClubScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
-  const { user } = useAuth();
+  const { user, profile } = useAuth();
+  const { t } = useTranslations();
+  const { categories } = useCategories();
   const [name, setName] = useState('');
   const [tagline, setTagline] = useState('');
   const [category, setCategory] = useState('');
@@ -63,7 +66,7 @@ export default function CreateClubScreen() {
       logo_url,
       member_count: 1,
       rating: 0,
-      city: 'Bratislava',
+      city: profile?.city ?? 'Bratislava',
     }).select().single();
 
     if (!error && data) {
@@ -71,7 +74,7 @@ export default function CreateClubScreen() {
     }
 
     setLoading(false);
-    if (error) { Alert.alert('Error', error.message); return; }
+    if (error) { Alert.alert(t.common.error, error.message); return; }
     router.replace(`/club/${data.id}`);
   }
 
@@ -88,27 +91,25 @@ export default function CreateClubScreen() {
           </TouchableOpacity>
         </View>
 
-        <Text style={styles.title}>New club</Text>
+        <Text style={styles.title}>{t.club.createClub}</Text>
 
         <View style={styles.form}>
           <View>
-            <Input label="Club name" value={name} onChangeText={setName} placeholder="Run club BA" />
+            <Input label={t.club.clubName} value={name} onChangeText={setName} placeholder={t.club.clubNamePlaceholder} />
             {name.length > 16 && (
-              <Text style={styles.nameWarning}>
-                Names over 16 characters may be cut off with … in some places.
-              </Text>
+              <Text style={styles.nameWarning}>{t.club.nameTooLong}</Text>
             )}
           </View>
-          <Input label="Tagline" value={tagline} onChangeText={setTagline} placeholder="Running for everyone" />
+          <Input label={t.club.tagline} value={tagline} onChangeText={setTagline} placeholder={t.club.taglinePlaceholder} />
 
           <View>
-            <Text style={styles.label}>Category</Text>
+            <Text style={styles.label}>{t.club.category}</Text>
             <TouchableOpacity style={styles.selector} onPress={() => setShowCategories(!showCategories)}>
-              <Text style={category ? styles.selectorValue : styles.selectorPlaceholder}>{category || 'Sport - Running'}</Text>
+              <Text style={category ? styles.selectorValue : styles.selectorPlaceholder}>{category || t.event.selectCategory}</Text>
             </TouchableOpacity>
             {showCategories && (
               <View style={styles.dropdown}>
-                {CATEGORIES.map(cat => (
+                {categories.map(cat => (
                   <TouchableOpacity key={cat} style={styles.dropdownItem} onPress={() => { setCategory(cat); setShowCategories(false); }}>
                     <Text style={[styles.dropdownText, category === cat && styles.dropdownTextActive]}>{cat}</Text>
                   </TouchableOpacity>
@@ -120,7 +121,7 @@ export default function CreateClubScreen() {
           {/* Logo + Cover row */}
           <View style={styles.photosRow}>
             <View style={{ gap: 6 }}>
-              <Text style={styles.label}>Logo</Text>
+              <Text style={styles.label}>{t.club.logo}</Text>
               <TouchableOpacity style={styles.logoPicker} onPress={pickLogo} activeOpacity={0.8}>
                 {logo ? (
                   <Image source={{ uri: logo }} style={styles.logoPreview} />
@@ -130,7 +131,7 @@ export default function CreateClubScreen() {
               </TouchableOpacity>
             </View>
             <View style={{ flex: 1, gap: 6 }}>
-              <Text style={styles.label}>Cover photo</Text>
+              <Text style={styles.label}>{t.club.cover}</Text>
               <TouchableOpacity style={styles.coverPicker} onPress={pickCover} activeOpacity={0.8}>
                 {cover ? (
                   <Image source={{ uri: cover }} style={styles.coverPreview} />
@@ -146,12 +147,12 @@ export default function CreateClubScreen() {
 
           {/* Description */}
           <View style={{ gap: 6 }}>
-            <Text style={styles.label}>About (optional)</Text>
+            <Text style={styles.label}>{t.club.aboutOptional}</Text>
             <TextInput
               style={styles.textarea}
               value={description}
               onChangeText={setDescription}
-              placeholder="What's your club about?"
+              placeholder={t.club.descriptionPlaceholder}
               placeholderTextColor={Colors.gray}
               multiline
               numberOfLines={3}
@@ -162,8 +163,8 @@ export default function CreateClubScreen() {
       </ScrollView>
 
       <View style={[styles.footer, { paddingBottom: insets.bottom + 16 }]}>
-        <Button label="Create Club" onPress={handleCreate} loading={loading} disabled={!name} variant="black" />
-        <Button label="Back" onPress={() => router.back()} variant="ghost" />
+        <Button label={t.club.createClub} onPress={handleCreate} loading={loading} disabled={!name} variant="black" />
+        <Button label={t.common.back} onPress={() => router.back()} variant="ghost" />
       </View>
     </KeyboardAvoidingView>
   );

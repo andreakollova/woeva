@@ -8,12 +8,14 @@ import { supabase } from '@/lib/supabase';
 import { Button } from '@/components/ui/Button';
 import { BackButton } from '@/components/ui/BackButton';
 import { useAuth } from '@/context/AuthContext';
+import { useTranslations } from '@/context/LanguageContext';
 
 export default function RateScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const insets = useSafeAreaInsets();
   const router = useRouter();
   const { user } = useAuth();
+  const { t } = useTranslations();
   const [rating, setRating] = useState(0);
   const [comment, setComment] = useState('');
   const [loading, setLoading] = useState(false);
@@ -67,16 +69,16 @@ export default function RateScreen() {
     router.back();
   }
 
-  const labels = ['', 'Poor', 'Fair', 'Good', 'Great', 'Amazing'];
+  const labels = t.tickets.rateLabels;
 
   return (
     <View style={[styles.container, { paddingTop: insets.top + 16, paddingBottom: insets.bottom + 24 }]}>
       <BackButton />
 
       <View style={styles.header}>
-        <Text style={styles.eyebrow}>Rate the event</Text>
-        <Text style={styles.title}>{eventTitle || 'How was it?'}</Text>
-        {clubName ? <Text style={styles.clubName}>by {clubName}</Text> : null}
+        <Text style={styles.eyebrow}>{t.tickets.rateEvent}</Text>
+        <Text style={styles.title}>{eventTitle || t.tickets.howWasIt}</Text>
+        {clubName ? <Text style={styles.clubName}>{t.tickets.hostedByName(clubName)}</Text> : null}
       </View>
 
       {/* Stars */}
@@ -94,10 +96,10 @@ export default function RateScreen() {
       </View>
 
       {/* Comment */}
-      <Text style={styles.commentLabel}>Anything to add? <Text style={styles.optional}>(optional)</Text></Text>
+      <Text style={styles.commentLabel}>{t.tickets.anythingToAdd} <Text style={styles.optional}>{t.tickets.optional}</Text></Text>
       <TextInput
         style={styles.commentInput}
-        placeholder="Great vibe, would go again..."
+        placeholder={t.tickets.greatVibePlaceholder}
         placeholderTextColor={Colors.gray}
         value={comment}
         onChangeText={setComment}
@@ -107,7 +109,7 @@ export default function RateScreen() {
       />
 
       <Button
-        label="Submit rating"
+        label={t.tickets.submitRating}
         onPress={handleSubmit}
         loading={loading}
         disabled={rating === 0}

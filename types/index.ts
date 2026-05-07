@@ -1,12 +1,62 @@
 export interface Profile {
   id: string;
   name: string;
+  email: string | null;
   avatar_url: string | null;
   bio: string | null;
   city: string | null;
   interests: string[];
   phone: string | null;
+  push_token: string | null;
   notifications_enabled: boolean;
+  is_admin: boolean;
+  created_at: string;
+}
+
+export interface Category {
+  id: string;
+  name: string;
+  icon: string;
+  sort_order: number;
+  active: boolean;
+  created_at: string;
+}
+
+export interface Invoice {
+  id: string;
+  invoice_number: string;
+  creator_id: string | null;
+  billing_info: Record<string, any>;
+  period_label: string;
+  period_start: string | null;
+  period_end: string | null;
+  events_data: any[];
+  gross: number;
+  stripe_fee: number;
+  woeva_fee: number;
+  net: number;
+  status: 'draft' | 'issued' | 'paid';
+  created_at: string;
+  creator?: { name: string; email: string | null };
+}
+
+export interface AdminLog {
+  id: string;
+  admin_id: string | null;
+  action: string;
+  target_type: string | null;
+  target_id: string | null;
+  target_name: string | null;
+  note: string | null;
+  created_at: string;
+}
+
+export interface Blacklist {
+  id: string;
+  user_id: string;
+  reason: string | null;
+  created_by: string | null;
+  created_at: string;
 }
 
 export interface Event {
@@ -41,7 +91,7 @@ export interface Event {
 export interface Notification {
   id: string;
   user_id: string;
-  type: 'event_cancelled' | 'new_event' | 'event_chat';
+  type: 'event_cancelled' | 'new_event' | 'event_chat' | 'club_event' | 'admin_invite';
   title: string;
   body: string | null;
   data: Record<string, any> | null;

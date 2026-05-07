@@ -7,11 +7,14 @@ import { Button } from '@/components/ui/Button';
 import { Tag } from '@/components/ui/Tag';
 import { Colors } from '@/constants/colors';
 import { supabase } from '@/lib/supabase';
-import { CATEGORIES } from '@/types';
+import { useCategories } from '@/hooks/useCategories';
+import { useTranslations } from '@/context/LanguageContext';
 
 export default function InterestsScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
+  const { t } = useTranslations();
+  const { categories } = useCategories();
   const [selected, setSelected] = useState<string[]>([]);
   const [loading, setLoading] = useState(false);
 
@@ -36,12 +39,12 @@ export default function InterestsScreen() {
       <BackButton />
       <ScrollView contentContainerStyle={styles.scroll} showsVerticalScrollIndicator={false}>
         <View style={styles.header}>
-          <Text style={styles.title}>What's your thing?</Text>
-          <Text style={styles.subtitle}>Pick your favourites</Text>
+          <Text style={styles.title}>{t.auth.whatsYourThing}</Text>
+          <Text style={styles.subtitle}>{t.auth.pickFavourites}</Text>
         </View>
 
         <View style={styles.tags}>
-          {CATEGORIES.map((cat, i) => (
+          {categories.map((cat, i) => (
             <Tag
               key={cat}
               label={cat}
@@ -55,7 +58,7 @@ export default function InterestsScreen() {
 
       <View style={styles.footer}>
         <Button
-          label="Continue"
+          label={t.auth.continueBtn}
           onPress={handleContinue}
           loading={loading}
           disabled={selected.length === 0}

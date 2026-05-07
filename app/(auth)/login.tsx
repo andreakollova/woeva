@@ -10,10 +10,12 @@ import { Colors } from '@/constants/colors';
 import { Fonts } from '@/constants/fonts';
 import { supabase } from '@/lib/supabase';
 import { signInWithGoogle, signInWithApple } from '@/lib/socialAuth';
+import { useTranslations } from '@/context/LanguageContext';
 
 export default function LoginScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
+  const { t } = useTranslations();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
@@ -30,8 +32,8 @@ export default function LoginScreen() {
 
   async function handleLogin() {
     setErrors({});
-    if (!email) { setErrors(e => ({ ...e, email: 'Email is required' })); return; }
-    if (!password) { setErrors(e => ({ ...e, password: 'Password is required' })); return; }
+    if (!email) { setErrors(e => ({ ...e, email: t.auth.validEmail })); return; }
+    if (!password) { setErrors(e => ({ ...e, password: t.auth.minPassword })); return; }
 
     setLoading(true);
     const { error } = await supabase.auth.signInWithPassword({ email, password });
@@ -40,9 +42,9 @@ export default function LoginScreen() {
     if (error) {
       const msg = error.message ?? '';
       if (msg.toLowerCase().includes('email') && msg.toLowerCase().includes('confirm')) {
-        setErrors({ email: 'Email nebol potvrdený. Skontroluj schránku a potvrď účet.' });
+        setErrors({ email: t.auth.checkEmail });
       } else if (msg.toLowerCase().includes('invalid')) {
-        setErrors({ password: 'Nesprávny email alebo heslo' });
+        setErrors({ password: t.auth.validEmail });
       } else {
         setErrors({ password: msg });
       }
@@ -61,8 +63,8 @@ export default function LoginScreen() {
         <BackButton />
 
         <View style={styles.header}>
-          <Text style={styles.title}>Welcome back</Text>
-          <Text style={styles.subtitle}>Your city is waiting for you.</Text>
+          <Text style={styles.title}>{t.auth.welcomeBack}</Text>
+          <Text style={styles.subtitle}>{t.auth.cityWaiting}</Text>
         </View>
 
         {/* Social buttons first */}
@@ -74,34 +76,34 @@ export default function LoginScreen() {
         {/* Divider */}
         <View style={styles.divider}>
           <View style={styles.dividerLine} />
-          <Text style={styles.dividerText}>or</Text>
+          <Text style={styles.dividerText}>{t.auth.or}</Text>
           <View style={styles.dividerLine} />
         </View>
 
         {/* Email + password */}
         <View style={styles.form}>
           <Input
-            label="Email"
+            label={t.auth.email}
             value={email}
             onChangeText={setEmail}
-            placeholder="Andrea@gmail.com"
+            placeholder={t.auth.emailPlaceholder}
             keyboardType="email-address"
             autoCapitalize="none"
             error={errors.email}
           />
           <Input
-            label="Password"
+            label={t.auth.password}
             value={password}
             onChangeText={setPassword}
-            placeholder="••••••••••"
+            placeholder={t.auth.passwordDots}
             secureTextEntry
             error={errors.password}
-            rightLabel="Forgot Password?"
+            rightLabel={t.auth.forgotPassword}
             onRightLabelPress={() => router.push('/(auth)/forgot-password')}
           />
         </View>
 
-        <Button label="Sign in" onPress={handleLogin} loading={loading} variant="black" />
+        <Button label={t.auth.signIn} onPress={handleLogin} loading={loading} variant="black" />
       </ScrollView>
     </KeyboardAvoidingView>
   );
@@ -126,6 +128,7 @@ const styles = StyleSheet.create({
     fontFamily: Fonts.regular,
   },
   header: {
+    marginTop: 32,
     marginBottom: 28,
     gap: 6,
   },

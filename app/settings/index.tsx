@@ -7,40 +7,43 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Colors } from '@/constants/colors';
 import { Fonts } from '@/constants/fonts';
 import { useAuth } from '@/context/AuthContext';
-
-const SECTIONS = [
-  {
-    title: 'Account',
-    items: [
-      { label: 'Profile info', route: '/settings/profile' },
-      { label: 'Interests', route: '/settings/profile' },
-      { label: 'Payment methods', route: '/settings/payment-methods' },
-    ],
-  },
-  {
-    title: 'Creator',
-    items: [
-      { label: 'Notifications', route: '/settings/notifications' },
-      { label: 'Payouts', route: '/dashboard' },
-    ],
-  },
-  {
-    title: 'Support',
-    items: [
-      { label: 'About', route: '/settings/about' },
-    ],
-  },
-];
+import { useTranslations } from '@/context/LanguageContext';
+import type { Lang } from '@/lib/i18n';
 
 export default function SettingsScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const { signOut } = useAuth();
+  const { t, lang, setLang } = useTranslations();
+
+  const SECTIONS = [
+    {
+      title: t.settings.account,
+      items: [
+        { label: t.settings.profileInfo, route: '/settings/profile' },
+        { label: t.settings.interests, route: '/settings/profile' },
+        { label: t.settings.paymentMethods, route: '/settings/payment-methods' },
+      ],
+    },
+    {
+      title: t.settings.creator,
+      items: [
+        { label: t.common.notifications, route: '/settings/notifications' },
+        { label: t.dashboard.revenue, route: '/dashboard' },
+      ],
+    },
+    {
+      title: t.settings.support,
+      items: [
+        { label: t.settings.about, route: '/settings/about' },
+      ],
+    },
+  ];
 
   async function handleSignOut() {
-    Alert.alert('Sign out', 'Are you sure?', [
-      { text: 'Cancel', style: 'cancel' },
-      { text: 'Sign out', style: 'destructive', onPress: async () => { await signOut(); router.replace('/(auth)'); } },
+    Alert.alert(t.settings.signOutConfirm, t.settings.signOutMsg, [
+      { text: t.common.cancel, style: 'cancel' },
+      { text: t.settings.signOut, style: 'destructive', onPress: async () => { await signOut(); router.replace('/(auth)'); } },
     ]);
   }
 
@@ -48,11 +51,29 @@ export default function SettingsScreen() {
     <View style={[styles.container, { paddingTop: insets.top }]}>
       <View style={styles.header}>
         <BackButton />
-        <Text style={styles.title}>Settings</Text>
+        <Text style={styles.title}>{t.settings.settings}</Text>
         <WMark size={28} color={Colors.lime} />
       </View>
 
       <ScrollView contentContainerStyle={[styles.scroll, { paddingBottom: insets.bottom + 40 }]} showsVerticalScrollIndicator={false}>
+        {/* Language switcher */}
+        <View style={styles.section}>
+          <Text style={styles.sectionTitle}>{t.settings.language}</Text>
+          <View style={[styles.list, styles.langRow]}>
+            {(['en', 'sk'] as Lang[]).map((l, i) => (
+              <TouchableOpacity
+                key={l}
+                style={[styles.row, styles.langItem, lang === l && styles.langItemActive, i === 1 && styles.rowLast]}
+                onPress={() => setLang(l)}
+                activeOpacity={0.7}
+              >
+                <Text style={[styles.rowLabel, lang === l && styles.langLabelActive]}>{t.languages[l]}</Text>
+                {lang === l && <Text style={styles.langCheck}>✓</Text>}
+              </TouchableOpacity>
+            ))}
+          </View>
+        </View>
+
         {SECTIONS.map(section => (
           <View key={section.title} style={styles.section}>
             <Text style={styles.sectionTitle}>{section.title}</Text>
@@ -75,10 +96,10 @@ export default function SettingsScreen() {
         <View style={styles.section}>
           <View style={styles.list}>
             <TouchableOpacity style={styles.row} onPress={handleSignOut}>
-              <Text style={[styles.rowLabel, { color: Colors.error }]}>Sign out</Text>
+              <Text style={[styles.rowLabel, { color: Colors.error }]}>{t.settings.signOut}</Text>
             </TouchableOpacity>
             <TouchableOpacity style={[styles.row, styles.rowLast]} onPress={() => router.push('/settings/delete-account')}>
-              <Text style={[styles.rowLabel, { color: Colors.error }]}>Delete account</Text>
+              <Text style={[styles.rowLabel, { color: Colors.error }]}>{t.settings.deleteAccount}</Text>
             </TouchableOpacity>
           </View>
         </View>
@@ -101,4 +122,9 @@ const styles = StyleSheet.create({
   rowLast: { borderBottomWidth: 0 },
   rowLabel: { fontSize: 14, fontFamily: Fonts.regular, color: Colors.black },
   rowArrow: { fontSize: 18, color: Colors.gray },
+  langRow: { flexDirection: 'column' },
+  langItem: {},
+  langItemActive: { backgroundColor: '#FAFFF0' },
+  langLabelActive: { fontWeight: '700', fontFamily: Fonts.bold },
+  langCheck: { fontSize: 14, color: Colors.lime, fontWeight: '700' },
 });

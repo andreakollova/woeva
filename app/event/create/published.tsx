@@ -8,9 +8,11 @@ import Animated, {
 import { Colors } from '@/constants/colors';
 import { Fonts } from '@/constants/fonts';
 import { WMark } from '@/components/ui/WMark';
+import { useTranslations } from '@/context/LanguageContext';
 
 export default function PublishedScreen() {
   const router = useRouter();
+  const { t } = useTranslations();
 
   const ease = Easing.out(Easing.cubic);
 
@@ -54,10 +56,10 @@ export default function PublishedScreen() {
           <WMark size={48} color={Colors.black} />
         </Animated.View>
         <Animated.Text style={[styles.title, titleStyle]}>
-          You're out there.
+          {t.event.youreOutThere}
         </Animated.Text>
         <Animated.Text style={[styles.subtitle, subStyle]}>
-          Event published.{'\n'}Your people will find it.
+          {t.event.eventPublishedSub}
         </Animated.Text>
       </View>
     </View>

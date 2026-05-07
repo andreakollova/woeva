@@ -19,6 +19,8 @@ import { Button } from '@/components/ui/Button';
 import { Toast } from '@/components/ui/Toast';
 import { BackButton } from '@/components/ui/BackButton';
 import { useAuth } from '@/context/AuthContext';
+import { notify } from '@/lib/notify';
+import { useTranslations } from '@/context/LanguageContext';
 
 const { height: SCREEN_H } = Dimensions.get('window');
 const COVER_HEIGHT = Math.round(SCREEN_H * 0.48);
@@ -31,14 +33,6 @@ const SAMPLE_AVATARS = [
   require('@/assets/images/sample_av4.jpg'),
 ];
 
-const CANCEL_REASONS = [
-  'Health issues',
-  'Technical problems',
-  'Family reasons',
-  'Venue unavailable',
-  'Other',
-];
-
 type Attendee = { id: string; user_id: string; profile: { name: string | null; avatar_url: string | null } | null };
 
 export default function EventDetailScreen() {
@@ -46,6 +40,7 @@ export default function EventDetailScreen() {
   const insets = useSafeAreaInsets();
   const router = useRouter();
   const { user, profile, loading: authLoading } = useAuth();
+  const { t } = useTranslations();
 
   const [event, setEvent] = useState<Event | null>(null);
   const [creator, setCreator] = useState<Profile | null>(null);
@@ -138,11 +133,19 @@ export default function EventDetailScreen() {
       await supabase.from('events').update({ going_count: (event?.going_count ?? 0) + 1 }).eq('id', id);
       if (event?.creator_id && event.creator_id !== user.id) {
         await supabase.from('notifications').insert({
-          user_id: event.creator_id,
-          type: 'join',
+          user_id: event.creator_id, type: 'join',
           title: `New attendee for ${event.title}`,
           body: `${profile?.name ?? 'Someone'} joined your event.`,
           data: { event_id: id },
+        });
+        const d = new Date(event.date + 'T00:00:00');
+        notify.joinedEvent({
+          creatorId: event.creator_id,
+          attendeeName: profile?.name ?? 'Someone',
+          eventTitle: event.title,
+          eventDate: d.toLocaleDateString('en-US', { weekday: 'short', day: 'numeric', month: 'short' }),
+          eventTime: event.time ?? undefined,
+          eventId: id,
         });
       }
       setIsAttending(true); setLoading(false); setToast(true); load();
@@ -184,6 +187,17 @@ export default function EventDetailScreen() {
       }));
       await supabase.from('notifications').insert(notifications);
 
+      // Push + email to all attendees
+      const tokens = ((await supabase.from('profiles').select('push_token').in('id', allAttendees.map(a => a.user_id))).data ?? []).map((p: any) => p.push_token).filter(Boolean);
+      notify.eventCancelled({
+        eventId: id,
+        eventTitle: event.title,
+        creatorName: profile?.name ?? 'Organiser',
+        reason: cancelReason !== t.event.cancelReasons[4] ? cancelReason : cancelNote || undefined,
+        attendeeTokens: tokens,
+        attendeeEmails: [], // emails require service role — handled server-side if needed
+      });
+
       if (refundEligible && !event.is_free && hasPaidWithIntent) {
         await supabase.functions.invoke('refund-event', { body: { event_id: id } });
       }
@@ -216,7 +230,7 @@ export default function EventDetailScreen() {
 
   const isCreator = !!user && event.creator_id === user.id;
   const isFree = event.is_free || event.price === 0;
-  const priceLabel = isFree ? 'Free' : `€${event.price}`;
+  const priceLabel = isFree ? t.event.freeLabel : `€${event.price}`;
   const eventPast = new Date(`${event.date}T${event.time}`) < new Date();
   const hostName = event.club?.name ?? creator?.name ?? '';
   const hostInitial = hostName.charAt(0).toUpperCase();
@@ -225,25 +239,25 @@ export default function EventDetailScreen() {
   const overflow = Math.max(0, goingCount - 4);
 
   const d = new Date(event.date + 'T00:00:00');
-  const dayName = d.toLocaleDateString('en-US', { weekday: 'short' }).toUpperCase();
+  const dayName = d.toLocaleDateString(undefined, { weekday: 'short' }).toUpperCase();
   const dayNum = d.getDate();
-  const monthName = d.toLocaleDateString('en-US', { month: 'short' }).toUpperCase();
+  const monthName = d.toLocaleDateString(undefined, { month: 'short' }).toUpperCase();
   const isToday = new Date().toDateString() === d.toDateString();
 
   return (
     <View style={s.container}>
-      <Toast visible={toast} title="You're in" subtitle="See you out there." onHide={() => setToast(false)} />
+      <Toast visible={toast} title={t.event.joined} subtitle={t.event.eventCreatedSub} onHide={() => setToast(false)} />
 
       {/* QR fullscreen modal */}
       <Modal visible={qrModal} transparent animationType="fade" onRequestClose={() => setQrModal(false)}>
         <TouchableOpacity style={s.qrModalBg} activeOpacity={1} onPress={() => setQrModal(false)}>
           <View style={s.qrModalCard}>
             <Text style={s.qrModalTitle}>{event?.title}</Text>
-            <Text style={s.qrModalSub}>Show at the door</Text>
+            <Text style={s.qrModalSub}>{t.tickets.showAtDoor}</Text>
             <View style={s.qrModalCode}>
               <QRCode value={`woeva:event:${id}:${user?.id}`} size={220} color={Colors.black} backgroundColor={Colors.white} />
             </View>
-            <Text style={s.qrModalHint}>Tap anywhere to close</Text>
+            <Text style={s.qrModalHint}>{t.tickets.tapToClose}</Text>
           </View>
         </TouchableOpacity>
       </Modal>
@@ -253,10 +267,10 @@ export default function EventDetailScreen() {
         <TouchableOpacity style={s.modalOverlay} activeOpacity={1} onPress={() => setCancelModal(false)}>
           <TouchableOpacity activeOpacity={1} style={s.cancelSheet}>
             <View style={s.cancelSheetHandle} />
-            <Text style={s.cancelSheetTitle}>Cancel event</Text>
-            <Text style={s.cancelSheetSub}>This cannot be undone. Attendees will be notified.</Text>
+            <Text style={s.cancelSheetTitle}>{t.event.cancelEvent}</Text>
+            <Text style={s.cancelSheetSub}>{t.event.cancelCannotUndo}</Text>
 
-            {CANCEL_REASONS.map(reason => (
+            {t.event.cancelReasons.map(reason => (
               <TouchableOpacity
                 key={reason}
                 style={[s.reasonRow, cancelReason === reason && s.reasonRowActive]}
@@ -269,12 +283,12 @@ export default function EventDetailScreen() {
               </TouchableOpacity>
             ))}
 
-            {cancelReason === 'Other' && (
+            {cancelReason === t.event.cancelReasons[4] && (
               <TextInput
                 style={s.cancelNoteInput}
                 value={cancelNote}
                 onChangeText={setCancelNote}
-                placeholder="Briefly explain the reason..."
+                placeholder={t.event.cancelBrieflyExplain}
                 placeholderTextColor={Colors.gray}
                 multiline
                 numberOfLines={2}
@@ -283,9 +297,9 @@ export default function EventDetailScreen() {
             )}
 
             <View style={s.cancelActions}>
-              <Button label="Keep event" onPress={() => setCancelModal(false)} variant="ghost" />
+              <Button label={t.event.keepEvent} onPress={() => setCancelModal(false)} variant="ghost" />
               <Button
-                label="Continue →"
+                label={t.event.continueArrow}
                 onPress={() => { setCancelModal(false); setConfirmCancelModal(true); }}
                 disabled={!cancelReason}
                 variant="black"
@@ -300,17 +314,17 @@ export default function EventDetailScreen() {
         <View style={s.modalOverlay}>
           <View style={s.cancelSheet}>
             <View style={s.cancelSheetHandle} />
-            <Text style={s.cancelSheetTitle}>Are you sure?</Text>
+            <Text style={s.cancelSheetTitle}>{t.tickets.areYouSure}</Text>
             <Text style={[s.cancelSheetSub, { marginBottom: 8 }]}>
-              You're about to cancel <Text style={{ fontWeight: '700', color: Colors.black }}>{event?.title}</Text>.
+              {t.event.cancelEventConfirm} <Text style={{ fontWeight: '700', color: Colors.black }}>{event?.title}</Text>
             </Text>
             <View style={s.confirmWarningBox}>
-              <Text style={s.confirmWarningText}>• All reservations will be cancelled{'\n'}• Attendees will be notified immediately{'\n'}• This action cannot be undone</Text>
+              <Text style={s.confirmWarningText}>{t.event.cancelWarning}</Text>
             </View>
             <View style={[s.cancelActions, { marginTop: 20 }]}>
-              <Button label="Go back" onPress={() => { setConfirmCancelModal(false); setCancelModal(true); }} variant="ghost" />
+              <Button label={t.event.goBack} onPress={() => { setConfirmCancelModal(false); setCancelModal(true); }} variant="ghost" />
               <Button
-                label="Yes, cancel event"
+                label={t.event.cancelForever}
                 onPress={() => { setConfirmCancelModal(false); handleCancel(); }}
                 loading={cancelling}
                 variant="black"
@@ -319,6 +333,28 @@ export default function EventDetailScreen() {
           </View>
         </View>
       </Modal>
+
+      {/* ── Sticky controls — always on top regardless of scroll ── */}
+      <View style={[s.topLeft, { top: insets.top + 10 }]} pointerEvents="box-none">
+        <BackButton color={Colors.white} style={s.backBtn} />
+      </View>
+      {isCreator && event.status !== 'cancelled' && (
+        <View style={[s.topRight, { top: insets.top + 10 }]} pointerEvents="box-none">
+          <TouchableOpacity style={s.ctrlPill} onPress={() => router.push(`/event/${id}/edit` as any)}>
+            <Svg width={13} height={13} viewBox="0 0 24 24" fill="none">
+              <Path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7" stroke="white" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" />
+              <Path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z" stroke="white" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" />
+            </Svg>
+            <Text style={s.ctrlPillText}>{t.common.edit}</Text>
+          </TouchableOpacity>
+          <TouchableOpacity style={s.ctrlPill} onPress={() => { setCancelReason(''); setCancelNote(''); setCancelModal(true); }}>
+            <Svg width={13} height={13} viewBox="0 0 24 24" fill="none">
+              <Path d="M18 6L6 18M6 6l12 12" stroke="#FF6B6B" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" />
+            </Svg>
+            <Text style={[s.ctrlPillText, s.ctrlPillDanger]}>{t.common.cancel}</Text>
+          </TouchableOpacity>
+        </View>
+      )}
 
       <Animated.ScrollView
         onScroll={scrollHandler}
@@ -348,31 +384,6 @@ export default function EventDetailScreen() {
             <Rect x="0" y="0" width="100%" height="100%" fill="url(#fadeTop)" />
           </Svg>
 
-          {/* Controls */}
-          <View style={[s.topLeft, { top: insets.top + 10 }]}>
-            <BackButton color={Colors.white} style={s.backBtn} />
-          </View>
-          {isCreator && (
-            <View style={[s.topRight, { top: insets.top + 10 }]}>
-              {event.status !== 'cancelled' && (
-                <TouchableOpacity style={s.ctrlPill} onPress={() => router.push(`/event/${id}/edit` as any)}>
-                  <Svg width={13} height={13} viewBox="0 0 24 24" fill="none">
-                    <Path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7" stroke="white" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" />
-                    <Path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z" stroke="white" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" />
-                  </Svg>
-                  <Text style={s.ctrlPillText}>Edit</Text>
-                </TouchableOpacity>
-              )}
-              {event.status !== 'cancelled' && (
-                <TouchableOpacity style={s.ctrlPill} onPress={() => { setCancelReason(''); setCancelNote(''); setCancelModal(true); }}>
-                  <Svg width={13} height={13} viewBox="0 0 24 24" fill="none">
-                    <Path d="M18 6L6 18M6 6l12 12" stroke="#FF6B6B" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" />
-                  </Svg>
-                  <Text style={[s.ctrlPillText, s.ctrlPillDanger]}>Cancel</Text>
-                </TouchableOpacity>
-              )}
-            </View>
-          )}
 
           {/* Title + price + category on cover bottom */}
           <View style={s.coverBottom}>
@@ -400,7 +411,7 @@ export default function EventDetailScreen() {
                 <Path d="M18 6L6 18M6 6l12 12" stroke="#FF6B6B" strokeWidth={2.5} strokeLinecap="round" />
               </Svg>
               <View style={{ flex: 1 }}>
-                <Text style={s.cancelledBannerTitle}>Event cancelled</Text>
+                <Text style={s.cancelledBannerTitle}>{t.event.eventCancelledLabel}</Text>
                 {event.cancellation_reason ? <Text style={s.cancelledBannerSub}>{event.cancellation_reason}{event.cancellation_note ? ` — ${event.cancellation_note}` : ''}</Text> : null}
               </View>
             </View>
@@ -410,7 +421,7 @@ export default function EventDetailScreen() {
           {isAttending && user && event.status !== 'cancelled' && (
             <TouchableOpacity style={s.goingBanner} onPress={() => router.push('/(tabs)/booked')} activeOpacity={0.85}>
               <View style={s.liveDot} />
-              <Text style={s.goingBannerText}>You're going</Text>
+              <Text style={s.goingBannerText}>{t.event.youreGoingBanner}</Text>
               <View style={s.goingAvatarRow}>
                   {/* Current user always on top */}
                   <View style={[s.goingAv, s.goingAvUser, { marginLeft: 0, zIndex: 10 }]}>
@@ -444,7 +455,7 @@ export default function EventDetailScreen() {
                     </Svg>
                   </View>
                   <View style={{ flex: 1 }}>
-                    <Text style={s.infoText}>{isToday ? 'Today' : `${dayName}, ${dayNum} ${monthName}`}</Text>
+                    <Text style={s.infoText}>{isToday ? t.event.today : `${dayName}, ${dayNum} ${monthName}`}</Text>
                     {event.time ? <Text style={s.infoSub}>{event.time}{event.duration ? `  ·  ${event.duration}h` : ''}</Text> : null}
                   </View>
                 </View>
@@ -470,7 +481,7 @@ export default function EventDetailScreen() {
               {isAttending && user ? (
                 <TouchableOpacity style={s.inlinQR} onPress={() => setQrModal(true)} activeOpacity={0.8}>
                   <QRCode value={`woeva:event:${id}:${user.id}`} size={48} color={Colors.black} backgroundColor={Colors.white} />
-                  <Text style={s.inlinQRHint}>ticket</Text>
+                  <Text style={s.inlinQRHint}>{t.event.ticketLabel}</Text>
                 </TouchableOpacity>
               ) : null}
             </View>
@@ -486,7 +497,7 @@ export default function EventDetailScreen() {
                   })}
                   {overflow > 0 && <View style={[s.av, s.avOverflow, { marginLeft: -6 }]}><Text style={s.avOverflowText}>+{overflow}</Text></View>}
                 </View>
-                {goingCount > 0 && <Text style={s.infoSub}><Text style={s.infoGoingNum}>{goingCount}</Text> {goingCount === 1 ? 'person' : 'people'} going</Text>}
+                {goingCount > 0 && <Text style={s.infoSub}>{t.event.going_people(goingCount)}</Text>}
               </View>
             )}
           </View>
@@ -515,17 +526,17 @@ export default function EventDetailScreen() {
                   : <View style={[s.hostAvatar, s.hostAvatarFallback]}><Text style={s.hostAvatarInitial}>{hostInitial}</Text></View>
                 }
                 <View style={{ flex: 1 }}>
-                  <Text style={s.hostLabel}>Hosted by</Text>
+                  <Text style={s.hostLabel}>{t.event.hostedBy}</Text>
                   <Text style={s.hostName}>{hostName}</Text>
                 </View>
                 {isMember
-                  ? <View style={s.memberPill}><Text style={s.memberPillText}>Member</Text></View>
+                  ? <View style={s.memberPill}><Text style={s.memberPillText}>{t.event.memberLabel}</Text></View>
                   : user && isAttending && event.club
                     ? <TouchableOpacity style={s.joinPill} onPress={async (e) => {
                         e.stopPropagation?.();
                         await supabase.from('club_members').insert({ club_id: event.club!.id, user_id: user.id, role: 'member', status: 'approved' });
                         setIsMember(true);
-                      }}><Text style={s.joinPillText}>+ Join</Text></TouchableOpacity>
+                      }}><Text style={s.joinPillText}>{t.event.joinPlus}</Text></TouchableOpacity>
                     : event.club
                       ? <Svg width={16} height={16} viewBox="0 0 24 24" fill="none"><Path d="M9 18l6-6-6-6" stroke={Colors.gray} strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" /></Svg>
                       : null
@@ -547,11 +558,11 @@ export default function EventDetailScreen() {
               </Svg>
             </View>
             <View style={{ flex: 1 }}>
-              <Text style={[s.chatLabel, !isAttending && { color: Colors.gray }]}>Group chat</Text>
+              <Text style={[s.chatLabel, !isAttending && { color: Colors.gray }]}>{t.chat.groupChat}</Text>
               <Text style={s.chatSub}>
                 {isAttending
-                  ? (unreadCount > 0 ? `${unreadCount} new message${unreadCount === 1 ? '' : 's'}` : 'Tap to open')
-                  : 'Join the event to unlock'}
+                  ? (unreadCount > 0 ? t.event.newMessages(unreadCount) : t.event.chatTapToOpen)
+                  : t.event.chatJoinToUnlock}
               </Text>
             </View>
             {isAttending && unreadCount > 0 && <View style={s.unreadBadge}><Text style={s.unreadBadgeText}>{unreadCount > 99 ? '99+' : unreadCount}</Text></View>}
@@ -568,34 +579,34 @@ export default function EventDetailScreen() {
         <View style={[s.cta, { paddingBottom: insets.bottom + 12 }]}>
           {!authLoading && !user && (
             <View style={s.guestRow}>
-              <Text style={s.guestText}>Join to attend events</Text>
+              <Text style={s.guestText}>{t.event.joinToAttend}</Text>
               <TouchableOpacity onPress={() => router.push('/(auth)/login')}>
-                <Text style={s.guestLink}>Log in</Text>
+                <Text style={s.guestLink}>{t.auth.signIn}</Text>
               </TouchableOpacity>
             </View>
           )}
           {user && isAttending && eventPast
             ? (
               <View style={s.attendingRow}>
-                <Button label="✓  You went" onPress={() => {}} variant="lime" disabled style={s.attendingBtn} textStyle={{ fontSize: 13 }} />
+                <Button label={t.event.youWent} onPress={() => {}} variant="lime" disabled style={s.attendingBtn} textStyle={{ fontSize: 13 }} />
                 <TouchableOpacity style={s.ticketBtn} onPress={() => router.push(`/event/${id}/rate` as any)} activeOpacity={0.8}>
                   <Text style={s.ticketBtnEmoji}>★</Text>
-                  <Text style={s.ticketBtnText}>Rate event</Text>
+                  <Text style={s.ticketBtnText}>{t.tickets.rateEvent}</Text>
                 </TouchableOpacity>
               </View>
             )
             : user && isAttending
             ? (
               <View style={s.attendingRow}>
-                <Button label="✓  You're going" onPress={() => {}} variant="lime" disabled style={s.attendingBtn} textStyle={{ fontSize: 13 }} />
+                <Button label={t.event.youreGoing} onPress={() => {}} variant="lime" disabled style={s.attendingBtn} textStyle={{ fontSize: 13 }} />
                 <TouchableOpacity style={s.ticketBtn} onPress={handleInvite} activeOpacity={0.8}>
                   <Animated.Text style={[s.ticketBtnEmoji, waveStyle]}>👋</Animated.Text>
-                  <Text style={s.ticketBtnText}>Invite a friend</Text>
+                  <Text style={s.ticketBtnText}>{t.event.inviteFriend}</Text>
                 </TouchableOpacity>
               </View>
             )
             : <Button
-                label={user ? (isFree ? 'Join — it\'s free' : `Buy ticket  ·  ${priceLabel}`) : 'Get Woeva — Join free'}
+                label={user ? (isFree ? t.event.joinFree : t.event.buyTicket(priceLabel)) : t.event.getWoeva}
                 onPress={handleJoin}
                 loading={loading}
                 variant="lime"
@@ -615,8 +626,8 @@ const s = StyleSheet.create({
   coverInner: { position: 'absolute', top: 0, left: 0, right: 0, bottom: -60 },
   coverImg: { width: '100%', height: '100%' },
   coverGradient: { position: 'absolute', top: 0, left: 0, right: 0, bottom: 0 },
-  topLeft: { position: 'absolute', left: 16 },
-  topRight: { position: 'absolute', right: 16, flexDirection: 'row', gap: 8 },
+  topLeft: { position: 'absolute', left: 16, zIndex: 10 },
+  topRight: { position: 'absolute', right: 16, flexDirection: 'row', gap: 8, zIndex: 10 },
   backBtn: { backgroundColor: '#000', borderRadius: 20 },
   ctrlPill: { backgroundColor: '#000', borderRadius: 20, paddingHorizontal: 14, paddingVertical: 8, flexDirection: 'row', alignItems: 'center', gap: 5 },
   ctrlPillText: { fontSize: 13, fontWeight: '600', color: Colors.white },

@@ -44,7 +44,7 @@ export default function ForgotPasswordScreen() {
               label="Email"
               value={email}
               onChangeText={setEmail}
-              placeholder="danka@gmail.com"
+              placeholder="you@example.com"
               keyboardType="email-address"
               autoCapitalize="none"
             />

@@ -11,10 +11,12 @@ import { EventCard } from '@/components/ui/EventCard';
 import { Button } from '@/components/ui/Button';
 import { WMark } from '@/components/ui/WMark';
 import { Fonts } from '@/constants/fonts';
+import { useTranslations } from '@/context/LanguageContext';
 
 export default function SearchScreen() {
   const insets = useSafeAreaInsets();
   const router = useRouter();
+  const { t } = useTranslations();
   const [query, setQuery] = useState('');
   const [results, setResults] = useState<Event[]>([]);
   const [searched, setSearched] = useState(false);
@@ -54,11 +56,11 @@ export default function SearchScreen() {
         </TouchableOpacity>
       </View>
       <View style={styles.header}>
-        <Text style={styles.title}>Discover</Text>
+        <Text style={styles.title}>{t.search.discover}</Text>
         <View style={styles.searchBar}>
           <TextInput
             style={styles.searchInput}
-            placeholder="Yoga, run, club, event"
+            placeholder={t.search.searchBarPlaceholder}
             placeholderTextColor={Colors.gray}
             value={query}
             onChangeText={setQuery}
@@ -102,18 +104,16 @@ export default function SearchScreen() {
           {results.length === 0 ? (
             <Animated.View entering={FadeInDown} style={styles.empty}>
               <View style={styles.emptyDot} />
-              <Text style={styles.emptyTitle}>Nothing matches</Text>
-              <Text style={styles.emptyText}>
-                No {query} yet in your city. Want to start it?
-              </Text>
+              <Text style={styles.emptyTitle}>{t.search.nothingMatches}</Text>
+              <Text style={styles.emptyText}>{t.search.nothingMatchesFor(query)}</Text>
               <View style={styles.emptyActions}>
                 <Button
-                  label={`Start a ${query} club`}
+                  label={t.search.startClub(query)}
                   onPress={() => router.push('/club/create/index')}
                   variant="lime"
                 />
                 <Button
-                  label="Browse popular"
+                  label={t.search.browsePopular}
                   onPress={() => { setMode('map'); setSearched(false); setQuery(''); }}
                   variant="ghost"
                 />

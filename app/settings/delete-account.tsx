@@ -6,24 +6,25 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Colors } from '@/constants/colors';
 import { Button } from '@/components/ui/Button';
 import { supabase } from '@/lib/supabase';
+import { useTranslations } from '@/context/LanguageContext';
 
 export default function DeleteAccountScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
+  const { t } = useTranslations();
   const [loading, setLoading] = useState(false);
 
   async function handleDelete() {
     Alert.alert(
-      'Final warning',
-      'This will permanently delete your account. This cannot be undone.',
+      t.deleteAccount.finalWarning,
+      t.deleteAccount.finalWarningMsg,
       [
-        { text: 'Cancel', style: 'cancel' },
+        { text: t.deleteAccount.cancel, style: 'cancel' },
         {
-          text: 'Delete forever',
+          text: t.deleteAccount.deleteForever,
           style: 'destructive',
           onPress: async () => {
             setLoading(true);
-            // Call Supabase Edge Function to delete user data + auth user
             await supabase.functions.invoke('delete-account');
             await supabase.auth.signOut();
             setLoading(false);
@@ -38,19 +39,17 @@ export default function DeleteAccountScreen() {
     <View style={[styles.container, { paddingTop: insets.top, paddingBottom: insets.bottom + 24 }]}>
       <View style={styles.header}>
         <BackButton />
-        <Text style={styles.title}>Delete account</Text>
+        <Text style={styles.title}>{t.deleteAccount.title}</Text>
       </View>
 
       <View style={styles.content}>
-        <Text style={styles.warningTitle}>This action{'\n'}can't be{'\n'}undone.</Text>
-        <Text style={styles.warningText}>
-          Your profile, events and all data will be permanently removed.
-        </Text>
+        <Text style={styles.warningTitle}>{t.deleteAccount.warning}</Text>
+        <Text style={styles.warningText}>{t.deleteAccount.warningText}</Text>
       </View>
 
       <View style={styles.footer}>
-        <Button label="Delete account" onPress={handleDelete} loading={loading} variant="danger" />
-        <Button label="Cancel" onPress={() => router.back()} variant="ghost" />
+        <Button label={t.deleteAccount.deleteButton} onPress={handleDelete} loading={loading} variant="danger" />
+        <Button label={t.deleteAccount.cancel} onPress={() => router.back()} variant="ghost" />
       </View>
     </View>
   );

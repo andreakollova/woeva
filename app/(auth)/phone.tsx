@@ -7,16 +7,18 @@ import { Button } from '@/components/ui/Button';
 import { Input } from '@/components/ui/Input';
 import { Colors } from '@/constants/colors';
 import { supabase } from '@/lib/supabase';
+import { useTranslations } from '@/context/LanguageContext';
 
 export default function PhoneScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
+  const { t } = useTranslations();
   const [phone, setPhone] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
 
   async function handleSendOtp() {
-    if (!phone || phone.length < 9) { setError('Enter a valid phone number'); return; }
+    if (!phone || phone.length < 9) { setError(t.auth.validPhone); return; }
     setLoading(true);
     const { error } = await supabase.auth.signInWithOtp({ phone });
     setLoading(false);
@@ -30,23 +32,23 @@ export default function PhoneScreen() {
         <BackButton />
 
         <View style={styles.header}>
-          <Text style={styles.title}>Enter your number</Text>
-          <Text style={styles.subtitle}>We'll send you a code to verify.</Text>
+          <Text style={styles.title}>{t.auth.enterYourNumber}</Text>
+          <Text style={styles.subtitle}>{t.auth.sendCodeSub}</Text>
         </View>
 
         <View style={styles.form}>
           <Input
-            label="Phone number"
+            label={t.auth.phoneNumber}
             value={phone}
-            onChangeText={t => { setPhone(t); setError(''); }}
-            placeholder="+421 900 000 000"
+            onChangeText={v => { setPhone(v); setError(''); }}
+            placeholder="+1 555 000 0000"
             keyboardType="phone-pad"
             error={error}
           />
         </View>
 
         <View style={styles.bottom}>
-          <Button label="Send code" onPress={handleSendOtp} loading={loading} variant="black" />
+          <Button label={t.auth.sendCode} onPress={handleSendOtp} loading={loading} variant="black" />
         </View>
       </View>
     </KeyboardAvoidingView>

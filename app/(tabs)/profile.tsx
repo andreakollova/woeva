@@ -8,6 +8,7 @@ import { Fonts } from '@/constants/fonts';
 import { WMark } from '@/components/ui/WMark';
 import { supabase } from '@/lib/supabase';
 import { useAuth } from '@/context/AuthContext';
+import { useTranslations } from '@/context/LanguageContext';
 
 function SettingsIcon() {
   return (
@@ -26,6 +27,7 @@ export default function ProfileScreen() {
   const insets = useSafeAreaInsets();
   const router = useRouter();
   const { user, profile } = useAuth();
+  const { t } = useTranslations();
   const [eventsCount, setEventsCount] = useState(0);
   const [clubsCount, setClubsCount] = useState(0);
   const [clubs, setClubs] = useState<{ id: string; name: string; cover_url: string | null; logo_url: string | null; category: string }[]>([]);
@@ -56,7 +58,7 @@ export default function ProfileScreen() {
   const initial = displayName.charAt(0).toUpperCase() || '?';
   const createdAt = user?.created_at || (user as any)?.created_at;
   const joinedDate = createdAt
-    ? new Date(createdAt).toLocaleDateString('en-US', { month: 'long', year: 'numeric' })
+    ? new Date(createdAt).toLocaleDateString(undefined, { month: 'long', year: 'numeric' })
     : '';
   const city = profile?.city || '';
 
@@ -73,7 +75,7 @@ export default function ProfileScreen() {
           </TouchableOpacity>
         </View>
 
-        <Text style={styles.pageTitle}>Profile</Text>
+        <Text style={styles.pageTitle}>{t.settings.profile}</Text>
 
         {/* Avatar */}
         <TouchableOpacity style={styles.avatarWrap} onPress={() => router.push('/settings/profile')} activeOpacity={0.85}>
@@ -89,32 +91,32 @@ export default function ProfileScreen() {
         </TouchableOpacity>
 
         {/* Name + subtitle */}
-        <Text style={styles.name}>{displayName || 'Your name'}</Text>
+        <Text style={styles.name}>{displayName || t.settings.yourName}</Text>
         <Text style={styles.subtitle}>
-          {city ? `${city}  ·  ` : ''}{joinedDate ? `joined ${joinedDate}` : ''}
+          {city ? `${city}  ·  ` : ''}{joinedDate ? t.settings.joinedOn(joinedDate) : ''}
         </Text>
 
         {/* Stats */}
         <View style={styles.stats}>
           <View style={styles.statCard}>
             <Text style={styles.statNum}>{eventsCount}</Text>
-            <Text style={styles.statLabel}>Events</Text>
+            <Text style={styles.statLabel}>{t.dashboard.events}</Text>
           </View>
           <View style={[styles.statCard, styles.statCardLime]}>
             <Text style={styles.statNum}>{clubsCount}</Text>
-            <Text style={styles.statLabel}>Clubs</Text>
+            <Text style={styles.statLabel}>{t.dashboard.members}</Text>
           </View>
         </View>
 
         {/* Bio */}
         {(profile?.bio || true) && (
           <View style={styles.section}>
-            <Text style={styles.sectionTitle}>Bio</Text>
+            <Text style={styles.sectionTitle}>{t.settings.bio}</Text>
             {profile?.bio ? (
               <Text style={styles.bioText}>{profile.bio}</Text>
             ) : (
               <TouchableOpacity onPress={() => router.push('/settings/profile')}>
-                <Text style={styles.bioEmpty}>Add a bio →</Text>
+                <Text style={styles.bioEmpty}>{t.settings.addBio}</Text>
               </TouchableOpacity>
             )}
           </View>
@@ -123,7 +125,7 @@ export default function ProfileScreen() {
         {/* Favorites / Interests */}
         {(profile?.interests?.length ?? 0) > 0 && (
           <View style={styles.section}>
-            <Text style={styles.sectionTitle}>Favorites</Text>
+            <Text style={styles.sectionTitle}>{t.settings.favorites}</Text>
             <View style={styles.tags}>
               {profile!.interests.map(tag => (
                 <View key={tag} style={styles.tag}>
@@ -137,7 +139,7 @@ export default function ProfileScreen() {
         {/* Latest events (attended) — only visible to self */}
         {latestEvents.length > 0 && (
           <View style={styles.section}>
-            <Text style={styles.sectionTitle}>Latest events</Text>
+            <Text style={styles.sectionTitle}>{t.settings.latestEvents}</Text>
             <View style={styles.clubsList}>
               {latestEvents.map(event => {
                 const d = new Date(event.date + 'T00:00:00');
@@ -169,7 +171,7 @@ export default function ProfileScreen() {
         {/* My clubs */}
         {clubs.length > 0 && (
           <View style={styles.section}>
-            <Text style={styles.sectionTitle}>My clubs</Text>
+            <Text style={styles.sectionTitle}>{t.settings.myClubs}</Text>
             <View style={styles.clubsList}>
               {clubs.map(club => (
                 <TouchableOpacity
@@ -177,9 +179,9 @@ export default function ProfileScreen() {
                   style={styles.clubRow}
                   onPress={() => router.push(`/club/${club.id}` as any)}
                   onLongPress={() => {
-                    Alert.alert('Leave club', `Leave ${club.name}?`, [
-                      { text: 'Cancel', style: 'cancel' },
-                      { text: 'Leave', style: 'destructive', onPress: async () => {
+                    Alert.alert(t.settings.leaveClub, t.settings.leaveClubConfirm(club.name), [
+                      { text: t.common.cancel, style: 'cancel' },
+                      { text: t.event.leave, style: 'destructive', onPress: async () => {
                         await supabase.from('club_members').delete().eq('club_id', club.id).eq('user_id', user!.id);
                         setClubs(prev => prev.filter(c => c.id !== club.id));
                         setClubsCount(prev => Math.max(prev - 1, 0));
@@ -198,11 +200,20 @@ export default function ProfileScreen() {
                     <Text style={styles.clubName}>{club.name}</Text>
                     {club.category ? <Text style={styles.clubCategory}>{club.category}</Text> : null}
                   </View>
-                  <Text style={styles.clubLeaveHint}>hold to leave</Text>
+                  <Text style={styles.clubLeaveHint}>{t.settings.holdToLeave}</Text>
                 </TouchableOpacity>
               ))}
             </View>
           </View>
+        )}
+        {profile?.is_admin && (
+          <TouchableOpacity
+            style={styles.adminBtn}
+            onPress={() => router.push('/admin' as any)}
+            activeOpacity={0.85}
+          >
+            <Text style={styles.adminBtnText}>⚡ Admin Panel</Text>
+          </TouchableOpacity>
         )}
       </ScrollView>
     </View>
@@ -239,6 +250,8 @@ const styles = StyleSheet.create({
   clubName: { fontSize: 15, fontWeight: '600', color: Colors.black, fontFamily: Fonts.semibold },
   clubCategory: { fontSize: 12, color: Colors.gray, fontFamily: Fonts.regular, marginTop: 1 },
   clubLeaveHint: { fontSize: 11, color: Colors.grayBorder, fontFamily: Fonts.regular },
+  adminBtn: { marginTop: 32, backgroundColor: Colors.black, borderRadius: 16, padding: 16, alignItems: 'center' },
+  adminBtnText: { color: Colors.lime, fontSize: 15, fontWeight: '700', fontFamily: Fonts.bold },
   tags: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
   tag: { paddingHorizontal: 14, paddingVertical: 7, borderRadius: 50, backgroundColor: Colors.grayLight },
   tagText: { fontSize: 13, fontFamily: Fonts.regular, color: Colors.black },

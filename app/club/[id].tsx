@@ -13,6 +13,7 @@ import { EventCard } from '@/components/ui/EventCard';
 import { Toast } from '@/components/ui/Toast';
 import { BackButton } from '@/components/ui/BackButton';
 import { useAuth } from '@/context/AuthContext';
+import { useTranslations } from '@/context/LanguageContext';
 
 const COVER_HEIGHT = 260;
 const AVATAR_SIZE = 30;
@@ -23,6 +24,7 @@ export default function ClubDetailScreen() {
   const insets = useSafeAreaInsets();
   const router = useRouter();
   const { user } = useAuth();
+  const { t } = useTranslations();
   const [club, setClub] = useState<Club | null>(null);
   const [members, setMembers] = useState<ClubMember[]>([]);
   const [events, setEvents] = useState<Event[]>([]);
@@ -55,9 +57,9 @@ export default function ClubDetailScreen() {
 
   async function handleRemoveMember(m: ClubMember) {
     const name = (m as any).profile?.name ?? 'this member';
-    Alert.alert('Remove member', `Remove ${name} from ${club?.name}?`, [
-      { text: 'Cancel', style: 'cancel' },
-      { text: 'Remove', style: 'destructive', onPress: async () => {
+    Alert.alert(t.club.removeMember, t.club.removeMemberMsg(name, club?.name ?? ''), [
+      { text: t.common.cancel, style: 'cancel' },
+      { text: t.club.remove, style: 'destructive', onPress: async () => {
         await supabase.from('club_members').delete().eq('id', m.id);
         await supabase.from('clubs').update({ member_count: Math.max((club?.member_count ?? 1) - 1, 0) }).eq('id', id);
         setMembers(prev => prev.filter(x => x.id !== m.id));
@@ -85,7 +87,7 @@ export default function ClubDetailScreen() {
 
   return (
     <View style={styles.container}>
-      <Toast visible={toast} title="You're in!" subtitle={`Welcome to ${club.name}`} onHide={() => setToast(false)} />
+      <Toast visible={toast} title={t.club.youreIn} subtitle={t.club.welcomeTo(club.name)} onHide={() => setToast(false)} />
 
       {/* Members modal */}
       <Modal visible={showMembersModal} animationType="slide" transparent onRequestClose={() => setShowMembersModal(false)}>
@@ -93,7 +95,7 @@ export default function ClubDetailScreen() {
           <View style={styles.membersSheet}>
             <View style={styles.membersSheetHandle} />
             <View style={styles.membersSheetHeader}>
-              <Text style={styles.membersSheetTitle}>Members · {memberCount}</Text>
+              <Text style={styles.membersSheetTitle}>{t.club.membersCount(memberCount)}</Text>
               <TouchableOpacity onPress={() => setShowMembersModal(false)} hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}>
                 <Text style={styles.membersSheetClose}>✕</Text>
               </TouchableOpacity>
@@ -116,11 +118,11 @@ export default function ClubDetailScreen() {
                     </View>
                     <Text style={styles.memberModalName}>{firstName}</Text>
                     {m.role === 'admin' && (
-                      <View style={styles.adminTag}><Text style={styles.adminTagText}>Admin</Text></View>
+                      <View style={styles.adminTag}><Text style={styles.adminTagText}>{t.club.adminRole}</Text></View>
                     )}
                     {isAdmin && m.user_id !== user?.id && (
                       <TouchableOpacity onPress={() => { setShowMembersModal(false); handleRemoveMember(m); }} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
-                        <Text style={styles.removeText}>Remove</Text>
+                        <Text style={styles.removeText}>{t.club.remove}</Text>
                       </TouchableOpacity>
                     )}
                   </View>
@@ -154,7 +156,7 @@ export default function ClubDetailScreen() {
               onPress={() => router.push(`/club/${id}/edit` as any)}
               activeOpacity={0.8}
             >
-              <Text style={styles.adminText}>EDIT</Text>
+              <Text style={styles.adminText}>{t.club.editBadge}</Text>
             </TouchableOpacity>
           )}
         </View>
@@ -189,19 +191,19 @@ export default function ClubDetailScreen() {
           <View style={styles.statsRow}>
             <View style={styles.statItem}>
               <Text style={styles.statNum}>{events.length}</Text>
-              <Text style={styles.statLabel}>Events</Text>
+              <Text style={styles.statLabel}>{t.club.events}</Text>
             </View>
             <View style={styles.statDivider} />
             <View style={styles.statItem}>
               <Text style={styles.statNum}>{memberCount}</Text>
-              <Text style={styles.statLabel}>Members</Text>
+              <Text style={styles.statLabel}>{t.club.members}</Text>
             </View>
             {(club.rating ?? 0) > 0 && (
               <>
                 <View style={styles.statDivider} />
                 <View style={styles.statItem}>
                   <Text style={styles.statNum}>{club.rating?.toFixed(1)}</Text>
-                  <Text style={styles.statLabel}>Rating</Text>
+                  <Text style={styles.statLabel}>{t.club.ratingLabel}</Text>
                 </View>
               </>
             )}
@@ -211,7 +213,7 @@ export default function ClubDetailScreen() {
           {club.description ? (
             <>
               <View style={styles.divider} />
-              <Text style={styles.sectionTitle}>About</Text>
+              <Text style={styles.sectionTitle}>{t.club.aboutTitle}</Text>
               <Text style={styles.aboutText}>{club.description}</Text>
             </>
           ) : null}
@@ -237,7 +239,7 @@ export default function ClubDetailScreen() {
                 <Text style={styles.memberBubbleMoreText}>+{memberCount - 6}</Text>
               </View>
             )}
-            <Text style={styles.membersClickLabel}>{memberCount} {memberCount === 1 ? 'member' : 'members'}</Text>
+            <Text style={styles.membersClickLabel}>{t.club.memberCount(memberCount)}</Text>
           </TouchableOpacity>
 
           {/* Admin: create event */}
@@ -246,7 +248,7 @@ export default function ClubDetailScreen() {
               <View style={styles.divider} />
               <ManageRow
                 icon="plus"
-                label="Create event for this club"
+                label={t.club.createEventForClub}
                 onPress={() => router.push('/event/create/step2')}
                 last
               />
@@ -257,7 +259,7 @@ export default function ClubDetailScreen() {
           {events.length > 0 && (
             <>
               <View style={styles.divider} />
-              <Text style={styles.sectionTitle}>Upcoming events</Text>
+              <Text style={styles.sectionTitle}>{t.club.upcomingEvents}</Text>
               <View style={styles.eventsList}>
                 {events.map((event, i) => (
                   <Animated.View key={event.id} entering={FadeInDown.delay(i * 60)}>
@@ -273,18 +275,18 @@ export default function ClubDetailScreen() {
 
       {!isAdmin && !isMember && (
         <View style={[styles.footer, { paddingBottom: insets.bottom + 16 }]}>
-          <Button label="Join club" onPress={handleJoin} loading={loading} variant="lime" />
+          <Button label={t.club.joinClub} onPress={handleJoin} loading={loading} variant="lime" />
         </View>
       )}
       {isMember && !isAdmin && (
         <View style={[styles.footer, { paddingBottom: insets.bottom + 16 }]}>
           <Button
-            label="You're a member ✓"
+            label={t.club.joined}
             variant="lime"
             onPress={() => {
-              Alert.alert('Leave club', `Leave ${club?.name}?`, [
-                { text: 'Cancel', style: 'cancel' },
-                { text: 'Leave', style: 'destructive', onPress: async () => {
+              Alert.alert(t.club.leaveClub, t.club.leaveClubMsg(club?.name ?? ''), [
+                { text: t.common.cancel, style: 'cancel' },
+                { text: t.club.leaveBtn, style: 'destructive', onPress: async () => {
                   await supabase.from('club_members').delete().eq('club_id', id).eq('user_id', user!.id);
                   await supabase.from('clubs').update({ member_count: Math.max((club?.member_count ?? 1) - 1, 0) }).eq('id', id);
                   setIsMember(false);

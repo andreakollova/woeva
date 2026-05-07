@@ -39,6 +39,7 @@ export function VenueInput({ value, onChange }: VenueInputProps) {
   const [results, setResults] = useState<VenueResult[]>([]);
   const [loading, setLoading] = useState(false);
   const [focused, setFocused] = useState(false);
+  const [confirmed, setConfirmed] = useState(false);
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   function getLabel(r: NominatimResult): string {
@@ -52,6 +53,7 @@ export function VenueInput({ value, onChange }: VenueInputProps) {
 
   async function search(query: string) {
     onChange(query);
+    setConfirmed(false);
     setResults([]);
     if (query.length < 3) return;
 
@@ -78,6 +80,7 @@ export function VenueInput({ value, onChange }: VenueInputProps) {
 
   function select(r: VenueResult) {
     onChange(r.name, r.lat, r.lng);
+    setConfirmed(true);
     setResults([]);
     Keyboard.dismiss();
   }
@@ -85,7 +88,7 @@ export function VenueInput({ value, onChange }: VenueInputProps) {
   return (
     <View>
       <Text style={styles.label}>Venue</Text>
-      <View style={[styles.inputWrap, focused && styles.inputFocused]}>
+      <View style={[styles.inputWrap, focused && styles.inputFocused, confirmed && styles.inputConfirmed]}>
         <TextInput
           style={styles.input}
           value={value}
@@ -97,7 +100,14 @@ export function VenueInput({ value, onChange }: VenueInputProps) {
           autoCorrect={false}
         />
         {loading && <ActivityIndicator size="small" color={Colors.gray} style={styles.spinner} />}
+        {confirmed && !loading && <Text style={styles.confirmedIcon}>✓</Text>}
       </View>
+      {value.length > 0 && !confirmed && !loading && (
+        <Text style={styles.hint}>↑ Select from the list to pin on map</Text>
+      )}
+      {confirmed && (
+        <Text style={styles.confirmedHint}>📍 Location confirmed — will appear on map</Text>
+      )}
 
       {results.length > 0 && (
         <View style={styles.dropdown}>
@@ -139,6 +149,29 @@ const styles = StyleSheet.create({
   },
   inputFocused: {
     borderColor: Colors.black,
+  },
+  inputConfirmed: {
+    borderColor: '#22C55E',
+  },
+  confirmedIcon: {
+    fontSize: 14,
+    color: '#22C55E',
+    fontWeight: '700',
+    marginLeft: 6,
+  },
+  hint: {
+    fontSize: 11,
+    color: Colors.gray,
+    fontFamily: Fonts.regular,
+    marginTop: 4,
+    marginLeft: 2,
+  },
+  confirmedHint: {
+    fontSize: 11,
+    color: '#22C55E',
+    fontFamily: Fonts.regular,
+    marginTop: 4,
+    marginLeft: 2,
   },
   input: {
     flex: 1,

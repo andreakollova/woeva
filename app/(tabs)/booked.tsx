@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity, RefreshControl, Image, ImageStyle, Modal, Alert } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, TouchableOpacity, RefreshControl, Image, ImageStyle, Modal, Alert, Share, Linking, Platform } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import Animated, { FadeInDown } from 'react-native-reanimated';
@@ -11,6 +11,8 @@ import { Event } from '@/types';
 import { Button } from '@/components/ui/Button';
 import { WMark } from '@/components/ui/WMark';
 import { useAuth } from '@/context/AuthContext';
+import { notify } from '@/lib/notify';
+import { useTranslations } from '@/context/LanguageContext';
 
 type BookedEvent = Event & { attendee_id?: string };
 
@@ -25,6 +27,7 @@ export default function BookedScreen() {
   const insets = useSafeAreaInsets();
   const router = useRouter();
   const { user, profile } = useAuth();
+  const { t } = useTranslations();
   const [tab, setTab] = useState<'upcoming' | 'past'>('upcoming');
   const [events, setEvents] = useState<BookedEvent[]>([]);
   const [ratedIds, setRatedIds] = useState<Set<string>>(new Set());
@@ -71,23 +74,76 @@ export default function BookedScreen() {
     setRefreshing(false);
   }
 
+  function handleLeaveEvent(event: BookedEvent) {
+    const isFree = event.is_free || !event.price;
+    const eventDateTime = new Date(`${event.date}T${event.time || '00:00'}:00`);
+    const hoursUntil = (eventDateTime.getTime() - Date.now()) / (1000 * 60 * 60);
+    const refundEligible = !isFree && hoursUntil > 48;
+    const noRefund = !isFree && hoursUntil <= 48;
+
+    const subtitle = refundEligible
+      ? `You paid €${event.price} for this ticket. Since the event is more than 48 hours away, you are eligible for a refund — contact support after leaving.`
+      : noRefund
+        ? `You paid €${event.price} for this ticket. The event is less than 48 hours away, so this ticket is non-refundable.`
+        : t.tickets.leaveNoSpot;
+
+    const confirmTitle = refundEligible ? t.tickets.leaveRefundTitle : noRefund ? t.tickets.leaveNoRefundTitle : t.tickets.leaveConfirmTitle;
+    const confirmSub = refundEligible ? t.tickets.leaveRefundSub : noRefund ? t.tickets.leaveNoRefundSub : t.tickets.leaveSub;
+
+    Alert.alert(confirmTitle, subtitle, [
+      { text: t.common.cancel, style: 'cancel' },
+      {
+        text: noRefund ? t.tickets.leaveAnyway : t.tickets.leaveEvent,
+        style: 'destructive',
+        onPress: () => {
+          Alert.alert(t.tickets.areYouSure, confirmSub, [
+            { text: t.tickets.goBack, style: 'cancel' },
+            {
+              text: t.tickets.yesLeave,
+              style: 'destructive',
+              onPress: async () => {
+                await supabase.from('event_attendees').delete().eq('id', event.attendee_id!);
+                setEvents(prev => prev.filter(e => e.id !== event.id));
+                if (event.creator_id && user && event.creator_id !== user.id) {
+                  supabase.from('notifications').insert({
+                    user_id: event.creator_id, type: 'leave',
+                    title: `Someone left ${event.title}`,
+                    body: `${profile?.name ?? 'An attendee'} cancelled their spot.`,
+                    data: { event_id: event.id },
+                  }).then(() => {});
+                  notify.leftEvent({
+                    creatorId: event.creator_id,
+                    creatorEmail: '',
+                    attendeeName: profile?.name ?? 'An attendee',
+                    eventTitle: event.title,
+                    eventId: event.id,
+                  });
+                }
+              },
+            },
+          ]);
+        },
+      },
+    ]);
+  }
+
   function handleDeleteTicket(event: BookedEvent) {
     Alert.alert(
-      'Remove ticket?',
-      `"${event.title}" will be permanently removed from your past tickets. This cannot be undone.`,
+      t.tickets.removeTicket,
+      t.tickets.removeTicketMsg(event.title),
       [
-        { text: 'Cancel', style: 'cancel' },
+        { text: t.common.cancel, style: 'cancel' },
         {
-          text: 'Remove ticket',
+          text: t.tickets.removeTicket,
           style: 'destructive',
           onPress: () => {
             Alert.alert(
-              'Are you sure?',
-              'The ticket will be deleted. You will no longer have a record of this event.',
+              t.tickets.areYouSure,
+              t.tickets.removeTicketConfirm,
               [
-                { text: 'Go back', style: 'cancel' },
+                { text: t.tickets.goBack, style: 'cancel' },
                 {
-                  text: 'Yes, delete it',
+                  text: t.tickets.yesDelete,
                   style: 'destructive',
                   onPress: async () => {
                     setDeletingId(event.id);
@@ -112,17 +168,17 @@ export default function BookedScreen() {
         </TouchableOpacity>
       </View>
 
-      <Text style={styles.title}>My tickets</Text>
+      <Text style={styles.title}>{t.tickets.myTickets}</Text>
 
       <View style={styles.tabs}>
-        {(['upcoming', 'past'] as const).map(t => (
+        {(['upcoming', 'past'] as const).map(tabKey => (
           <TouchableOpacity
-            key={t}
-            style={[styles.tabBtn, tab === t && styles.tabBtnActive]}
-            onPress={() => setTab(t)}
+            key={tabKey}
+            style={[styles.tabBtn, tab === tabKey && styles.tabBtnActive]}
+            onPress={() => setTab(tabKey)}
           >
-            <Text style={[styles.tabText, tab === t && styles.tabTextActive]}>
-              {t === 'upcoming' ? 'Upcoming' : 'Past'}
+            <Text style={[styles.tabText, tab === tabKey && styles.tabTextActive]}>
+              {tabKey === 'upcoming' ? t.tickets.upcoming : t.tickets.past}
             </Text>
           </TouchableOpacity>
         ))}
@@ -136,15 +192,13 @@ export default function BookedScreen() {
         {events.length === 0 ? (
           <Animated.View entering={FadeInDown} style={styles.empty}>
             <Text style={styles.emptyTitle}>
-              {tab === 'upcoming' ? 'No tickets yet' : 'No past events'}
+              {tab === 'upcoming' ? t.tickets.noUpcoming : t.tickets.noPast}
             </Text>
             <Text style={styles.emptyText}>
-              {tab === 'upcoming'
-                ? 'Find an event and grab your spot.'
-                : 'Events you attended will appear here.'}
+              {tab === 'upcoming' ? t.tickets.noUpcomingSub : t.tickets.noPastSub}
             </Text>
             {tab === 'upcoming' && (
-              <Button label="Discover events" onPress={() => router.push('/(tabs)/search')} variant="lime" style={styles.cta} />
+              <Button label={t.tickets.discoverEvents} onPress={() => router.push('/(tabs)/search')} variant="lime" style={styles.cta} />
             )}
           </Animated.View>
         ) : (
@@ -160,6 +214,7 @@ export default function BookedScreen() {
                 onPress={() => router.push(`/event/${event.id}`)}
                 onRate={() => router.push(`/event/${event.id}/rate`)}
                 onDelete={() => handleDeleteTicket(event)}
+                onLeave={() => handleLeaveEvent(event)}
               />
             </Animated.View>
           ))
@@ -169,7 +224,7 @@ export default function BookedScreen() {
   );
 }
 
-function TicketCard({ event, userId, userAvatar, userName, isPast, isRated, onPress, onRate, onDelete }: {
+function TicketCard({ event, userId, userAvatar, userName, isPast, isRated, onPress, onRate, onDelete, onLeave }: {
   event: BookedEvent;
   userId: string;
   userAvatar: string | null;
@@ -179,8 +234,11 @@ function TicketCard({ event, userId, userAvatar, userName, isPast, isRated, onPr
   onPress: () => void;
   onRate: () => void;
   onDelete?: () => void;
+  onLeave?: () => void;
 }) {
+  const { t } = useTranslations();
   const [qrModal, setQrModal] = useState(false);
+  const [optionsModal, setOptionsModal] = useState(false);
   const [goingCount, setGoingCount] = useState(event.going_count ?? 0);
 
   useEffect(() => {
@@ -205,10 +263,77 @@ function TicketCard({ event, userId, userAvatar, userName, isPast, isRated, onPr
   const dateStr = `${d.getDate()} ${d.toLocaleDateString('en-US', { month: 'long' })} ${d.getFullYear()}`;
   const qrValue = `woeva:event:${event.id}:${userId}`;
   const isFree = event.is_free || event.price === 0;
-  const priceLabel = isFree ? 'Free' : `€${event.price}`;
+  const priceLabel = isFree ? t.tickets.free : `€${event.price}`;
+
+  function handleShare() {
+    Share.share({ message: `Check out "${event.title}" on Woeva!` });
+  }
+
+  function handleDirections() {
+    if (!event.venue) return;
+    const query = encodeURIComponent(event.venue);
+    const url = Platform.OS === 'ios'
+      ? `maps://?q=${query}`
+      : `geo:0,0?q=${query}`;
+    Linking.openURL(url).catch(() => {
+      Linking.openURL(`https://maps.google.com/?q=${query}`);
+    });
+  }
+
+  function handleCalendar() {
+    Alert.alert('Add to calendar', `${event.title}\n${event.date}${event.time ? ' at ' + event.time : ''}${event.venue ? '\n' + event.venue : ''}`, [
+      { text: 'Close', style: 'cancel' },
+    ]);
+  }
 
   return (
     <TouchableOpacity onPress={onPress} activeOpacity={0.92} style={styles.ticket}>
+      {/* Options modal */}
+      <Modal visible={optionsModal} transparent animationType="fade" onRequestClose={() => setOptionsModal(false)}>
+        <TouchableOpacity style={styles.optionsOverlay} activeOpacity={1} onPress={() => setOptionsModal(false)}>
+          <View style={styles.optionsSheet}>
+            <View style={styles.optionsHandle} />
+            <Text style={styles.optionsTitle}>{event.title}</Text>
+
+            {!isPast && onLeave && (
+              <TouchableOpacity style={[styles.optionsRow, styles.optionsRowDestructive]} onPress={() => { setOptionsModal(false); onLeave(); }} activeOpacity={0.7}>
+                <Text style={styles.optionsRowIconText}>🚪</Text>
+                <View style={styles.optionsRowBody}>
+                  <Text style={[styles.optionsRowLabel, styles.optionsRowLabelDestructive]}>{t.tickets.leaveEvent}</Text>
+                  <Text style={styles.optionsRowSub}>{t.tickets.leaveEventSub}</Text>
+                </View>
+              </TouchableOpacity>
+            )}
+
+            <TouchableOpacity style={styles.optionsRow} onPress={() => { setOptionsModal(false); handleShare(); }} activeOpacity={0.7}>
+              <Text style={styles.optionsRowIconText}>🔗</Text>
+              <View style={styles.optionsRowBody}>
+                <Text style={styles.optionsRowLabel}>{t.tickets.shareTicket}</Text>
+                <Text style={styles.optionsRowSub}>{t.tickets.shareTicketSub}</Text>
+              </View>
+            </TouchableOpacity>
+
+            {event.venue ? (
+              <TouchableOpacity style={styles.optionsRow} onPress={() => { setOptionsModal(false); handleDirections(); }} activeOpacity={0.7}>
+                <Text style={styles.optionsRowIconText}>📍</Text>
+                <View style={styles.optionsRowBody}>
+                  <Text style={styles.optionsRowLabel}>{t.tickets.getDirections}</Text>
+                  <Text style={styles.optionsRowSub}>{event.venue}</Text>
+                </View>
+              </TouchableOpacity>
+            ) : null}
+
+            <TouchableOpacity style={styles.optionsRow} onPress={() => { setOptionsModal(false); handleCalendar(); }} activeOpacity={0.7}>
+              <Text style={styles.optionsRowIconText}>📅</Text>
+              <View style={styles.optionsRowBody}>
+                <Text style={styles.optionsRowLabel}>{t.tickets.eventDetails}</Text>
+                <Text style={styles.optionsRowSub}>{event.date}{event.time ? ' · ' + event.time : ''}</Text>
+              </View>
+            </TouchableOpacity>
+          </View>
+        </TouchableOpacity>
+      </Modal>
+
       {/* Cover strip */}
       <View style={styles.ticketCover}>
         {event.cover_url
@@ -219,7 +344,7 @@ function TicketCard({ event, userId, userAvatar, userName, isPast, isRated, onPr
         <View style={styles.ticketCoverOverlay} />
         <View style={styles.ticketCoverContent}>
           <View style={styles.ticketStatusPill}>
-            <Text style={styles.ticketStatusText}>{isPast ? 'USED' : 'VALID'}</Text>
+            <Text style={styles.ticketStatusText}>{isPast ? t.tickets.used : t.tickets.valid}</Text>
             <View style={[styles.ticketStatusDot, { backgroundColor: isPast ? Colors.gray : Colors.lime }]} />
           </View>
           <Text style={styles.ticketEventTitle} numberOfLines={2}>{event.title}</Text>
@@ -234,6 +359,16 @@ function TicketCard({ event, userId, userAvatar, userName, isPast, isRated, onPr
             <Text style={styles.ticketDeleteIcon}>×</Text>
           </TouchableOpacity>
         )}
+        {!isPast && (
+          <TouchableOpacity
+            style={styles.ticketOptionsBtn}
+            onPress={e => { e.stopPropagation(); setOptionsModal(true); }}
+            hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+            activeOpacity={0.7}
+          >
+            <Text style={styles.ticketOptionsIcon}>⋯</Text>
+          </TouchableOpacity>
+        )}
       </View>
 
       {/* Info section */}
@@ -241,22 +376,22 @@ function TicketCard({ event, userId, userAvatar, userName, isPast, isRated, onPr
         {/* Date + Time row */}
         <View style={styles.ticketInfoGrid}>
           <View style={styles.ticketInfoCell}>
-            <Text style={styles.ticketInfoLabel}>DATE</Text>
+            <Text style={styles.ticketInfoLabel}>{t.tickets.dateLabel}</Text>
             <Text style={styles.ticketInfoValue}>{dayName}</Text>
             <Text style={styles.ticketInfoSub}>{dateStr}</Text>
           </View>
           <View style={styles.ticketInfoDivider} />
           <View style={styles.ticketInfoCell}>
-            <Text style={styles.ticketInfoLabel}>TIME</Text>
+            <Text style={styles.ticketInfoLabel}>{t.tickets.timeLabel}</Text>
             <Text style={styles.ticketInfoValue}>{event.time || '—'}</Text>
-            {event.duration ? <Text style={styles.ticketInfoSub}>{event.duration}h duration</Text> : null}
+            {event.duration ? <Text style={styles.ticketInfoSub}>{t.tickets.duration_hours(event.duration)}</Text> : null}
           </View>
         </View>
 
         {/* Venue */}
         {event.venue ? (
           <View style={styles.ticketVenueRow}>
-            <Text style={styles.ticketInfoLabel}>LOCATION</Text>
+            <Text style={styles.ticketInfoLabel}>{t.tickets.locationLabel}</Text>
             <Text style={styles.ticketVenue}>{event.venue}</Text>
           </View>
         ) : null}
@@ -279,7 +414,7 @@ function TicketCard({ event, userId, userAvatar, userName, isPast, isRated, onPr
                 : <Image key={i} source={SAMPLE_AVATARS[(i + 1) % SAMPLE_AVATARS.length]} style={[styles.goingAvatar, { marginLeft: -7 }] as ImageStyle} />;
             })}
           </View>
-          <Text style={styles.goingLabel}>{Math.max(goingCount, 1)} {goingCount === 1 ? 'person' : 'people'} going</Text>
+          <Text style={styles.goingLabel}>{t.tickets.going_people(Math.max(goingCount, 1))}</Text>
           <View style={[styles.pricePill, isFree && styles.pricePillFree]}>
             <Text style={[styles.priceText, isFree && styles.priceTextFree]}>{priceLabel}</Text>
           </View>
@@ -301,11 +436,11 @@ function TicketCard({ event, userId, userAvatar, userName, isPast, isRated, onPr
           <TouchableOpacity style={styles.qrModalBg} activeOpacity={1} onPress={() => setQrModal(false)}>
             <View style={styles.qrModalCard}>
               <Text style={styles.qrModalTitle}>{event.title}</Text>
-              <Text style={styles.qrModalSub}>{isPast ? 'Event attended' : 'Show at the door'}</Text>
+              <Text style={styles.qrModalSub}>{isPast ? t.tickets.eventAttended : t.tickets.showAtDoor}</Text>
               <View style={styles.qrModalCode}>
                 <QRCode value={qrValue} size={220} color={Colors.black} backgroundColor={Colors.white} />
               </View>
-              <Text style={styles.qrModalHint}>Tap anywhere to close</Text>
+              <Text style={styles.qrModalHint}>{t.tickets.tapToClose}</Text>
             </View>
           </TouchableOpacity>
         </Modal>
@@ -320,9 +455,9 @@ function TicketCard({ event, userId, userAvatar, userName, isPast, isRated, onPr
           </TouchableOpacity>
           <View style={styles.qrInfo}>
             <Text style={styles.qrAttendeeName} numberOfLines={1}>{userName}</Text>
-            <Text style={styles.qrTitle}>{isPast ? 'Event attended' : 'Your ticket'}</Text>
+            <Text style={styles.qrTitle}>{isPast ? t.tickets.eventAttended : t.tickets.yourTicket}</Text>
             <Text style={styles.qrSub}>
-              {isPast ? 'Thanks for coming!' : 'Show this QR at the door'}
+              {isPast ? t.tickets.thanksForComing : t.tickets.showAtDoor}
             </Text>
             {event.club?.name ? (
               <Text style={styles.qrClub}>{event.club.name}</Text>
@@ -330,11 +465,11 @@ function TicketCard({ event, userId, userAvatar, userName, isPast, isRated, onPr
 
             {isPast && !isRated && event.club_id && (
               <TouchableOpacity style={styles.rateBtn} onPress={onRate} activeOpacity={0.8}>
-                <Text style={styles.rateBtnText}>Rate event →</Text>
+                <Text style={styles.rateBtnText}>{t.tickets.rateEventArrow}</Text>
               </TouchableOpacity>
             )}
             {isPast && isRated && (
-              <Text style={styles.ratedText}>★ Rated</Text>
+              <Text style={styles.ratedText}>{t.tickets.rated}</Text>
             )}
           </View>
         </View>
@@ -377,6 +512,8 @@ const styles = StyleSheet.create({
   ticketCoverContent: { position: 'absolute', bottom: 0, left: 0, right: 0, padding: 18, gap: 6 },
   ticketDeleteBtn: { position: 'absolute', top: 12, right: 12, width: 28, height: 28, borderRadius: 14, backgroundColor: 'rgba(0,0,0,0.5)', alignItems: 'center', justifyContent: 'center' },
   ticketDeleteIcon: { fontSize: 18, color: Colors.white, lineHeight: 22, fontWeight: '300' },
+  ticketOptionsBtn: { position: 'absolute', top: 12, right: 12, width: 32, height: 28, borderRadius: 14, backgroundColor: 'rgba(0,0,0,0.4)', alignItems: 'center', justifyContent: 'center' },
+  ticketOptionsIcon: { fontSize: 16, color: Colors.white, lineHeight: 20, letterSpacing: 1 },
   ticketStatusPill: { flexDirection: 'row', alignItems: 'center', gap: 6, alignSelf: 'flex-start', backgroundColor: 'rgba(255,255,255,0.15)', borderRadius: 50, paddingHorizontal: 10, paddingVertical: 5 },
   ticketStatusText: { fontSize: 9, fontWeight: '800', color: Colors.white, letterSpacing: 1.2 },
   ticketStatusDot: { width: 6, height: 6, borderRadius: 3 },
@@ -429,6 +566,19 @@ const styles = StyleSheet.create({
   rateBtn: { marginTop: 8, backgroundColor: Colors.lime, borderRadius: 10, paddingVertical: 8, paddingHorizontal: 14, alignSelf: 'flex-start' },
   rateBtnText: { fontSize: 12, fontWeight: '700', color: Colors.black, fontFamily: Fonts.semibold },
   ratedText: { fontSize: 12, color: 'rgba(255,255,255,0.4)', fontFamily: Fonts.medium, marginTop: 6 },
+
+  // Options sheet
+  optionsOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'flex-end' },
+  optionsSheet: { backgroundColor: Colors.white, borderTopLeftRadius: 24, borderTopRightRadius: 24, paddingTop: 12, paddingBottom: 40, paddingHorizontal: 20 },
+  optionsHandle: { width: 36, height: 4, borderRadius: 2, backgroundColor: Colors.grayBorder, alignSelf: 'center', marginBottom: 16 },
+  optionsTitle: { fontSize: 15, fontWeight: '700', color: Colors.black, fontFamily: Fonts.bold, marginBottom: 12 },
+  optionsRow: { flexDirection: 'row', alignItems: 'center', gap: 14, paddingVertical: 14, borderTopWidth: 1, borderTopColor: '#F0F0F0' },
+  optionsRowDestructive: {},
+  optionsRowIconText: { fontSize: 22, width: 32, textAlign: 'center' },
+  optionsRowBody: { flex: 1 },
+  optionsRowLabel: { fontSize: 15, fontWeight: '600', color: Colors.black, fontFamily: Fonts.semibold },
+  optionsRowLabelDestructive: { color: '#FF3B30' },
+  optionsRowSub: { fontSize: 12, color: Colors.gray, fontFamily: Fonts.regular, marginTop: 1 },
 
   // QR modal
   qrModalBg: { flex: 1, backgroundColor: 'rgba(0,0,0,0.75)', alignItems: 'center', justifyContent: 'center' },

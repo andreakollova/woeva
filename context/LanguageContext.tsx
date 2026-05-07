@@ -1,0 +1,38 @@
+import React, { createContext, useContext, useEffect, useState } from 'react';
+import { translations, Lang, Translations } from '@/lib/i18n/translations';
+import { LANG_KEY, loadSavedLang, saveLang } from '@/lib/i18n';
+
+interface LanguageContextType {
+  lang: Lang;
+  t: Translations;
+  setLang: (l: Lang) => void;
+}
+
+const LanguageContext = createContext<LanguageContextType>({
+  lang: 'en',
+  t: translations.en,
+  setLang: () => {},
+});
+
+export function LanguageProvider({ children }: { children: React.ReactNode }) {
+  const [lang, setLangState] = useState<Lang>('en');
+
+  useEffect(() => {
+    loadSavedLang().then(setLangState);
+  }, []);
+
+  function setLang(l: Lang) {
+    setLangState(l);
+    saveLang(l);
+  }
+
+  return (
+    <LanguageContext.Provider value={{ lang, t: translations[lang], setLang }}>
+      {children}
+    </LanguageContext.Provider>
+  );
+}
+
+export function useTranslations() {
+  return useContext(LanguageContext);
+}

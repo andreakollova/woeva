@@ -6,10 +6,12 @@ import * as Location from 'expo-location';
 import * as Notifications from 'expo-notifications';
 import { Button } from '@/components/ui/Button';
 import { Colors } from '@/constants/colors';
+import { useTranslations } from '@/context/LanguageContext';
 
 export default function PermissionsScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
+  const { t } = useTranslations();
   const [loading, setLoading] = useState(false);
 
   async function handleLetsGo() {
@@ -23,24 +25,24 @@ export default function PermissionsScreen() {
   return (
     <View style={[styles.container, { paddingTop: insets.top + 24, paddingBottom: insets.bottom + 24 }]}>
       <View style={styles.header}>
-        <Text style={styles.title}>Enable features</Text>
+        <Text style={styles.title}>{t.permissions.enableFeatures}</Text>
       </View>
 
       <View style={styles.items}>
         <View style={styles.item}>
-          <Text style={styles.itemTitle}>Location</Text>
-          <Text style={styles.itemSub}>You will know exactly where to go.</Text>
+          <Text style={styles.itemTitle}>{t.permissions.location}</Text>
+          <Text style={styles.itemSub}>{t.permissions.locationSub}</Text>
         </View>
         <View style={styles.divider} />
         <View style={styles.item}>
-          <Text style={styles.itemTitle}>Notifications</Text>
-          <Text style={styles.itemSub}>Updated when you're needed.</Text>
+          <Text style={styles.itemTitle}>{t.permissions.notificationsLabel}</Text>
+          <Text style={styles.itemSub}>{t.permissions.notificationsSub}</Text>
         </View>
       </View>
 
       <View style={styles.footer}>
-        <Button label="Let's go" onPress={handleLetsGo} loading={loading} variant="lime" />
-        <Button label="Maybe later" onPress={() => router.replace('/(tabs)')} variant="ghost" />
+        <Button label={t.permissions.letsGo} onPress={handleLetsGo} loading={loading} variant="lime" />
+        <Button label={t.permissions.maybeLater} onPress={() => router.replace('/(tabs)')} variant="ghost" />
       </View>
     </View>
   );

@@ -11,7 +11,8 @@ import { Button } from '@/components/ui/Button';
 import { Toast } from '@/components/ui/Toast';
 import { supabase } from '@/lib/supabase';
 import { useAuth } from '@/context/AuthContext';
-import { CATEGORIES } from '@/types';
+import { useCategories } from '@/hooks/useCategories';
+import { useTranslations } from '@/context/LanguageContext';
 
 const CITIES = ['Bratislava', 'Košice', 'Prešov', 'Žilina', 'Nitra', 'Banská Bystrica', 'Other'];
 
@@ -19,6 +20,8 @@ export default function EditProfileScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const { user, profile, refetchProfile } = useAuth();
+  const { t } = useTranslations();
+  const { categories } = useCategories();
   const [name, setName] = useState(profile?.name ?? '');
   const [bio, setBio] = useState(profile?.bio ?? '');
   const [city, setCity] = useState(profile?.city ?? '');
@@ -43,7 +46,7 @@ export default function EditProfileScreen() {
       const ext = (avatar.split('.').pop() ?? 'jpg').toLowerCase().replace('heic', 'jpg');
       const uploaded = await uploadImage(avatar, 'avatars', `avatars/${user.id}.${ext}`);
       if (!uploaded) {
-        Alert.alert('Upload failed', 'Could not upload photo. Please try again.');
+        Alert.alert(t.settings.uploadFailed, t.settings.uploadFailedMsg);
         setLoading(false);
         return;
       }
@@ -52,7 +55,7 @@ export default function EditProfileScreen() {
 
     const { error } = await supabase.from('profiles').upsert({ id: user.id, name, bio, city, avatar_url, interests });
     setLoading(false);
-    if (error) { Alert.alert('Error saving', error.message); return; }
+    if (error) { Alert.alert(t.common.error, error.message); return; }
     await refetchProfile?.();
     setSaved(true);
     setTimeout(() => router.back(), 1400);
@@ -71,7 +74,7 @@ export default function EditProfileScreen() {
         {/* Header */}
         <View style={styles.header}>
           <BackButton />
-          <Text style={styles.title}>Edit profile</Text>
+          <Text style={styles.title}>{t.settings.editProfile}</Text>
           <View style={{ width: 36 }} />
         </View>
 
@@ -91,20 +94,21 @@ export default function EditProfileScreen() {
               </View>
             </View>
           </TouchableOpacity>
-          <Text style={styles.avatarHint}>Tap to change photo</Text>
+          <Text style={styles.avatarHint}>{t.settings.editProfile}</Text>
         </View>
 
         {/* Fields */}
         <View style={styles.form}>
           {/* Name */}
           <View style={styles.fieldGroup}>
-            <Text style={styles.fieldLabel}>Name</Text>
+            <Text style={styles.fieldLabel}>{t.settings.name}</Text>
             <TextInput
               style={[styles.fieldInput, focusedField === 'name' && styles.fieldInputFocused]}
               value={name}
-              onChangeText={setName}
-              placeholder="Your full name"
+              onChangeText={v => setName(v.slice(0, 100))}
+              placeholder={t.auth.fullNamePlaceholder}
               placeholderTextColor={Colors.gray}
+              maxLength={100}
               onFocus={() => setFocusedField('name')}
               onBlur={() => setFocusedField(null)}
             />
@@ -112,15 +116,16 @@ export default function EditProfileScreen() {
 
           {/* Bio */}
           <View style={styles.fieldGroup}>
-            <Text style={styles.fieldLabel}>Bio</Text>
+            <Text style={styles.fieldLabel}>{t.settings.bio}</Text>
             <TextInput
               style={[styles.fieldInput, styles.fieldInputMulti, focusedField === 'bio' && styles.fieldInputFocused]}
               value={bio}
-              onChangeText={setBio}
-              placeholder="Tell people a bit about yourself..."
+              onChangeText={v => setBio(v.slice(0, 500))}
+              placeholder={t.settings.bioPlaceholder}
               placeholderTextColor={Colors.gray}
               multiline
               numberOfLines={3}
+              maxLength={500}
               textAlignVertical="top"
               onFocus={() => setFocusedField('bio')}
               onBlur={() => setFocusedField(null)}
@@ -129,12 +134,12 @@ export default function EditProfileScreen() {
 
           {/* City */}
           <View style={styles.fieldGroup}>
-            <Text style={styles.fieldLabel}>City</Text>
+            <Text style={styles.fieldLabel}>{t.settings.city}</Text>
             <TouchableOpacity
               style={[styles.fieldInput, styles.fieldInputRow, focusedField === 'city' && styles.fieldInputFocused]}
               onPress={() => setShowCities(!showCities)}
             >
-              <Text style={city ? styles.fieldValue : styles.fieldPlaceholder}>{city || 'Select city'}</Text>
+              <Text style={city ? styles.fieldValue : styles.fieldPlaceholder}>{city || t.settings.selectCity}</Text>
               <Text style={styles.chevron}>{showCities ? '▴' : '▾'}</Text>
             </TouchableOpacity>
             {showCities && (
@@ -155,10 +160,10 @@ export default function EditProfileScreen() {
 
           {/* Interests */}
           <View style={styles.fieldGroup}>
-            <Text style={styles.fieldLabel}>Interests</Text>
-            <Text style={styles.fieldHint}>Select what you're into — used to recommend events</Text>
+            <Text style={styles.fieldLabel}>{t.settings.interests}</Text>
+            <Text style={styles.fieldHint}>{t.settings.interests}</Text>
             <View style={styles.chipsWrap}>
-              {CATEGORIES.map(cat => {
+              {categories.map(cat => {
                 const active = interests.includes(cat);
                 return (
                   <TouchableOpacity
@@ -177,10 +182,10 @@ export default function EditProfileScreen() {
       </ScrollView>
 
       <View style={[styles.footer, { paddingBottom: insets.bottom + 16 }]}>
-        <Button label="Save changes" onPress={handleSave} loading={loading} variant="black" />
+        <Button label={t.settings.saveChanges} onPress={handleSave} loading={loading} variant="black" />
       </View>
 
-      <Toast visible={saved} title="Profile saved" subtitle="Looking good!" onHide={() => setSaved(false)} />
+      <Toast visible={saved} title={t.settings.profileSaved} subtitle={t.settings.profileSavedSub} onHide={() => setSaved(false)} />
     </KeyboardAvoidingView>
   );
 }

@@ -60,12 +60,7 @@
           "enableGooglePay": true
         }
       ],
-      [
-        "@react-native-google-signin/google-signin",
-        {
-          "iosUrlScheme": "com.googleusercontent.apps.YOUR_GOOGLE_CLIENT_ID"
-        }
-      ]
+      "expo-location"
     ],
     "experiments": {
       "typedRoutes": true

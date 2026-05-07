@@ -10,11 +10,13 @@ import { VenueInput } from '@/components/ui/VenueInput';
 import { Button } from '@/components/ui/Button';
 import { Toast } from '@/components/ui/Toast';
 import { supabase } from '@/lib/supabase';
+import { useTranslations } from '@/context/LanguageContext';
 
 export default function EditEventScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const { id } = useLocalSearchParams<{ id: string }>();
+  const { t } = useTranslations();
 
   const [title, setTitle] = useState('');
   const [tagline, setTagline] = useState('');
@@ -57,8 +59,8 @@ export default function EditEventScreen() {
   }
 
   async function handleSave() {
-    if (!venue.trim()) { Alert.alert('Missing venue', 'Please enter a venue.'); return; }
-    if (!title.trim()) { Alert.alert('Missing title', 'Please enter an event name.'); return; }
+    if (!venue.trim()) { Alert.alert(t.event.missingVenue, t.event.missingVenueMsg); return; }
+    if (!title.trim()) { Alert.alert(t.event.missingTitle, t.event.missingTitleMsg); return; }
     setLoading(true);
 
     const eventDate = date.toISOString().split('T')[0];
@@ -79,12 +81,12 @@ export default function EditEventScreen() {
     }).eq('id', id);
 
     setLoading(false);
-    if (error) { Alert.alert('Could not save', error.message); return; }
+    if (error) { Alert.alert(t.event.couldNotCreate, error.message); return; }
     setToast(true);
     setTimeout(() => router.back(), 1200);
   }
 
-  const dateStr = date.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' });
+  const dateStr = date.toLocaleDateString(undefined, { weekday: 'short', month: 'short', day: 'numeric' });
   const timeStr = `${time.getHours().toString().padStart(2, '0')}:${time.getMinutes().toString().padStart(2, '0')}`;
 
   return (
@@ -96,30 +98,30 @@ export default function EditEventScreen() {
       >
         <View style={styles.header}>
           <TouchableOpacity onPress={() => router.back()} hitSlop={12}>
-            <Text style={styles.cancel}>Cancel</Text>
+            <Text style={styles.cancel}>{t.common.cancel}</Text>
           </TouchableOpacity>
-          <Text style={styles.headerTitle}>Edit event</Text>
+          <Text style={styles.headerTitle}>{t.event.editEvent}</Text>
           <View style={{ width: 56 }} />
         </View>
 
         <View style={styles.form}>
           <Input
-            label="Event name"
+            label={t.event.eventName}
             value={title}
             onChangeText={setTitle}
-            placeholder="What's happening?"
+            placeholder={t.event.eventNamePlaceholderEdit}
           />
 
           <Input
-            label="Description"
+            label={t.event.description.split(' (')[0]}
             value={tagline}
             onChangeText={setTagline}
-            placeholder="Tell people what to expect..."
+            placeholder={t.event.descriptionPlaceholderEdit}
           />
 
           {/* Date */}
           <View>
-            <Text style={styles.label}>Date</Text>
+            <Text style={styles.label}>{t.event.date}</Text>
             <TouchableOpacity style={styles.field} onPress={() => setShowDate(true)}>
               <Text style={styles.fieldValue}>{dateStr}</Text>
             </TouchableOpacity>
@@ -136,7 +138,7 @@ export default function EditEventScreen() {
 
           {/* Time */}
           <View>
-            <Text style={styles.label}>Time</Text>
+            <Text style={styles.label}>{t.event.time}</Text>
             <TouchableOpacity style={styles.field} onPress={() => setShowTime(true)}>
               <Text style={styles.fieldValue}>{timeStr}</Text>
             </TouchableOpacity>
@@ -160,7 +162,7 @@ export default function EditEventScreen() {
           />
 
           <Input
-            label="Price (€) — leave 0 for free"
+            label={t.event.priceFree}
             value={price}
             onChangeText={setPrice}
             placeholder="0"
@@ -170,8 +172,8 @@ export default function EditEventScreen() {
           {/* Recurring toggle */}
           <TouchableOpacity style={styles.recurringRow} onPress={() => setIsRecurring(r => !r)} activeOpacity={0.7}>
             <View style={styles.recurringText}>
-              <Text style={styles.recurringTitle}>Repeat every week</Text>
-              <Text style={styles.recurringSub}>Same day, time and venue each week</Text>
+              <Text style={styles.recurringTitle}>{t.event.repeatWeekly}</Text>
+              <Text style={styles.recurringSub}>{t.event.repeatSub}</Text>
             </View>
             <View style={[styles.toggle, isRecurring && styles.toggleOn]}>
               <View style={[styles.toggleThumb, isRecurring && styles.toggleThumbOn]} />
@@ -181,10 +183,10 @@ export default function EditEventScreen() {
       </ScrollView>
 
       <View style={[styles.footer, { paddingBottom: insets.bottom + 16 }]}>
-        <Button label="Save changes" onPress={handleSave} loading={loading} variant="black" />
+        <Button label={t.club.saveChanges} onPress={handleSave} loading={loading} variant="black" />
       </View>
 
-      <Toast visible={toast} title="Saved!" subtitle="Your event has been updated." onHide={() => setToast(false)} />
+      <Toast visible={toast} title={t.event.savedTitle} subtitle={t.event.savedSub} onHide={() => setToast(false)} />
     </KeyboardAvoidingView>
   );
 }

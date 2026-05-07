@@ -9,6 +9,7 @@ import Svg, { Path } from 'react-native-svg';
 import { Button } from '@/components/ui/Button';
 import { WMark } from '@/components/ui/WMark';
 import { Fonts } from '@/constants/fonts';
+import { useTranslations } from '@/context/LanguageContext';
 
 const { width: W, height: H } = Dimensions.get('window');
 
@@ -36,6 +37,7 @@ function SmallW({ width, height }: { width: number; height: number }) {
 export default function SplashScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
+  const { t } = useTranslations();
 
   const contentOpacity = useSharedValue(0);
   const contentY = useSharedValue(20);
@@ -108,14 +110,14 @@ export default function SplashScreen() {
           </View>
           <Text style={styles.logoText}>oeva</Text>
         </View>
-        <Text style={styles.tagline}>Your people are already{'\n'}out. Join them.</Text>
+        <Text style={styles.tagline}>{t.auth.splashTagline}</Text>
       </Animated.View>
 
       {/* Buttons */}
       <Animated.View style={[styles.buttons, { paddingBottom: insets.bottom + 16 }, contentStyle]}>
-        <Button label="Get started" onPress={() => router.push('/(auth)/register')} variant="black" textStyle={{ color: '#FFFFFF' }} />
+        <Button label={t.auth.getStarted} onPress={() => router.push('/(auth)/register')} variant="black" textStyle={{ color: '#FFFFFF' }} />
         <Button
-          label="I have an account"
+          label={t.auth.haveAccount}
           onPress={() => router.push('/(auth)/login')}
           variant="ghost"
           textStyle={{ color: '#0A0A09', textDecorationLine: 'underline', fontSize: 18, fontWeight: '600' }}

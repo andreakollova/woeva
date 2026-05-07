@@ -27,6 +27,8 @@ import { BackButton } from '@/components/ui/BackButton';
 import { Button } from '@/components/ui/Button';
 import { Input } from '@/components/ui/Input';
 import { generateCreatorInvoice } from '@/lib/generateInvoice';
+import { notify } from '@/lib/notify';
+import { useTranslations } from '@/context/LanguageContext';
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 const WOEVA_FEE = 0.05;
@@ -93,7 +95,7 @@ function EventChart({ events, range, width, getValue, color, gradId }: {
     for (let i = 6; i >= 0; i--) {
       const d = new Date(now); d.setDate(d.getDate() - i);
       const key = d.toISOString().slice(0, 10);
-      const label = d.toLocaleDateString('sk-SK', { weekday: 'short' });
+      const label = d.toLocaleDateString('en-US', { weekday: 'short' });
       const val = events.filter(e => e.date === key).reduce((s, e) => s + getValue(e), 0);
       buckets.push({ label, val });
     }
@@ -107,7 +109,7 @@ function EventChart({ events, range, width, getValue, color, gradId }: {
   } else {
     for (let i = 5; i >= 0; i--) {
       const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
-      const label = d.toLocaleDateString('sk-SK', { month: 'short' });
+      const label = d.toLocaleDateString('en-US', { month: 'short' });
       const val = events.filter(e => {
         const ed = new Date(e.date);
         return ed.getFullYear() === d.getFullYear() && ed.getMonth() === d.getMonth();
@@ -160,7 +162,8 @@ function EventChart({ events, range, width, getValue, color, gradId }: {
 export default function DashboardScreen() {
   const insets = useSafeAreaInsets();
   const router = useRouter();
-  const { user } = useAuth();
+  const { user, profile } = useAuth();
+  const { t } = useTranslations();
   const { width: screenWidth } = useWindowDimensions();
   const chartWidth = screenWidth - 40;
 
@@ -253,9 +256,9 @@ export default function DashboardScreen() {
   async function removeAdmin(userId: string) {
     const targetClub = selectedClub ?? clubs[0];
     if (!targetClub || userId === user?.id) return;
-    Alert.alert('Remove admin', 'Remove this person as admin?', [
-      { text: 'Cancel', style: 'cancel' },
-      { text: 'Remove', style: 'destructive', onPress: async () => {
+    Alert.alert(t.club.removeAdmin, t.club.removeAdminMsg, [
+      { text: t.common.cancel, style: 'cancel' },
+      { text: t.club.remove, style: 'destructive', onPress: async () => {
         await supabase.from('club_members')
           .update({ role: 'member' })
           .eq('club_id', targetClub.id).eq('user_id', userId);
@@ -267,8 +270,8 @@ export default function DashboardScreen() {
   async function searchInvite(q: string) {
     setInviteQuery(q);
     if (q.trim().length < 2) { setInviteResults([]); return; }
-    const { data } = await supabase.from('profiles').select('id, name, avatar_url')
-      .ilike('name', `%${q.trim()}%`).limit(6);
+    const { data } = await supabase.from('profiles').select('id, name, avatar_url, email')
+      .ilike('email', `%${q.trim()}%`).limit(6);
     setInviteResults((data ?? []) as any[]);
   }
 
@@ -277,12 +280,12 @@ export default function DashboardScreen() {
     if (!targetClub) return;
 
     Alert.alert(
-      `Add ${profileName} as admin?`,
-      `They will be able to:\n• Edit club name, photos, description\n• Create and manage events\n• Post in club chat\n\nThey will NOT be able to:\n• Access billing or payouts\n• Delete the club\n\nThey'll need to confirm the invite in their notifications.`,
+      t.club.confirmInvite(profileName),
+      t.club.confirmInviteMsg,
       [
-        { text: 'Cancel', style: 'cancel' },
+        { text: t.common.cancel, style: 'cancel' },
         {
-          text: 'Send invite',
+          text: t.club.sendInvite,
           onPress: async () => {
             setInvitingAdmin(true);
             // Insert as pending — they must accept
@@ -295,11 +298,18 @@ export default function DashboardScreen() {
               body: `You've been invited to co-manage ${targetClub.name}. Tap to accept or decline.`,
               data: { club_id: targetClub.id, action: 'admin_invite' },
             });
+            notify.adminInvite({
+              inviteeId: profileId,
+              inviteeName: profileName,
+              inviterName: profile?.name ?? user?.email ?? 'Someone',
+              clubName: targetClub.name,
+              clubId: targetClub.id,
+            });
             setInvitingAdmin(false);
             setShowInviteAdmin(false);
             setInviteQuery('');
             setInviteResults([]);
-            Alert.alert('Invite sent', `${profileName} will receive a notification to accept.`);
+            Alert.alert(t.club.inviteSent, t.club.inviteSentMsg(profileName));
           },
         },
       ]
@@ -326,7 +336,7 @@ export default function DashboardScreen() {
       .select('id, user_id, created_at, profile:profiles(id, name, avatar_url)')
       .eq('club_id', clubId).eq('status', 'approved')
       .order('created_at', { ascending: false });
-    setMembers((membersData ?? []) as Member[]);
+    setMembers((membersData ?? []) as unknown as Member[]);
   }
 
   async function load() {
@@ -435,7 +445,7 @@ export default function DashboardScreen() {
       });
       if (res.data?.already_connected) {
         setStripeAccount(s => s ? { ...s, onboarding_complete: true } : s);
-        Alert.alert('Already connected', 'Your Stripe account is already set up.');
+        Alert.alert(t.dashboard.alreadyConnected, t.dashboard.alreadyConnectedMsg);
         setConnectingStripe(false);
         return;
       }
@@ -444,7 +454,7 @@ export default function DashboardScreen() {
         await checkStripeStatus();
       }
     } catch (e) {
-      Alert.alert('Error', 'Could not connect to Stripe. Try again.');
+      Alert.alert(t.common.error, t.dashboard.stripeError);
     }
     setConnectingStripe(false);
   }
@@ -518,7 +528,7 @@ export default function DashboardScreen() {
 
   async function downloadInvoice() {
     if (!billing) return;
-    const month = new Date().toLocaleDateString('sk-SK', { month: 'long', year: 'numeric' });
+    const month = new Date().toLocaleDateString('en-US', { month: 'long', year: 'numeric' });
     const invoiceNum = `W-${new Date().getFullYear()}-${String(new Date().getMonth() + 1).padStart(2, '0')}`;
     const paidEvents = events.filter(e => !e.is_free && e.paid_count > 0);
     const html = generateCreatorInvoice(billing, paidEvents, month, invoiceNum);
@@ -529,7 +539,7 @@ export default function DashboardScreen() {
       const { uri } = await Print.printToFileAsync({ html, base64: false });
       await Sharing.shareAsync(uri, { mimeType: 'application/pdf', dialogTitle: `Invoice ${invoiceNum}` });
     } catch {
-      Alert.alert('PDF unavailable', 'Install expo-print and expo-sharing to download invoices:\nnpx expo install expo-print expo-sharing');
+      Alert.alert(t.dashboard.pdfUnavailable, 'Install expo-print and expo-sharing to download invoices:\nnpx expo install expo-print expo-sharing');
     }
   }
 
@@ -560,7 +570,7 @@ export default function DashboardScreen() {
   if (loading) {
     return (
       <View style={[s.container, { paddingTop: insets.top }]}>
-        <View style={s.topBar}><BackButton /><Text style={s.pageTitle}>Dashboard</Text><View style={{ width: 36 }} /></View>
+        <View style={s.topBar}><BackButton /><Text style={s.pageTitle}>{t.dashboard.dashboard}</Text><View style={{ width: 36 }} /></View>
         <ActivityIndicator style={{ marginTop: 80 }} color={Colors.black} />
       </View>
     );
@@ -573,28 +583,28 @@ export default function DashboardScreen() {
         <View style={s.modalOverlay}>
           <ScrollView style={s.billingSheet} keyboardShouldPersistTaps="handled" contentContainerStyle={{ paddingBottom: 40 }}>
             <View style={s.billingSheetHandle} />
-            <Text style={s.billingSheetTitle}>Fakturačné údaje</Text>
-            <Text style={s.billingSheetSub}>Tieto údaje sa zobrazia na tvojich faktúrach. Vyžadované pred pripojením Stripe.</Text>
+            <Text style={s.billingSheetTitle}>{t.dashboard.billingDetails}</Text>
+            <Text style={s.billingSheetSub}>{t.dashboard.billingDetailsSub}</Text>
 
             <View style={s.billingForm}>
-              <Input label="Názov firmy / meno" value={bCompany} onChangeText={setBCompany} placeholder="Moje s.r.o." />
-              <Input label="IČO" value={bIco} onChangeText={setBIco} placeholder="12345678" />
-              <Input label="DIČ (nepovinné)" value={bDic} onChangeText={setBDic} placeholder="SK2012345678" />
-              <Input label="Adresa" value={bAddress} onChangeText={setBAddress} placeholder="Hlavná 1" />
+              <Input label={t.dashboard.companyName} value={bCompany} onChangeText={setBCompany} placeholder="My Company Ltd." />
+              <Input label={t.dashboard.companyId} value={bIco} onChangeText={setBIco} placeholder="12345678" />
+              <Input label={t.dashboard.taxId} value={bDic} onChangeText={setBDic} placeholder="SK2012345678" />
+              <Input label={t.dashboard.streetAddress} value={bAddress} onChangeText={setBAddress} placeholder="123 Main Street" />
               <View style={s.billingRow}>
                 <View style={{ flex: 1 }}>
-                  <Input label="Mesto" value={bCity} onChangeText={setBCity} placeholder="Bratislava" />
+                  <Input label={t.dashboard.cityLabel} value={bCity} onChangeText={setBCity} placeholder="Bratislava" />
                 </View>
                 <View style={{ flex: 1 }}>
-                  <Input label="Krajina" value={bCountry} onChangeText={setBCountry} placeholder="Slovakia" />
+                  <Input label={t.dashboard.country} value={bCountry} onChangeText={setBCountry} placeholder="Slovakia" />
                 </View>
               </View>
             </View>
 
             <View style={{ gap: 10, marginTop: 8 }}>
-              <Button label="Uložiť" onPress={saveBilling} loading={savingBilling}
+              <Button label={t.dashboard.save} onPress={saveBilling} loading={savingBilling}
                 disabled={!bCompany.trim() || !bIco.trim() || !bAddress.trim() || !bCity.trim()} variant="black" />
-              <Button label="Zrušiť" onPress={() => setShowBillingModal(false)} variant="ghost" />
+              <Button label={t.dashboard.cancelLabel} onPress={() => setShowBillingModal(false)} variant="ghost" />
             </View>
           </ScrollView>
         </View>
@@ -616,7 +626,7 @@ export default function DashboardScreen() {
               </TouchableOpacity>
             : <BackButton />
           }
-          <Text style={s.pageTitle}>{activeTab === 'scan' ? 'Scan QR' : 'Dashboard'}</Text>
+          <Text style={s.pageTitle}>{activeTab === 'scan' ? t.dashboard.scanQR : t.dashboard.dashboard}</Text>
           <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
             {clubs.some(c => c.creator_id === user?.id) && activeTab !== 'scan' && (
               <TouchableOpacity style={s.bellBtn} onPress={openClubSettings}>
@@ -641,7 +651,7 @@ export default function DashboardScreen() {
             <TouchableOpacity
               style={[s.viewFilterChip, !selectedClubId && s.viewFilterChipActive]}
               onPress={() => setSelectedClubId(null)} activeOpacity={0.7}>
-              <Text style={[s.viewFilterText, !selectedClubId && s.viewFilterTextActive]}>All</Text>
+              <Text style={[s.viewFilterText, !selectedClubId && s.viewFilterTextActive]}>{t.home.all}</Text>
             </TouchableOpacity>
             {clubs.map(c => (
               <TouchableOpacity key={c.id}
@@ -659,10 +669,10 @@ export default function DashboardScreen() {
             {/* Quick overview strip */}
             <View style={s.overviewStrip}>
               {[
-                { label: 'Events', val: viewEvents.length },
-                { label: 'Attendees', val: viewEvents.reduce((sum, e) => sum + e.going_count, 0) },
-                { label: 'Members', val: members.length },
-                { label: 'Revenue', val: fmt(totalGross) },
+                { label: t.dashboard.events, val: viewEvents.length },
+                { label: t.dashboard.attendees, val: viewEvents.reduce((sum, e) => sum + e.going_count, 0) },
+                { label: t.dashboard.members, val: members.length },
+                { label: t.dashboard.revenue, val: fmt(totalGross) },
               ].map(item => (
                 <View key={item.label} style={s.overviewItem}>
                   <Text style={s.overviewVal}>{item.val}</Text>
@@ -677,7 +687,7 @@ export default function DashboardScreen() {
               if (!displayClub) return null;
               const isOwner = displayClub.creator_id === user?.id;
               return (
-                <TouchableOpacity style={s.clubCard} onPress={() => router.push(`/club/${displayClub.id}` as any)} activeOpacity={0.85}>
+                <View style={s.clubCard}>
                   {displayClub.cover_url
                     ? <Image source={{ uri: displayClub.cover_url }} style={StyleSheet.absoluteFill as any} resizeMode="cover" />
                     : displayClub.logo_url
@@ -694,29 +704,32 @@ export default function DashboardScreen() {
                     <Rect x="0" y="0" width="100%" height="100%" fill="url(#g1)" />
                   </Svg>
                   <View style={s.clubCardContent}>
-                    <Text style={s.clubCardLabel}>{isOwner ? 'Your club' : 'Club admin'}</Text>
+                    <Text style={s.clubCardLabel}>{isOwner ? t.club.myClub : t.club.adminClub}</Text>
                     <Text style={s.clubCardName}>{displayClub.name}</Text>
+                    <View style={s.clubCardActions}>
+                      <TouchableOpacity style={s.clubCardActionBtn} onPress={() => router.push(`/club/${displayClub.id}` as any)} activeOpacity={0.8}>
+                        <Text style={s.clubCardActionText}>{t.club.viewClub}</Text>
+                      </TouchableOpacity>
+                      <TouchableOpacity style={[s.clubCardActionBtn, s.clubCardActionBtnEdit]} onPress={() => router.push(`/club/${displayClub.id}/edit` as any)} activeOpacity={0.8}>
+                        <Text style={[s.clubCardActionText, s.clubCardActionTextEdit]}>{t.common.edit}</Text>
+                      </TouchableOpacity>
+                    </View>
                   </View>
-                  {isOwner && (
-                    <TouchableOpacity style={s.clubEditBtn} onPress={e => { e.stopPropagation(); router.push(`/club/${displayClub.id}/edit` as any); }} activeOpacity={0.8}>
-                      <Text style={s.clubEditBtnText}>Edit</Text>
-                    </TouchableOpacity>
-                  )}
-                </TouchableOpacity>
+                </View>
               );
             })()}
 
             {/* Members overview */}
             {members.length > 0 && (
               <>
-                <Text style={s.sectionTitle}>Members</Text>
+                <Text style={s.sectionTitle}>{t.dashboard.members}</Text>
                 <View style={s.statsGrid}>
                   <View style={[s.statCard, s.statCardLarge]}>
                     <Text style={s.statNumLarge}>{members.length}</Text>
-                    <Text style={s.statLabel}>Total</Text>
+                    <Text style={s.statLabel}>{t.dashboard.total}</Text>
                   </View>
                   <View style={s.statsSmall}>
-                    {[['7 days', new7d], ['30 days', new30d], ['1 year', new1y]].map(([label, val]) => (
+                    {[[t.dashboard.new7days, new7d], [t.dashboard.new30days, new30d], [t.dashboard.new1year, new1y]].map(([label, val]) => (
                       <View key={label as string} style={s.statCardSmall}>
                         <Text style={s.statLabel}>{label}</Text>
                         <Text style={s.statNumSmall}>+{val}</Text>
@@ -730,13 +743,13 @@ export default function DashboardScreen() {
             {/* Earnings overview */}
             {totalGross > 0 && (
               <>
-                <Text style={[s.sectionTitle, { marginTop: 24 }]}>Earnings</Text>
+                <Text style={[s.sectionTitle, { marginTop: 24 }]}>{t.dashboard.earnings}</Text>
                 <View style={s.earningsRow}>
-                  {[['This week', weekGross, weekNet], ['This month', monthGross, monthNet], ['All time', totalGross, totalNet]].map(([label, gross, net]) => (
+                  {[[t.dashboard.thisWeek, weekGross, weekNet], [t.dashboard.thisMonth, monthGross, monthNet], [t.dashboard.allTime, totalGross, totalNet]].map(([label, gross, net]) => (
                     <View key={label as string} style={s.earningsCard}>
                       <Text style={s.earningsLabel}>{label}</Text>
                       <Text style={s.earningsGross}>{fmt(gross as number)}</Text>
-                      <Text style={s.earningsNet}>net {fmt(net as number)}</Text>
+                      <Text style={s.earningsNet}>{t.dashboard.net(fmt(net as number))}</Text>
                     </View>
                   ))}
                 </View>
@@ -746,9 +759,9 @@ export default function DashboardScreen() {
             {/* Empty state */}
             {viewEvents.length === 0 && (
               <View style={s.emptyBox}>
-                <Text style={s.emptyTitle}>No events yet</Text>
+                <Text style={s.emptyTitle}>{t.dashboard.noEvents}</Text>
                 <Text style={s.emptySub}>
-                  {selectedClubId ? `No events for ${selectedClub?.name ?? 'this club'} yet.` : 'Create your first event to see it here.'}
+                  {selectedClubId ? t.dashboard.noEventsForClub(selectedClub?.name ?? '') : t.dashboard.createFirst}
                 </Text>
               </View>
             )}
@@ -756,7 +769,7 @@ export default function DashboardScreen() {
             {/* Upcoming events */}
             {upcomingEvents.length > 0 && (
               <>
-                <Text style={[s.sectionTitle, { marginTop: 12 }]}>Upcoming events</Text>
+                <Text style={[s.sectionTitle, { marginTop: 12 }]}>{t.dashboard.upcomingEvents}</Text>
                 <View style={{ gap: 10 }}>
                   {upcomingEvents.slice(0, 5).map(e => (
                     <TouchableOpacity key={e.id} style={s.upcomingCard}
@@ -776,7 +789,7 @@ export default function DashboardScreen() {
                         <View style={s.upcomingMeta}>
                           <View style={s.upcomingAttendees}>
                             <Text style={s.upcomingAttendeesNum}>{e.going_count}</Text>
-                            <Text style={s.upcomingAttendeesLabel}> going</Text>
+                            <Text style={s.upcomingAttendeesLabel}> {t.dashboard.going}</Text>
                           </View>
                           {!e.is_free && e.gross > 0 && <Text style={s.upcomingRevenue}>{fmt(e.gross)}</Text>}
                         </View>
@@ -785,12 +798,12 @@ export default function DashboardScreen() {
                         <TouchableOpacity style={s.upcomingActionBtn}
                           onPress={ev => { ev.stopPropagation(); router.push(`/event/${e.id}/edit` as any); }}
                           hitSlop={{ top: 4, bottom: 4, left: 4, right: 4 }}>
-                          <Text style={s.upcomingActionEdit}>Edit</Text>
+                          <Text style={s.upcomingActionEdit}>{t.dashboard.editBtn}</Text>
                         </TouchableOpacity>
                         <TouchableOpacity style={[s.upcomingActionBtn, s.upcomingActionPeopleBtn]}
                           onPress={ev => { ev.stopPropagation(); openAttendees(e); }}
                           hitSlop={{ top: 4, bottom: 4, left: 4, right: 4 }}>
-                          <Text style={s.upcomingActionPeople}>People</Text>
+                          <Text style={s.upcomingActionPeople}>{t.dashboard.peopleBtn}</Text>
                         </TouchableOpacity>
                       </View>
                     </TouchableOpacity>
@@ -806,9 +819,9 @@ export default function DashboardScreen() {
           <>
             <View style={s.segment}>
               {([
-                { key: 'upcoming', label: `Upcoming (${upcomingEvents.length})` },
-                { key: 'past', label: `Past (${pastEvents.length})` },
-                { key: 'cancelled', label: `Cancelled (${cancelledEvents.length})` },
+                { key: 'upcoming', label: t.dashboard.upcomingCount(upcomingEvents.length) },
+                { key: 'past', label: t.dashboard.pastCount(pastEvents.length) },
+                { key: 'cancelled', label: t.dashboard.cancelledCount(cancelledEvents.length) },
               ] as const).map(f => (
                 <TouchableOpacity key={f.key} style={[s.segmentItem, eventsFilter === f.key && s.segmentItemActive]}
                   onPress={() => setEventsFilter(f.key)} activeOpacity={0.8}>
@@ -819,9 +832,9 @@ export default function DashboardScreen() {
 
             {displayedEvents.length === 0 ? (
               <View style={s.emptyBox}>
-                <Text style={s.emptyTitle}>No {eventsFilter} events</Text>
+                <Text style={s.emptyTitle}>{t.dashboard.noEvents}</Text>
                 <Text style={s.emptySub}>
-                  {eventsFilter === 'upcoming' ? 'Create an event to see it here.' : eventsFilter === 'past' ? 'Your past events will appear here.' : 'Cancelled events will appear here.'}
+                  {eventsFilter === 'upcoming' ? t.dashboard.createEventHere : eventsFilter === 'past' ? t.dashboard.pastEventsHere : t.dashboard.cancelledEventsHere}
                 </Text>
               </View>
             ) : (
@@ -839,19 +852,19 @@ export default function DashboardScreen() {
                       <View style={{ flex: 1 }}>
                         <Text style={s.listName} numberOfLines={1}>{e.title}</Text>
                         <Text style={s.listSub}>{dateStr}</Text>
-                        {!e.is_free && <Text style={s.listRevenue}>{e.paid_count} tickets · {fmt(e.gross)} gross</Text>}
+                        {!e.is_free && <Text style={s.listRevenue}>{t.dashboard.ticketsGross(e.paid_count, fmt(e.gross))}</Text>}
                       </View>
-                      {e.status === 'cancelled' && <View style={s.cancelledBadge}><Text style={s.cancelledBadgeText}>Cancelled</Text></View>}
+                      {e.status === 'cancelled' && <View style={s.cancelledBadge}><Text style={s.cancelledBadgeText}>{t.dashboard.cancelled}</Text></View>}
                       {!e.is_free && e.gross > 0 && e.status !== 'cancelled' && (
                         <View style={s.goingBadge}>
                           <Text style={s.goingNum}>{e.going_count}</Text>
-                          <Text style={s.goingLabel}>going</Text>
+                          <Text style={s.goingLabel}>{t.dashboard.going}</Text>
                         </View>
                       )}
                       {(e.is_free || e.gross === 0) && e.status !== 'cancelled' && (
                         <View style={s.goingBadge}>
                           <Text style={s.goingNum}>{e.going_count}</Text>
-                          <Text style={s.goingLabel}>going</Text>
+                          <Text style={s.goingLabel}>{t.dashboard.going}</Text>
                         </View>
                       )}
                     </TouchableOpacity>
@@ -871,28 +884,28 @@ export default function DashboardScreen() {
                 <Path d="M5 19h14" stroke={Colors.black} strokeWidth={2} strokeLinecap="round" />
               </Svg>
             </View>
-            <Text style={s.payoutsIntroTitle}>Get paid for your events</Text>
+            <Text style={s.payoutsIntroTitle}>{t.dashboard.getPaidTitle}</Text>
             <Text style={s.payoutsIntroBody}>
-              To create paid events and receive payouts, you'll need two things:
+              {t.dashboard.getPaidBody}
             </Text>
             <View style={s.payoutsIntroSteps}>
               <View style={s.payoutsIntroStep}>
                 <View style={s.payoutsIntroStepNum}><Text style={s.payoutsIntroStepNumText}>1</Text></View>
                 <View style={{ flex: 1 }}>
-                  <Text style={s.payoutsIntroStepTitle}>Billing info</Text>
-                  <Text style={s.payoutsIntroStepSub}>Your company or trade name, IČO, address — required for invoices.</Text>
+                  <Text style={s.payoutsIntroStepTitle}>{t.dashboard.billingInfoTitle}</Text>
+                  <Text style={s.payoutsIntroStepSub}>{t.dashboard.billingInfoSub}</Text>
                 </View>
               </View>
               <View style={s.payoutsIntroStep}>
                 <View style={s.payoutsIntroStepNum}><Text style={s.payoutsIntroStepNumText}>2</Text></View>
                 <View style={{ flex: 1 }}>
-                  <Text style={s.payoutsIntroStepTitle}>Stripe Connect</Text>
-                  <Text style={s.payoutsIntroStepSub}>Payments go directly to your bank account. Woeva charges 5% platform fee. Payouts every Monday.</Text>
+                  <Text style={s.payoutsIntroStepTitle}>{t.dashboard.stripeConnectTitle}</Text>
+                  <Text style={s.payoutsIntroStepSub}>{t.dashboard.stripeConnectSub}</Text>
                 </View>
               </View>
             </View>
             <TouchableOpacity style={s.payoutsIntroBtn} onPress={() => setShowPayoutsSetup(true)} activeOpacity={0.85}>
-              <Text style={s.payoutsIntroBtnText}>Continue →</Text>
+              <Text style={s.payoutsIntroBtnText}>{t.dashboard.continueSetup}</Text>
             </TouchableOpacity>
           </View>
         )}
@@ -905,9 +918,9 @@ export default function DashboardScreen() {
                 <View style={[s.payoutStepDot, billing && s.payoutStepDotDone]}>
                   {billing ? <Text style={s.payoutStepCheck}>✓</Text> : <Text style={s.payoutStepNum}>1</Text>}
                 </View>
-                <Text style={s.payoutStepTitle}>Fakturačné údaje</Text>
+                <Text style={s.payoutStepTitle}>{t.dashboard.fakturacneUdaje}</Text>
                 <TouchableOpacity onPress={() => setShowBillingModal(true)}>
-                  <Text style={s.payoutStepEdit}>{billing ? 'Upraviť' : 'Nastaviť'}</Text>
+                  <Text style={s.payoutStepEdit}>{billing ? t.dashboard.upravit : t.dashboard.nastavit}</Text>
                 </TouchableOpacity>
               </View>
               {billing && (
@@ -930,23 +943,23 @@ export default function DashboardScreen() {
                 </View>
                 <Text style={s.payoutStepTitle}>Stripe Connect</Text>
                 {stripeAccount?.onboarding_complete && (
-                  <View style={s.connectedPill}><Text style={s.connectedPillText}>Connected</Text></View>
+                  <View style={s.connectedPill}><Text style={s.connectedPillText}>{t.dashboard.connected}</Text></View>
                 )}
               </View>
               {!stripeAccount?.onboarding_complete && (
                 <View style={{ gap: 10, marginTop: 12 }}>
                   <Text style={s.stripeInfo}>
-                    Platby od účastníkov idú priamo na tvoj bankový účet. Woeva si účtuje {PLATFORM_FEE_PCT}% platformový poplatok (zahŕňa Stripe poplatky). Výplaty prebiehajú automaticky každý pondelok.
+                    {t.dashboard.stripeInfo(PLATFORM_FEE_PCT)}
                   </Text>
                   <Button
-                    label={connectingStripe ? 'Otvára sa...' : 'Pripojiť Stripe'}
+                    label={connectingStripe ? t.dashboard.opening : t.dashboard.connectStripe}
                     onPress={connectStripe}
                     loading={connectingStripe}
                     disabled={!billing || connectingStripe}
                     variant="black"
                   />
                   {stripeAccount && (
-                    <Button label={checkingStatus ? 'Kontrola...' : 'Skontrolovať stav'} onPress={checkStripeStatus}
+                    <Button label={checkingStatus ? t.dashboard.checking : t.dashboard.checkStatus} onPress={checkStripeStatus}
                       loading={checkingStatus} variant="ghost" />
                   )}
                 </View>
@@ -955,7 +968,7 @@ export default function DashboardScreen() {
                 <View style={s.stripeStatusRow}>
                   <View style={[s.stripeStatusDot, { backgroundColor: stripeAccount.payouts_enabled ? Colors.lime : '#FF9500' }]} />
                   <Text style={s.stripeStatusText}>
-                    {stripeAccount.payouts_enabled ? 'Výplaty aktívne · každý pondelok' : 'Výplaty sa aktivujú po overení'}
+                    {stripeAccount.payouts_enabled ? t.dashboard.payoutsActive : t.dashboard.payoutsPending}
                   </Text>
                 </View>
               )}
@@ -964,20 +977,20 @@ export default function DashboardScreen() {
             {/* Earnings summary */}
             {stripeAccount?.onboarding_complete && (
               <>
-                <Text style={s.sectionTitle}>Zárobky</Text>
+                <Text style={s.sectionTitle}>{t.dashboard.earnings}</Text>
                 <View style={s.earningsGrid}>
                   {[
-                    { label: 'Tento týždeň', gross: weekGross, net: weekNet },
-                    { label: 'Tento mesiac', gross: monthGross, net: monthNet },
-                    { label: 'Celkovo', gross: totalGross, net: totalNet },
+                    { label: t.dashboard.thisWeek, gross: weekGross, net: weekNet },
+                    { label: t.dashboard.thisMonth, gross: monthGross, net: monthNet },
+                    { label: t.dashboard.allTime, gross: totalGross, net: totalNet },
                   ].map(item => (
                     <View key={item.label} style={s.earningsGridCard}>
                       <Text style={s.earningsGridLabel}>{item.label}</Text>
                       <Text style={s.earningsGridGross}>{fmt(item.gross)}</Text>
-                      <Text style={s.earningsGridSub}>brutto</Text>
+                      <Text style={s.earningsGridSub}>{t.dashboard.gross}</Text>
                       <View style={s.earningsDivider} />
                       <Text style={s.earningsGridNet}>{fmt(item.net)}</Text>
-                      <Text style={s.earningsGridSub}>netto</Text>
+                      <Text style={s.earningsGridSub}>{t.dashboard.netto}</Text>
                     </View>
                   ))}
                 </View>
@@ -985,7 +998,7 @@ export default function DashboardScreen() {
                 {/* Per-event breakdown */}
                 {events.filter(e => !e.is_free && e.paid_count > 0).length > 0 && (
                   <>
-                    <Text style={[s.sectionTitle, { marginTop: 24 }]}>Per event</Text>
+                    <Text style={[s.sectionTitle, { marginTop: 24 }]}>{t.dashboard.perEvent}</Text>
                     <View style={s.listCard}>
                       {events.filter(e => !e.is_free && e.paid_count > 0).map((e, i, arr) => (
                         <View key={e.id} style={[s.eventBreakdownRow, i < arr.length - 1 && s.listRowBorder]}>
@@ -995,7 +1008,7 @@ export default function DashboardScreen() {
                           </View>
                           <View style={{ alignItems: 'flex-end' }}>
                             <Text style={s.breakdownGross}>{fmt(e.gross)}</Text>
-                            <Text style={s.breakdownNet}>{fmt(e.net)} netto</Text>
+                            <Text style={s.breakdownNet}>{fmt(e.net)} {t.dashboard.netto}</Text>
                           </View>
                         </View>
                       ))}
@@ -1006,17 +1019,17 @@ export default function DashboardScreen() {
                 {/* Payout history */}
                 {payouts.length > 0 && (
                   <>
-                    <Text style={[s.sectionTitle, { marginTop: 24 }]}>História výplat</Text>
+                    <Text style={[s.sectionTitle, { marginTop: 24 }]}>{t.dashboard.payoutHistory}</Text>
                     <View style={s.listCard}>
                       {payouts.map((p, i) => {
-                        const arrival = new Date(p.arrival_date).toLocaleDateString('sk-SK', { day: 'numeric', month: 'short', year: 'numeric' });
+                        const arrival = new Date(p.arrival_date).toLocaleDateString('en-US', { day: 'numeric', month: 'short', year: 'numeric' });
                         const statusColor = p.status === 'paid' ? Colors.lime : p.status === 'in_transit' ? '#FF9500' : Colors.gray;
                         return (
                           <View key={p.id} style={[s.listRow, i < payouts.length - 1 && s.listRowBorder]}>
                             <View style={[s.payoutStatusDot, { backgroundColor: statusColor }]} />
                             <View style={{ flex: 1 }}>
                               <Text style={s.listName}>{fmt(p.amount)}</Text>
-                              <Text style={s.listSub}>{p.status === 'paid' ? 'Doručená' : p.status === 'in_transit' ? 'Na ceste' : 'Čaká'} · {arrival}</Text>
+                              <Text style={s.listSub}>{p.status === 'paid' ? t.dashboard.payoutDelivered : p.status === 'in_transit' ? t.dashboard.payoutInTransit : t.dashboard.payoutPending} · {arrival}</Text>
                             </View>
                           </View>
                         );
@@ -1030,7 +1043,7 @@ export default function DashboardScreen() {
                   <Svg width={16} height={16} viewBox="0 0 24 24" fill="none">
                     <Path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4M7 10l5 5 5-5M12 15V3" stroke={Colors.black} strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" />
                   </Svg>
-                  <Text style={s.invoiceBtnText}>Stiahnuť faktúru (PDF)</Text>
+                  <Text style={s.invoiceBtnText}>{t.dashboard.downloadInvoice}</Text>
                 </TouchableOpacity>
               </>
             )}
@@ -1050,7 +1063,7 @@ export default function DashboardScreen() {
             <>
               {/* Range selector */}
               <View style={s.segment}>
-                {([['week', 'This week'], ['month', 'This month'], ['all', 'All time']] as const).map(([key, label]) => (
+                {([['week', t.dashboard.thisWeek], ['month', t.dashboard.thisMonth], ['all', t.dashboard.allTime]] as const).map(([key, label]) => (
                   <TouchableOpacity key={key} style={[s.segmentItem, statsRange === key && s.segmentItemActive]}
                     onPress={() => setStatsRange(key)} activeOpacity={0.8}>
                     <Text style={[s.segmentText, statsRange === key && s.segmentTextActive]}>{label}</Text>
@@ -1060,26 +1073,26 @@ export default function DashboardScreen() {
 
               {/* Attendance chart — primary */}
               <View style={s.chartCard}>
-                <Text style={s.chartTitle}>Attendance</Text>
+                <Text style={s.chartTitle}>{t.dashboard.attendance}</Text>
                 <EventChart events={viewEvents} range={statsRange} width={chartWidth - 32} getValue={e => e.going_count} color={Colors.black} gradId="attGrad" />
               </View>
 
               {/* Revenue chart — secondary, only if there's paid revenue */}
               {viewEvents.some(e => e.gross > 0) && (
                 <View style={[s.chartCard, { marginTop: 12 }]}>
-                  <Text style={s.chartTitle}>Revenue</Text>
+                  <Text style={s.chartTitle}>{t.dashboard.revenue}</Text>
                   <EventChart events={viewEvents} range={statsRange} width={chartWidth - 32} getValue={e => e.gross} color={Colors.lime} gradId="revGrad" />
                 </View>
               )}
 
               <View style={s.statsOverview}>
                 {[
-                  { label: 'Events', val: filtered.length },
-                  { label: 'Tickets sold', val: filtered.reduce((sum, e) => sum + e.paid_count, 0) },
-                  { label: 'Free events', val: filtered.filter(e => e.is_free).length },
-                  { label: 'Paid events', val: filtered.filter(e => !e.is_free).length },
-                  { label: 'Attendees', val: filtered.reduce((sum, e) => sum + e.going_count, 0) },
-                  { label: 'Club members', val: members.length },
+                  { label: t.dashboard.events, val: filtered.length },
+                  { label: t.dashboard.ticketsSold, val: filtered.reduce((sum, e) => sum + e.paid_count, 0) },
+                  { label: t.dashboard.freeEvents, val: filtered.filter(e => e.is_free).length },
+                  { label: t.dashboard.paidEvents, val: filtered.filter(e => !e.is_free).length },
+                  { label: t.dashboard.attendees, val: filtered.reduce((sum, e) => sum + e.going_count, 0) },
+                  { label: t.dashboard.clubMembers, val: members.length },
                 ].map(item => (
                   <View key={item.label} style={s.statsOverviewCard}>
                     <Text style={s.statsOverviewNum}>{item.val}</Text>
@@ -1090,22 +1103,22 @@ export default function DashboardScreen() {
 
               {fGross > 0 && (
                 <>
-                  <Text style={[s.sectionTitle, { marginTop: 24 }]}>Revenue</Text>
+                  <Text style={[s.sectionTitle, { marginTop: 24 }]}>{t.dashboard.revenue}</Text>
                   <View style={s.revenueCard}>
                     <View style={s.revenueRow}>
-                      <Text style={s.revenueLabel}>Gross revenue</Text>
+                      <Text style={s.revenueLabel}>{t.dashboard.grossRevenue}</Text>
                       <Text style={s.revenueVal}>{fmt(fGross)}</Text>
                     </View>
                     <View style={s.revenueRow}>
-                      <Text style={s.revenueLabel}>Stripe fees (est.)</Text>
+                      <Text style={s.revenueLabel}>{t.dashboard.stripeFees}</Text>
                       <Text style={[s.revenueVal, { color: Colors.gray }]}>- {fmt(fStripe)}</Text>
                     </View>
                     <View style={s.revenueRow}>
-                      <Text style={s.revenueLabel}>Woeva fee (5%)</Text>
+                      <Text style={s.revenueLabel}>{t.dashboard.woevaFee}</Text>
                       <Text style={[s.revenueVal, { color: Colors.gray }]}>- {fmt(fWoeva)}</Text>
                     </View>
                     <View style={[s.revenueRow, { borderTopWidth: 1.5, borderTopColor: Colors.black, marginTop: 8, paddingTop: 12 }]}>
-                      <Text style={[s.revenueLabel, { fontWeight: '800', fontFamily: Fonts.extrabold }]}>Net to you</Text>
+                      <Text style={[s.revenueLabel, { fontWeight: '800', fontFamily: Fonts.extrabold }]}>{t.dashboard.netToYou}</Text>
                       <Text style={[s.revenueVal, { fontWeight: '800', fontFamily: Fonts.extrabold }]}>{fmt(fNet)}</Text>
                     </View>
                   </View>
@@ -1114,14 +1127,14 @@ export default function DashboardScreen() {
 
               {filtered.length > 0 && (
                 <>
-                  <Text style={[s.sectionTitle, { marginTop: 24 }]}>Top events by attendance</Text>
+                  <Text style={[s.sectionTitle, { marginTop: 24 }]}>{t.dashboard.topByAttendance}</Text>
                   <View style={s.listCard}>
                     {[...filtered].sort((a, b) => b.going_count - a.going_count).slice(0, 5).map((e, i, arr) => (
                       <View key={e.id} style={[s.listRow, i < arr.length - 1 && s.listRowBorder]}>
                         <Text style={s.rankNum}>{i + 1}</Text>
                         <View style={{ flex: 1 }}>
                           <Text style={s.listName} numberOfLines={1}>{e.title}</Text>
-                          <Text style={s.listSub}>{e.going_count} attendees</Text>
+                          <Text style={s.listSub}>{t.dashboard.attendeesCount(e.going_count)}</Text>
                         </View>
                         {!e.is_free && <Text style={s.eventRevenue}>{fmt(e.gross)}</Text>}
                       </View>
@@ -1132,8 +1145,8 @@ export default function DashboardScreen() {
 
               {filtered.length === 0 && (
                 <View style={s.emptyBox}>
-                  <Text style={s.emptyTitle}>No data</Text>
-                  <Text style={s.emptySub}>No events in this period.</Text>
+                  <Text style={s.emptyTitle}>{t.dashboard.noData}</Text>
+                  <Text style={s.emptySub}>{t.dashboard.noPeriodEvents}</Text>
                 </View>
               )}
             </>
@@ -1146,10 +1159,10 @@ export default function DashboardScreen() {
         <View style={[StyleSheet.absoluteFill, s.scanContainer, { top: insets.top + 60, bottom: 80 + insets.bottom }]}>
           {!cameraPermission?.granted ? (
             <View style={s.scanPermBox}>
-              <Text style={s.scanPermTitle}>Camera access needed</Text>
-              <Text style={s.scanPermSub}>To scan attendee QR codes at the door.</Text>
+              <Text style={s.scanPermTitle}>{t.dashboard.cameraNeeded}</Text>
+              <Text style={s.scanPermSub}>{t.dashboard.cameraNeededSub}</Text>
               <TouchableOpacity style={s.scanPermBtn} onPress={requestCameraPermission}>
-                <Text style={s.scanPermBtnText}>Allow camera</Text>
+                <Text style={s.scanPermBtnText}>{t.dashboard.allowCamera}</Text>
               </TouchableOpacity>
             </View>
           ) : (
@@ -1166,7 +1179,7 @@ export default function DashboardScreen() {
                 <View style={s.scanCornerTL} /><View style={s.scanCornerTR} />
                 <View style={s.scanCornerBL} /><View style={s.scanCornerBR} />
               </View>
-              <Text style={s.scanHint}>Point at attendee's QR code</Text>
+              <Text style={s.scanHint}>{t.dashboard.pointCamera}</Text>
               {scannedTicket && (
                 <View style={s.scanResult}>
                   <View style={s.scanResultTop}>
@@ -1181,7 +1194,7 @@ export default function DashboardScreen() {
                       <Text style={s.scanResultName}>{scannedTicket.userName}</Text>
                       <Text style={s.scanResultEvent} numberOfLines={1}>{scannedTicket.eventTitle}</Text>
                       <Text style={[s.scanResultStatus, { color: scannedTicket.valid ? '#22C55E' : '#FF3B30' }]}>
-                        {scannedTicket.valid ? '✓  Valid ticket' : '✗  Not registered'}
+                        {scannedTicket.valid ? t.dashboard.validTicket : t.dashboard.notRegistered}
                       </Text>
                     </View>
                     <TouchableOpacity onPress={() => setScannedTicket(null)} style={s.scanResultClose}>
@@ -1195,7 +1208,7 @@ export default function DashboardScreen() {
                       activeOpacity={0.8}
                     >
                       <Text style={[s.scanCheckInBtnText, checkedIn[scannedTicket.eventId]?.has(scannedTicket.userId) && { color: Colors.black }]}>
-                        {checkedIn[scannedTicket.eventId]?.has(scannedTicket.userId) ? '✓ Checked in' : 'Confirm arrival'}
+                        {checkedIn[scannedTicket.eventId]?.has(scannedTicket.userId) ? t.dashboard.checkedIn : t.dashboard.confirmArrival}
                       </Text>
                     </TouchableOpacity>
                   )}
@@ -1211,24 +1224,24 @@ export default function DashboardScreen() {
         <TouchableOpacity style={s.modalOverlay} activeOpacity={1} onPress={() => setShowClubSettings(false)}>
           <View style={[s.attendeesSheet, { paddingBottom: insets.bottom + 24 }]}>
             <View style={s.billingSheetHandle} />
-            <Text style={s.billingSheetTitle}>Club settings</Text>
+            <Text style={s.billingSheetTitle}>{t.dashboard.clubSettings}</Text>
 
             {/* Edit club */}
             <View style={s.settingsSection}>
-              <Text style={s.settingsSectionTitle}>CLUB</Text>
+              <Text style={s.settingsSectionTitle}>{t.dashboard.clubSection}</Text>
               <TouchableOpacity style={s.settingsRow} onPress={() => {
                 setShowClubSettings(false);
                 const c = selectedClub ?? clubs[0];
                 if (c) router.push(`/club/${c.id}/edit` as any);
               }} activeOpacity={0.7}>
-                <Text style={s.settingsRowLabel}>Edit name, photos, description</Text>
+                <Text style={s.settingsRowLabel}>{t.dashboard.editClubDetails}</Text>
                 <Text style={s.settingsRowArrow}>›</Text>
               </TouchableOpacity>
             </View>
 
             {/* Admins */}
             <View style={s.settingsSection}>
-              <Text style={s.settingsSectionTitle}>ADMINS</Text>
+              <Text style={s.settingsSectionTitle}>{t.dashboard.admins.toUpperCase()}</Text>
               {clubAdmins.map(a => (
                 <View key={a.user_id} style={s.settingsAdminRow}>
                   <View style={s.attendeeAvatar}>
@@ -1237,25 +1250,25 @@ export default function DashboardScreen() {
                   </View>
                   <Text style={[s.attendeeName, { flex: 1 }]}>{a.name}</Text>
                   {a.user_id === user?.id
-                    ? <Text style={s.settingsOwnerBadge}>Owner</Text>
+                    ? <Text style={s.settingsOwnerBadge}>{t.club.owner}</Text>
                     : <TouchableOpacity onPress={() => removeAdmin(a.user_id)} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
-                        <Text style={s.settingsRemoveText}>Remove</Text>
+                        <Text style={s.settingsRemoveText}>{t.club.remove}</Text>
                       </TouchableOpacity>
                   }
                 </View>
               ))}
               <TouchableOpacity style={s.settingsRow} onPress={() => { setShowInviteAdmin(true); }} activeOpacity={0.7}>
-                <Text style={[s.settingsRowLabel, { color: Colors.black, fontWeight: '600' }]}>+ Invite admin</Text>
+                <Text style={[s.settingsRowLabel, { color: Colors.black, fontWeight: '600' }]}>{t.dashboard.inviteAdminPlus}</Text>
               </TouchableOpacity>
             </View>
 
             {/* Creator notifications */}
             <View style={s.settingsSection}>
-              <Text style={s.settingsSectionTitle}>MY NOTIFICATIONS</Text>
+              <Text style={s.settingsSectionTitle}>{t.dashboard.myNotifications}</Text>
               {[
-                { label: 'Someone joins my event', val: notifJoin, set: setNotifJoin },
-                { label: 'Someone leaves my event', val: notifLeave, set: setNotifLeave },
-                { label: 'New chat messages', val: notifChat, set: setNotifChat },
+                { label: t.dashboard.someoneJoins, val: notifJoin, set: setNotifJoin },
+                { label: t.dashboard.someoneLeaves, val: notifLeave, set: setNotifLeave },
+                { label: t.dashboard.newChatMessages, val: notifChat, set: setNotifChat },
               ].map(item => (
                 <View key={item.label} style={s.settingsToggleRow}>
                   <Text style={s.settingsRowLabel}>{item.label}</Text>
@@ -1278,17 +1291,19 @@ export default function DashboardScreen() {
         <TouchableOpacity style={s.modalOverlay} activeOpacity={1} onPress={() => setShowInviteAdmin(false)}>
           <View style={[s.attendeesSheet, { paddingBottom: insets.bottom + 16 }]}>
             <View style={s.billingSheetHandle} />
-            <Text style={s.billingSheetTitle}>Invite admin</Text>
-            <Text style={[s.listSub, { marginBottom: 12 }]}>Search by name to add a co-admin to {(selectedClub ?? clubs[0])?.name}</Text>
+            <Text style={s.billingSheetTitle}>{t.club.inviteAdmin}</Text>
+            <Text style={[s.listSub, { marginBottom: 12 }]}>{t.club.inviteAdminSub((selectedClub ?? clubs[0])?.name ?? '')}</Text>
             <TextInput
               style={s.inviteInput}
               value={inviteQuery}
               onChangeText={searchInvite}
-              placeholder="Search by name..."
+              placeholder={t.club.inviteEmailPlaceholder}
               placeholderTextColor={Colors.gray}
+              keyboardType="email-address"
+              autoCapitalize="none"
               autoFocus
             />
-            {inviteResults.map((r, i) => (
+            {inviteResults.map((r: any, i) => (
               <TouchableOpacity
                 key={r.id}
                 style={[s.attendeeRow, i < inviteResults.length - 1 && { borderBottomWidth: 1, borderColor: Colors.grayBorder }]}
@@ -1300,12 +1315,15 @@ export default function DashboardScreen() {
                   {r.avatar_url ? <Image source={{ uri: r.avatar_url }} style={StyleSheet.absoluteFill as any} /> : null}
                   {!r.avatar_url && <Text style={s.attendeeInitial}>{r.name.charAt(0).toUpperCase()}</Text>}
                 </View>
-                <Text style={s.attendeeName}>{r.name}</Text>
-                <Text style={[s.listSub, { marginLeft: 'auto' }]}>Add →</Text>
+                <View style={{ flex: 1 }}>
+                  <Text style={s.attendeeName}>{r.name}</Text>
+                  {r.email && <Text style={s.listSub}>{r.email}</Text>}
+                </View>
+                <Text style={[s.listSub, { marginLeft: 'auto' }]}>{t.club.addArrow}</Text>
               </TouchableOpacity>
             ))}
             {inviteQuery.length >= 2 && inviteResults.length === 0 && (
-              <Text style={[s.emptySub, { marginTop: 12 }]}>No users found</Text>
+              <Text style={[s.emptySub, { marginTop: 12 }]}>{t.club.notFound}</Text>
             )}
           </View>
         </TouchableOpacity>
@@ -1317,7 +1335,7 @@ export default function DashboardScreen() {
           <View style={[s.attendeesSheet, { paddingBottom: insets.bottom + 16 }]}>
             <View style={s.billingSheetHandle} />
             <Text style={s.billingSheetTitle}>{attendeesEvent?.title}</Text>
-            <Text style={[s.listSub, { marginBottom: 12 }]}>{attendeesEvent?.going_count} going</Text>
+            <Text style={[s.listSub, { marginBottom: 12 }]}>{attendeesEvent?.going_count} {t.dashboard.going}</Text>
             {loadingAttendees
               ? <ActivityIndicator color={Colors.black} />
               : <FlatList
@@ -1333,16 +1351,16 @@ export default function DashboardScreen() {
                         </View>
                         <Text style={s.attendeeName}>{item.name.split(' ')[0]}</Text>
                         {isIn
-                          ? <View style={s.checkedInBadge}><Text style={s.checkedInBadgeText}>✓ Checked in</Text></View>
+                          ? <View style={s.checkedInBadge}><Text style={s.checkedInBadgeText}>{t.dashboard.checkedIn}</Text></View>
                           : <TouchableOpacity style={s.checkInBtn} onPress={() => markCheckedIn(attendeesEvent!.id, item.id)} activeOpacity={0.7}>
-                              <Text style={s.checkInBtnText}>Check in</Text>
+                              <Text style={s.checkInBtnText}>{t.dashboard.checkIn}</Text>
                             </TouchableOpacity>
                         }
                       </View>
                     );
                   }}
                   ItemSeparatorComponent={() => <View style={{ height: 1, backgroundColor: Colors.grayBorder }} />}
-                  ListEmptyComponent={<Text style={s.emptySub}>No attendees yet</Text>}
+                  ListEmptyComponent={<Text style={s.emptySub}>{t.dashboard.noAttendeesYet}</Text>}
                 />
             }
           </View>
@@ -1353,11 +1371,11 @@ export default function DashboardScreen() {
       <View style={[s.bottomNavWrapper, { paddingBottom: insets.bottom + 8 }]}>
         <View style={s.bottomNavPill}>
           {([
-            { key: 'home', label: 'Home', icon: 'home' },
-            { key: 'events', label: 'Events', icon: 'calendar' },
-            { key: 'scan', label: 'Scan', icon: 'scan', center: true },
-            { key: 'stats', label: 'Stats', icon: 'bar' },
-            { key: 'payouts', label: 'Payouts', icon: 'payout' },
+            { key: 'home', label: t.dashboard.homeTab, icon: 'home' },
+            { key: 'events', label: t.dashboard.events, icon: 'calendar' },
+            { key: 'scan', label: t.dashboard.scanTab, icon: 'scan', center: true },
+            { key: 'stats', label: t.dashboard.statsTab, icon: 'bar' },
+            { key: 'payouts', label: t.dashboard.payoutsTab, icon: 'payout' },
           ] as { key: DashTab; label: string; icon: string; center?: boolean }[]).map(tab => {
             const active = activeTab === tab.key;
             const color = active ? Colors.black : 'rgba(0,0,0,0.35)';
@@ -1401,12 +1419,15 @@ const s = StyleSheet.create({
   sectionTitle: { fontSize: 11, fontWeight: '700', color: Colors.gray, letterSpacing: 0.8, textTransform: 'uppercase', marginBottom: 10 },
 
   // Club card
-  clubCard: { height: 130, borderRadius: 20, overflow: 'hidden', marginBottom: 24, backgroundColor: '#000' },
-  clubCardContent: { position: 'absolute', bottom: 14, left: 16 },
+  clubCard: { height: 150, borderRadius: 20, overflow: 'hidden', marginBottom: 24, backgroundColor: '#000' },
+  clubCardContent: { position: 'absolute', bottom: 14, left: 16, right: 16 },
   clubCardLabel: { fontSize: 10, fontWeight: '600', color: 'rgba(255,255,255,0.6)', textTransform: 'uppercase', letterSpacing: 0.6, marginBottom: 2 },
-  clubCardName: { fontSize: 19, fontWeight: '700', fontFamily: Fonts.bold, color: Colors.white },
-  clubEditBtn: { position: 'absolute', top: 12, right: 12, backgroundColor: 'rgba(255,255,255,0.2)', borderRadius: 50, paddingHorizontal: 12, paddingVertical: 5 },
-  clubEditBtnText: { fontSize: 12, fontWeight: '600', color: Colors.white, fontFamily: Fonts.semibold },
+  clubCardName: { fontSize: 19, fontWeight: '700', fontFamily: Fonts.bold, color: Colors.white, marginBottom: 10 },
+  clubCardActions: { flexDirection: 'row', gap: 8 },
+  clubCardActionBtn: { paddingHorizontal: 14, paddingVertical: 6, borderRadius: 50, backgroundColor: 'rgba(255,255,255,0.18)' },
+  clubCardActionBtnEdit: { backgroundColor: Colors.lime },
+  clubCardActionText: { fontSize: 12, fontWeight: '600', color: Colors.white, fontFamily: Fonts.semibold },
+  clubCardActionTextEdit: { color: Colors.black },
 
   // Overview strip
   overviewStrip: { flexDirection: 'row', backgroundColor: Colors.grayLight, borderRadius: 18, paddingVertical: 14, paddingHorizontal: 6, marginBottom: 20, justifyContent: 'space-around' },
@@ -1616,6 +1637,12 @@ const s = StyleSheet.create({
   checkedInBadgeText: { fontSize: 11, fontWeight: '700', color: '#16A34A' },
   checkInBtn: { backgroundColor: Colors.grayLight, borderRadius: 50, paddingHorizontal: 12, paddingVertical: 6 },
   checkInBtnText: { fontSize: 11, fontWeight: '600', color: Colors.black, fontFamily: Fonts.semibold },
+
+  // Toggle switch (used in club settings)
+  toggle: { width: 44, height: 26, borderRadius: 13, backgroundColor: Colors.grayBorder, justifyContent: 'center', padding: 2 },
+  toggleOn: { backgroundColor: Colors.lime },
+  toggleThumb: { width: 22, height: 22, borderRadius: 11, backgroundColor: Colors.white },
+  toggleThumbOn: { alignSelf: 'flex-end' as const },
 
   // Back button in topbar
   backBtn: { width: 36, height: 36, alignItems: 'center', justifyContent: 'center' },

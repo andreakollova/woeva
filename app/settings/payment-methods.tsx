@@ -5,10 +5,12 @@ import { useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Colors } from '@/constants/colors';
 import { Button } from '@/components/ui/Button';
+import { useTranslations } from '@/context/LanguageContext';
 
 export default function PaymentMethodsScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
+  const { t } = useTranslations();
   const [selectedCard, setSelectedCard] = useState('visa_547');
 
   const savedCards = [
@@ -19,11 +21,11 @@ export default function PaymentMethodsScreen() {
     <View style={[styles.container, { paddingTop: insets.top }]}>
       <View style={styles.header}>
         <BackButton />
-        <Text style={styles.title}>Payment methods</Text>
+        <Text style={styles.title}>{t.settings.paymentMethods}</Text>
       </View>
 
       <ScrollView contentContainerStyle={[styles.scroll, { paddingBottom: insets.bottom + 40 }]}>
-        <Text style={styles.sectionLabel}>Saved cards</Text>
+        <Text style={styles.sectionLabel}>{t.settings.savedCards}</Text>
         {savedCards.map(card => (
           <TouchableOpacity
             key={card.id}
@@ -40,10 +42,10 @@ export default function PaymentMethodsScreen() {
         ))}
 
         <TouchableOpacity style={styles.addCard}>
-          <Text style={styles.addCardText}>+ Add card</Text>
+          <Text style={styles.addCardText}>{t.settings.addCard}</Text>
         </TouchableOpacity>
 
-        <Text style={styles.sectionLabel}>Other options</Text>
+        <Text style={styles.sectionLabel}>{t.settings.otherOptions}</Text>
         <TouchableOpacity style={styles.cardRow}>
           <View style={[styles.cardThumb, { backgroundColor: Colors.grayLight }]} />
           <Text style={styles.cardInfo}>Apple Pay</Text>

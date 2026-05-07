@@ -5,6 +5,7 @@ import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { StripeProvider } from '@stripe/stripe-react-native';
 import { StyleSheet } from 'react-native';
 import { AuthProvider } from '@/context/AuthContext';
+import { LanguageProvider } from '@/context/LanguageContext';
 import {
   useFonts,
   Inter_400Regular,
@@ -30,6 +31,7 @@ export default function RootLayout() {
   return (
     <GestureHandlerRootView style={styles.root}>
       <SafeAreaProvider>
+        <LanguageProvider>
         <AuthProvider>
         <StripeProvider publishableKey={STRIPE_KEY} merchantIdentifier="merchant.com.woeva.app">
           <StatusBar style="auto" />
@@ -52,13 +54,16 @@ export default function RootLayout() {
             <Stack.Screen name="settings/notifications" options={{ animation: 'slide_from_right' }} />
             <Stack.Screen name="settings/about" options={{ animation: 'slide_from_right' }} />
             <Stack.Screen name="settings/delete-account" options={{ animation: 'slide_from_right' }} />
+            <Stack.Screen name="settings/legal" options={{ animation: 'slide_from_right' }} />
             <Stack.Screen name="notifications/index" options={{ animation: 'slide_from_right' }} />
             <Stack.Screen name="event/[id]/rate" options={{ animation: 'slide_from_bottom', presentation: 'modal' }} />
             <Stack.Screen name="dashboard/index" options={{ animation: 'slide_from_right' }} />
             <Stack.Screen name="club/[id]/edit" options={{ animation: 'slide_from_right' }} />
+            <Stack.Screen name="admin" options={{ animation: 'slide_from_right' }} />
           </Stack>
         </StripeProvider>
         </AuthProvider>
+        </LanguageProvider>
       </SafeAreaProvider>
     </GestureHandlerRootView>
   );

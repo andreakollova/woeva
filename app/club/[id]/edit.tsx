@@ -13,12 +13,15 @@ import { Button } from '@/components/ui/Button';
 import { BackButton } from '@/components/ui/BackButton';
 import { supabase } from '@/lib/supabase';
 import { uploadImage } from '@/lib/uploadImage';
-import { CATEGORIES } from '@/types';
+import { useCategories } from '@/hooks/useCategories';
+import { useTranslations } from '@/context/LanguageContext';
 
 export default function ClubEditScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const insets = useSafeAreaInsets();
   const router = useRouter();
+  const { t } = useTranslations();
+  const { categories } = useCategories();
 
   const [name, setName] = useState('');
   const [tagline, setTagline] = useState('');
@@ -83,50 +86,65 @@ export default function ClubEditScreen() {
     }).eq('id', id);
 
     setLoading(false);
-    if (error) { Alert.alert('Error', error.message); return; }
+    if (error) { Alert.alert(t.common.error, error.message); return; }
     router.back();
   }
 
   async function confirmDelete() {
     setDeleting(true);
 
-    // Find upcoming events in this club
-    const now = new Date().toISOString().slice(0, 10);
-    const { data: upcomingEvents } = await supabase
+    // 1. Get ALL events for this club (past + upcoming)
+    const { data: allEvents } = await supabase
       .from('events')
-      .select('id, title')
-      .eq('club_id', id)
-      .gte('date', now);
+      .select('id, title, date')
+      .eq('club_id', id);
 
-    if (upcomingEvents && upcomingEvents.length > 0) {
-      const eventIds = upcomingEvents.map(e => e.id);
+    const allEventIds = (allEvents ?? []).map(e => e.id);
 
-      // Find all attendees of those events
-      const { data: attendees } = await supabase
-        .from('event_attendees')
-        .select('user_id, event_id')
-        .in('event_id', eventIds);
+    if (allEventIds.length > 0) {
+      // 2. Notify attendees of upcoming events
+      const now = new Date().toISOString().slice(0, 10);
+      const upcomingEvents = (allEvents ?? []).filter(e => e.date >= now);
+      const upcomingIds = upcomingEvents.map(e => e.id);
 
-      // Send notification to each unique attendee
-      if (attendees && attendees.length > 0) {
-        const eventTitles: Record<string, string> = {};
-        upcomingEvents.forEach(e => { eventTitles[e.id] = e.title; });
+      if (upcomingIds.length > 0) {
+        const { data: attendees } = await supabase
+          .from('event_attendees')
+          .select('user_id, event_id')
+          .in('event_id', upcomingIds);
 
-        const notifications = attendees.map(a => ({
-          user_id: a.user_id,
-          type: 'cancelled',
-          title: 'Club deleted',
-          body: `"${name}" was deleted. Your spot at "${eventTitles[a.event_id] ?? 'an event'}" has been cancelled.`,
-          data: { event_id: a.event_id },
-          read: false,
-        }));
-
-        await supabase.from('notifications').insert(notifications);
+        if (attendees && attendees.length > 0) {
+          const eventTitles: Record<string, string> = {};
+          upcomingEvents.forEach(e => { eventTitles[e.id] = e.title; });
+          await supabase.from('notifications').insert(
+            attendees.map(a => ({
+              user_id: a.user_id,
+              type: 'event_cancelled',
+              title: 'Club deleted',
+              body: `"${name}" was deleted. Your spot at "${eventTitles[a.event_id] ?? 'an event'}" has been cancelled.`,
+              data: { event_id: a.event_id },
+              read: false,
+            }))
+          );
+        }
       }
+
+      // 3. Delete event_attendees for all club events
+      await supabase.from('event_attendees').delete().in('event_id', allEventIds);
+
+      // 4. Delete messages (chat) for all club events
+      await supabase.from('messages').delete().in('room_id', allEventIds);
+
+      // 5. Delete the events themselves
+      await supabase.from('events').delete().eq('club_id', id);
     }
 
-    // Delete the club (cascade handles events, members)
+    // 6. Delete club members
+    await supabase.from('club_members').delete().eq('club_id', id);
+
+    // 7. Delete the club
     await supabase.from('clubs').delete().eq('id', id);
+
     setDeleting(false);
     setShowDeleteModal(false);
     router.dismiss(2);
@@ -145,22 +163,28 @@ export default function ClubEditScreen() {
             <View style={styles.deleteWarningIcon}>
               <Text style={styles.deleteWarningEmoji}>⚠️</Text>
             </View>
-            <Text style={styles.deleteSheetTitle}>Delete "{name}"?</Text>
+            <Text style={styles.deleteSheetTitle}>{t.club.deleteTitle(name)}</Text>
             <Text style={styles.deleteSheetBody}>
-              This action is permanent and cannot be undone.{'\n\n'}
-              • All events in this club will be removed{'\n'}
-              • All members will lose access{'\n'}
-              • Everyone registered for upcoming events will receive a cancellation notification
+              {t.club.deleteBodyIntro}{'\n\n'}{t.club.deleteBody}
             </Text>
             <View style={styles.deleteSheetActions}>
               {deleting
                 ? <ActivityIndicator color={Colors.black} style={{ marginVertical: 16 }} />
                 : <>
-                    <TouchableOpacity style={styles.deleteConfirmBtn} onPress={confirmDelete}>
-                      <Text style={styles.deleteConfirmText}>Yes, delete club</Text>
+                    <TouchableOpacity style={styles.deleteConfirmBtn} onPress={() => {
+                      Alert.alert(
+                        t.club.deleteWarning,
+                        t.club.deleteLastWarning(name),
+                        [
+                          { text: t.club.noKeepIt, style: 'cancel' },
+                          { text: t.club.deleteForever, style: 'destructive', onPress: confirmDelete },
+                        ]
+                      );
+                    }}>
+                      <Text style={styles.deleteConfirmText}>{t.club.yesDeleteClub}</Text>
                     </TouchableOpacity>
                     <TouchableOpacity style={styles.deleteCancelBtn} onPress={() => setShowDeleteModal(false)}>
-                      <Text style={styles.deleteCancelText}>Keep club</Text>
+                      <Text style={styles.deleteCancelText}>{t.club.keepClub}</Text>
                     </TouchableOpacity>
                   </>
               }
@@ -175,22 +199,22 @@ export default function ClubEditScreen() {
       >
         <View style={styles.topBar}>
           <BackButton />
-          <Text style={styles.pageTitle}>Edit club</Text>
+          <Text style={styles.pageTitle}>{t.club.editClub}</Text>
           <View style={{ width: 36 }} />
         </View>
 
         <View style={styles.form}>
-          <Input label="Club name" value={name} onChangeText={setName} placeholder="Your club name" />
-          <Input label="Tagline" value={tagline} onChangeText={setTagline} placeholder="Short description" />
+          <Input label={t.club.clubName} value={name} onChangeText={setName} placeholder={t.club.clubNamePlaceholderEdit} />
+          <Input label={t.club.tagline} value={tagline} onChangeText={setTagline} placeholder={t.club.taglinePlaceholderEdit} />
 
           {/* About */}
           <View style={{ gap: 6 }}>
-            <Text style={styles.label}>About</Text>
+            <Text style={styles.label}>{t.club.aboutTitle}</Text>
             <TextInput
               style={styles.textarea}
               value={description}
               onChangeText={setDescription}
-              placeholder="What's your club about?"
+              placeholder={t.club.aboutPlaceholder}
               placeholderTextColor={Colors.gray}
               multiline
               numberOfLines={3}
@@ -198,11 +222,40 @@ export default function ClubEditScreen() {
             />
           </View>
 
+          {/* Logo + Cover */}
+          <View style={styles.photosRow}>
+            <View style={{ gap: 6 }}>
+              <Text style={styles.label}>{t.club.logo}</Text>
+              <TouchableOpacity style={styles.logoPicker} onPress={pickLogo} activeOpacity={0.8}>
+                {logoSource ? (
+                  <Image source={{ uri: logoSource }} style={styles.logoPreview} />
+                ) : (
+                  <View style={[styles.logoPreview, styles.logoFallback]}>
+                    <Text style={styles.logoInitial}>{initial}</Text>
+                  </View>
+                )}
+              </TouchableOpacity>
+            </View>
+            <View style={{ flex: 1, gap: 6 }}>
+              <Text style={styles.label}>{t.club.cover}</Text>
+              <TouchableOpacity style={styles.coverPicker} onPress={pickCover} activeOpacity={0.8}>
+                {coverSource ? (
+                  <Image source={{ uri: coverSource }} style={styles.coverPreview} />
+                ) : (
+                  <View style={styles.coverEmpty}>
+                    <Text style={styles.photoPlus}>+</Text>
+                    <Text style={styles.coverHint}>16:9</Text>
+                  </View>
+                )}
+              </TouchableOpacity>
+            </View>
+          </View>
+
           {/* Category chips */}
           <View style={{ gap: 6 }}>
-            <Text style={styles.label}>Category</Text>
+            <Text style={styles.label}>{t.club.category}</Text>
             <View style={styles.chipsWrap}>
-              {CATEGORIES.map(cat => {
+              {categories.map(cat => {
                 const active = category === cat;
                 return (
                   <TouchableOpacity
@@ -217,43 +270,14 @@ export default function ClubEditScreen() {
               })}
             </View>
           </View>
-
-          {/* Logo + Cover */}
-          <View style={styles.photosRow}>
-            <View style={{ gap: 6 }}>
-              <Text style={styles.label}>Logo</Text>
-              <TouchableOpacity style={styles.logoPicker} onPress={pickLogo} activeOpacity={0.8}>
-                {logoSource ? (
-                  <Image source={{ uri: logoSource }} style={styles.logoPreview} />
-                ) : (
-                  <View style={[styles.logoPreview, styles.logoFallback]}>
-                    <Text style={styles.logoInitial}>{initial}</Text>
-                  </View>
-                )}
-              </TouchableOpacity>
-            </View>
-            <View style={{ flex: 1, gap: 6 }}>
-              <Text style={styles.label}>Cover photo</Text>
-              <TouchableOpacity style={styles.coverPicker} onPress={pickCover} activeOpacity={0.8}>
-                {coverSource ? (
-                  <Image source={{ uri: coverSource }} style={styles.coverPreview} />
-                ) : (
-                  <View style={styles.coverEmpty}>
-                    <Text style={styles.photoPlus}>+</Text>
-                    <Text style={styles.coverHint}>16:9</Text>
-                  </View>
-                )}
-              </TouchableOpacity>
-            </View>
-          </View>
         </View>
       </ScrollView>
 
       <View style={[styles.footer, { paddingBottom: insets.bottom + 16 }]}>
-        <Button label="Save changes" onPress={handleSave} loading={loading} variant="black" disabled={!name.trim()} />
-        <Button label="Cancel" onPress={() => router.back()} variant="ghost" />
+        <Button label={t.club.saveChanges} onPress={handleSave} loading={loading} variant="black" disabled={!name.trim()} />
+        <Button label={t.common.cancel} onPress={() => router.back()} variant="ghost" />
         <TouchableOpacity style={styles.deleteBtn} onPress={() => setShowDeleteModal(true)}>
-          <Text style={styles.deleteBtnText}>Delete club</Text>
+          <Text style={styles.deleteBtnText}>{t.club.deleteClub}</Text>
         </TouchableOpacity>
       </View>
     </KeyboardAvoidingView>

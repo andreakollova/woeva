@@ -6,11 +6,13 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Button } from '@/components/ui/Button';
 import { Colors } from '@/constants/colors';
 import { supabase } from '@/lib/supabase';
+import { useTranslations } from '@/context/LanguageContext';
 
 export default function OtpScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const { phone } = useLocalSearchParams<{ phone: string }>();
+  const { t } = useTranslations();
   const [otp, setOtp] = useState(['', '', '', '', '', '']);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
@@ -26,11 +28,11 @@ export default function OtpScreen() {
 
   async function handleVerify() {
     const code = otp.join('');
-    if (code.length < 6) { setError('Enter the 6-digit code'); return; }
+    if (code.length < 6) { setError(t.auth.enter6Digit); return; }
     setLoading(true);
     const { error } = await supabase.auth.verifyOtp({ phone: phone!, token: code, type: 'sms' });
     setLoading(false);
-    if (error) { setError('Invalid code. Try again.'); return; }
+    if (error) { setError(t.auth.invalidCode); return; }
     router.replace('/(auth)/interests');
   }
 
@@ -39,8 +41,8 @@ export default function OtpScreen() {
       <BackButton />
 
       <View style={styles.header}>
-        <Text style={styles.title}>Check your messages</Text>
-        <Text style={styles.subtitle}>We sent a code to {phone}</Text>
+        <Text style={styles.title}>{t.auth.checkMessages}</Text>
+        <Text style={styles.subtitle}>{t.auth.codeSentTo(phone!)}</Text>
       </View>
 
       <View style={styles.otpRow}>
@@ -61,8 +63,8 @@ export default function OtpScreen() {
       {error ? <Text style={styles.errorText}>{error}</Text> : null}
 
       <View style={styles.bottom}>
-        <Button label="Verify" onPress={handleVerify} loading={loading} variant="black" />
-        <Button label="Resend code" onPress={() => supabase.auth.signInWithOtp({ phone: phone! })} variant="ghost" />
+        <Button label={t.auth.verify} onPress={handleVerify} loading={loading} variant="black" />
+        <Button label={t.auth.resendCode} onPress={() => supabase.auth.signInWithOtp({ phone: phone! })} variant="ghost" />
       </View>
     </View>
   );

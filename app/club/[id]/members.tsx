@@ -7,6 +7,7 @@ import { Colors } from '@/constants/colors';
 import { Fonts } from '@/constants/fonts';
 import { supabase } from '@/lib/supabase';
 import { ClubMember } from '@/types';
+import { useTranslations } from '@/context/LanguageContext';
 
 export default function ClubMembersScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
@@ -15,6 +16,7 @@ export default function ClubMembersScreen() {
   const [approved, setApproved] = useState<ClubMember[]>([]);
   const [pending, setPending] = useState<ClubMember[]>([]);
   const [tab, setTab] = useState<'members' | 'requests'>('members');
+  const { t } = useTranslations();
 
   useEffect(() => { loadMembers(); }, [id]);
 
@@ -35,9 +37,9 @@ export default function ClubMembersScreen() {
   }
 
   async function reject(memberId: string) {
-    Alert.alert('Remove request', 'Decline this join request?', [
-      { text: 'Cancel', style: 'cancel' },
-      { text: 'Decline', style: 'destructive', onPress: async () => {
+    Alert.alert(t.club.removeRequest, t.club.declineRequest, [
+      { text: t.common.cancel, style: 'cancel' },
+      { text: t.club.decline, style: 'destructive', onPress: async () => {
         await supabase.from('club_members').delete().eq('id', memberId);
         loadMembers();
       }},
@@ -45,9 +47,9 @@ export default function ClubMembersScreen() {
   }
 
   async function removeMember(memberId: string, name: string) {
-    Alert.alert('Remove member', `Remove ${name} from the club?`, [
-      { text: 'Cancel', style: 'cancel' },
-      { text: 'Remove', style: 'destructive', onPress: async () => {
+    Alert.alert(t.club.removeMember, t.club.removeMemberSimple(name), [
+      { text: t.common.cancel, style: 'cancel' },
+      { text: t.club.remove, style: 'destructive', onPress: async () => {
         await supabase.from('club_members').delete().eq('id', memberId);
         loadMembers();
       }},
@@ -60,17 +62,17 @@ export default function ClubMembersScreen() {
     <View style={[styles.container, { paddingTop: insets.top }]}>
       <View style={styles.header}>
         <BackButton />
-        <Text style={styles.headerTitle}>Members</Text>
+        <Text style={styles.headerTitle}>{t.club.members}</Text>
         <View style={{ width: 36 }} />
       </View>
 
       <View style={styles.tabs}>
         <TouchableOpacity style={[styles.tabBtn, tab === 'members' && styles.tabActive]} onPress={() => setTab('members')}>
-          <Text style={[styles.tabText, tab === 'members' && styles.tabTextActive]}>Members ({approved.length})</Text>
+          <Text style={[styles.tabText, tab === 'members' && styles.tabTextActive]}>{t.club.membersTab(approved.length)}</Text>
         </TouchableOpacity>
         <TouchableOpacity style={[styles.tabBtn, tab === 'requests' && styles.tabActive]} onPress={() => setTab('requests')}>
           <Text style={[styles.tabText, tab === 'requests' && styles.tabTextActive]}>
-            Requests{pending.length > 0 ? ` (${pending.length})` : ''}
+            {pending.length > 0 ? t.club.requestsTabCount(pending.length) : t.club.requestsTab}
           </Text>
           {pending.length > 0 && <View style={styles.badge} />}
         </TouchableOpacity>
@@ -79,7 +81,7 @@ export default function ClubMembersScreen() {
       <ScrollView contentContainerStyle={{ paddingBottom: insets.bottom + 20 }} showsVerticalScrollIndicator={false}>
         {list.length === 0 && (
           <View style={styles.empty}>
-            <Text style={styles.emptyText}>{tab === 'members' ? 'No members yet' : 'No pending requests'}</Text>
+            <Text style={styles.emptyText}>{tab === 'members' ? t.club.noMembersYet : t.club.noPendingRequests}</Text>
           </View>
         )}
         {list.map(member => {
@@ -93,20 +95,20 @@ export default function ClubMembersScreen() {
               </View>
               <View style={styles.info}>
                 <Text style={styles.name}>{name}</Text>
-                {member.role === 'admin' && <Text style={styles.adminBadge}>Admin</Text>}
+                {member.role === 'admin' && <Text style={styles.adminBadge}>{t.club.adminRole}</Text>}
               </View>
               {tab === 'requests' ? (
                 <View style={styles.actions}>
                   <TouchableOpacity style={styles.approveBtn} onPress={() => approve(member.id)}>
-                    <Text style={styles.approveBtnText}>Accept</Text>
+                    <Text style={styles.approveBtnText}>{t.club.accept}</Text>
                   </TouchableOpacity>
                   <TouchableOpacity style={styles.rejectBtn} onPress={() => reject(member.id)}>
-                    <Text style={styles.rejectBtnText}>Decline</Text>
+                    <Text style={styles.rejectBtnText}>{t.club.decline}</Text>
                   </TouchableOpacity>
                 </View>
               ) : member.role !== 'admin' ? (
                 <TouchableOpacity onPress={() => removeMember(member.id, name)}>
-                  <Text style={styles.removeText}>Remove</Text>
+                  <Text style={styles.removeText}>{t.club.remove}</Text>
                 </TouchableOpacity>
               ) : null}
             </View>
