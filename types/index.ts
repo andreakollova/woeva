@@ -168,4 +168,4 @@ export const CATEGORIES = [
   'Running', 'Hockey', 'Dance', 'Food', 'Networking',
 ] as const;
 
-export type Category = typeof CATEGORIES[number];
+export type CategoryName = typeof CATEGORIES[number];
