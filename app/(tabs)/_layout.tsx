@@ -211,6 +211,13 @@ function TabBar({ state, descriptors, navigation }: any) {
 }
 
 export default function TabsLayout() {
+  const { profile } = useAuth();
+  const router = useRouter();
+
+  useEffect(() => {
+    if (profile?.is_admin) router.replace('/admin');
+  }, [profile?.is_admin]);
+
   return (
     <Tabs
       tabBar={props => <TabBar {...props} />}

@@ -34,8 +34,8 @@ function timeFmt(dateStr: string) {
   const now = new Date();
   const diff = now.getTime() - d.getTime();
   const mins = Math.floor(diff / 60000);
-  if (mins < 60) return `${mins}m ago`;
-  if (mins < 1440) return `${Math.floor(mins / 60)}h ago`;
+  if (mins < 60) return `pred ${mins} min`;
+  if (mins < 1440) return `pred ${Math.floor(mins / 60)} h`;
   return d.toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
 }
 
@@ -115,12 +115,12 @@ export default function AdminChatScreen() {
 
   async function deleteMessage(msg: MessageRow) {
     Alert.alert(
-      'Delete message',
-      `Delete this message from ${msg.sender_name}?`,
+      'Vymazať správu',
+      `Vymazať túto správu od ${msg.sender_name}?`,
       [
-        { text: 'Cancel', style: 'cancel' },
+        { text: 'Zrušiť', style: 'cancel' },
         {
-          text: 'Delete', style: 'destructive',
+          text: 'Vymazať', style: 'destructive',
           onPress: async () => {
             await supabase.from('messages').delete().eq('id', msg.id);
             await supabase.from('admin_log').insert({
@@ -149,9 +149,9 @@ export default function AdminChatScreen() {
         {item.last_message ? (
           <Text style={styles.rowSub} numberOfLines={1}>{item.last_message}</Text>
         ) : (
-          <Text style={[styles.rowSub, { fontStyle: 'italic' }]}>No messages</Text>
+          <Text style={[styles.rowSub, { fontStyle: 'italic' }]}>Žiadne správy</Text>
         )}
-        <Text style={styles.rowMeta}>{item.message_count} messages{item.last_message_at ? ` · ${timeFmt(item.last_message_at)}` : ''}</Text>
+        <Text style={styles.rowMeta}>{item.message_count} správ{item.last_message_at ? ` · ${timeFmt(item.last_message_at)}` : ''}</Text>
       </View>
     </TouchableOpacity>
   );
@@ -208,13 +208,13 @@ export default function AdminChatScreen() {
               <View style={{ width: 32 }} />
             </View>
 
-            <Text style={styles.modalHint}>Long press a message to delete it</Text>
+            <Text style={styles.modalHint}>Dlhý stlak na správu ju vymaže</Text>
 
             {messagesLoading ? (
               <ActivityIndicator style={{ marginTop: 40 }} color={Colors.black} />
             ) : messages.length === 0 ? (
               <View style={styles.emptyChat}>
-                <Text style={styles.emptyChatText}>No messages in this room</Text>
+                <Text style={styles.emptyChatText}>Žiadne správy v tomto chate</Text>
               </View>
             ) : (
               <FlatList

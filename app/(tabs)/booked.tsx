@@ -16,12 +16,6 @@ import { useTranslations } from '@/context/LanguageContext';
 
 type BookedEvent = Event & { attendee_id?: string };
 
-const SAMPLE_AVATARS = [
-  require('@/assets/images/sample_av1.jpg'),
-  require('@/assets/images/sample_av2.jpg'),
-  require('@/assets/images/sample_av3.jpg'),
-  require('@/assets/images/sample_av4.jpg'),
-];
 
 export default function BookedScreen() {
   const insets = useSafeAreaInsets();
@@ -409,9 +403,10 @@ function TicketCard({ event, userId, userAvatar, userName, isPast, isRated, onPr
               const others = ((event as any).attendees ?? []).filter((a: any) => a?.profile?.id !== userId);
               const att = others[i];
               const avatarUrl = att?.profile?.avatar_url;
+              const initial = (att?.profile?.name ?? '?').charAt(0).toUpperCase();
               return avatarUrl
                 ? <Image key={i} source={{ uri: avatarUrl }} style={[styles.goingAvatar, { marginLeft: -7 }] as ImageStyle} />
-                : <Image key={i} source={SAMPLE_AVATARS[(i + 1) % SAMPLE_AVATARS.length]} style={[styles.goingAvatar, { marginLeft: -7 }] as ImageStyle} />;
+                : <View key={i} style={[styles.goingAvatar, styles.goingAvatarFallback, { marginLeft: -7 }]}><Text style={styles.goingAvatarInitial}>{initial}</Text></View>;
             })}
           </View>
           <Text style={styles.goingLabel}>{t.tickets.going_people(Math.max(goingCount, 1))}</Text>

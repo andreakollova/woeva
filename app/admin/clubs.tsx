@@ -96,11 +96,11 @@ export default function AdminClubsScreen() {
   async function deleteClubConfirm1() {
     if (!selected) return;
     Alert.alert(
-      'Delete club',
-      `Delete "${selected.name}"? All events, members and chats will be permanently removed.`,
+      'Vymazať klub',
+      `Vymazať "${selected.name}"? Všetky podujatia, členovia a chaty budú natrvalo odstránené.`,
       [
-        { text: 'Cancel', style: 'cancel' },
-        { text: 'Continue', style: 'destructive', onPress: deleteClubConfirm2 },
+        { text: 'Zrušiť', style: 'cancel' },
+        { text: 'Pokračovať', style: 'destructive', onPress: deleteClubConfirm2 },
       ]
     );
   }
@@ -108,12 +108,12 @@ export default function AdminClubsScreen() {
   async function deleteClubConfirm2() {
     if (!selected) return;
     Alert.alert(
-      'Final confirmation',
-      `"${selected.name}" will be permanently deleted. ${selected.member_count} members will be notified.`,
+      'Posledná kontrola',
+      `"${selected.name}" bude natrvalo vymazaný. ${selected.member_count} členovia budú upozornení.`,
       [
-        { text: 'Cancel', style: 'cancel' },
+        { text: 'Zrušiť', style: 'cancel' },
         {
-          text: 'Delete forever', style: 'destructive',
+          text: 'Vymazať navždy', style: 'destructive',
           onPress: async () => {
             setActionLoading(true);
 
@@ -155,7 +155,7 @@ export default function AdminClubsScreen() {
       <View style={{ flex: 1 }}>
         <Text style={styles.rowName} numberOfLines={1}>{item.name}</Text>
         <Text style={styles.rowSub}>{item.category} · {item.creator_name}</Text>
-        <Text style={styles.rowSub}>{item.member_count} members · ★ {item.rating.toFixed(1)}</Text>
+        <Text style={styles.rowSub}>{item.member_count} členov</Text>
       </View>
     </TouchableOpacity>
   );
@@ -171,7 +171,7 @@ export default function AdminClubsScreen() {
       <View style={styles.searchWrap}>
         <TextInput
           style={styles.search}
-          placeholder="Search name, category, creator..."
+          placeholder="Hľadaj názov, kategóriu, zakladateľa..."
           placeholderTextColor={Colors.gray}
           value={search}
           onChangeText={setSearch}
@@ -199,7 +199,7 @@ export default function AdminClubsScreen() {
               <TouchableOpacity onPress={() => setSelected(null)}>
                 <Text style={styles.modalClose}>✕</Text>
               </TouchableOpacity>
-              <Text style={styles.modalTitle}>Club detail</Text>
+              <Text style={styles.modalTitle}>Detail klubu</Text>
               <View style={{ width: 32 }} />
             </View>
 
@@ -210,32 +210,28 @@ export default function AdminClubsScreen() {
 
               <Text style={styles.detailName}>{selected.name}</Text>
               <Text style={styles.detailSub}>{selected.category} · {selected.city}</Text>
-              <Text style={styles.detailSub}>Owner: {selected.creator_name}</Text>
+              <Text style={styles.detailSub}>Zakladateľ: {selected.creator_name}</Text>
               {selected.description ? <Text style={styles.detailDesc}>{selected.description}</Text> : null}
 
               <View style={styles.statsRow}>
                 <View style={styles.statBox}>
                   <Text style={styles.statNum}>{selected.member_count}</Text>
-                  <Text style={styles.statLbl}>Members</Text>
+                  <Text style={styles.statLbl}>Členovia</Text>
                 </View>
                 <View style={styles.statBox}>
                   <Text style={styles.statNum}>{selected.eventCount}</Text>
-                  <Text style={styles.statLbl}>Events</Text>
-                </View>
-                <View style={styles.statBox}>
-                  <Text style={styles.statNum}>★{selected.rating.toFixed(1)}</Text>
-                  <Text style={styles.statLbl}>Rating</Text>
+                  <Text style={styles.statLbl}>Podujatia</Text>
                 </View>
               </View>
 
               <View style={styles.actionSection}>
-                <Text style={styles.actionSectionTitle}>DANGER ZONE</Text>
+                <Text style={styles.actionSectionTitle}>NEBEZPEČNÁ ZÓNA</Text>
                 <TouchableOpacity
                   style={[styles.actionBtn, { backgroundColor: '#FFF0F0' }]}
                   onPress={deleteClubConfirm1}
                   disabled={actionLoading}
                 >
-                  <Text style={[styles.actionBtnText, { color: '#CC0000' }]}>Delete club permanently</Text>
+                  <Text style={[styles.actionBtnText, { color: '#CC0000' }]}>Natrvalo vymazať klub</Text>
                 </TouchableOpacity>
               </View>
             </ScrollView>

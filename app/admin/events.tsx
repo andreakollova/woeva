@@ -10,6 +10,7 @@ import { supabase } from '@/lib/supabase';
 import { useAuth } from '@/context/AuthContext';
 import { BackButton } from '@/components/ui/BackButton';
 import { notify } from '@/lib/notify';
+import { useRouter } from 'expo-router';
 
 type EventRow = {
   id: string;
@@ -40,6 +41,7 @@ type FilterTab = 'all' | 'active' | 'cancelled' | 'past';
 export default function AdminEventsScreen() {
   const insets = useSafeAreaInsets();
   const { user: adminUser } = useAuth();
+  const router = useRouter();
   const [events, setEvents] = useState<EventRow[]>([]);
   const [filter, setFilter] = useState<FilterTab>('all');
   const [search, setSearch] = useState('');
@@ -114,16 +116,16 @@ export default function AdminEventsScreen() {
   async function cancelEvent() {
     if (!selected) return;
     if (!cancelReason.trim()) {
-      Alert.alert('Reason required', 'Please enter a reason for cancellation.');
+      Alert.alert('Dôvod povinný', 'Zadaj prosím dôvod zrušenia.');
       return;
     }
     Alert.alert(
-      'Cancel event',
-      `Cancel "${selected.title}"? All attendees will be notified.`,
+      'Zrušiť podujatie',
+      `Zrušiť "${selected.title}"? Všetci účastníci budú notifikovaní.`,
       [
-        { text: 'Back', style: 'cancel' },
+        { text: 'Späť', style: 'cancel' },
         {
-          text: 'Cancel event', style: 'destructive',
+          text: 'Zrušiť podujatie', style: 'destructive',
           onPress: async () => {
             setActionLoading(true);
             await supabase.from('events').update({
@@ -164,11 +166,11 @@ export default function AdminEventsScreen() {
   async function deleteEventConfirm1() {
     if (!selected) return;
     Alert.alert(
-      'Delete event',
-      `Delete "${selected.title}"? This will remove all attendees and chat history.`,
+      'Vymazať podujatie',
+      `Vymazať "${selected.title}"? Všetci účastníci a história chatu budú odstránené.`,
       [
-        { text: 'Cancel', style: 'cancel' },
-        { text: 'Continue', style: 'destructive', onPress: deleteEventConfirm2 },
+        { text: 'Zrušiť', style: 'cancel' },
+        { text: 'Pokračovať', style: 'destructive', onPress: deleteEventConfirm2 },
       ]
     );
   }
@@ -176,12 +178,12 @@ export default function AdminEventsScreen() {
   async function deleteEventConfirm2() {
     if (!selected) return;
     Alert.alert(
-      'Final confirmation',
-      `"${selected.title}" will be permanently deleted. This cannot be undone.`,
+      'Posledná kontrola',
+      `"${selected.title}" bude natrvalo vymazané. Tento krok nie je možné vrátiť.`,
       [
-        { text: 'Cancel', style: 'cancel' },
+        { text: 'Zrušiť', style: 'cancel' },
         {
-          text: 'Delete forever', style: 'destructive',
+          text: 'Vymazať navždy', style: 'destructive',
           onPress: async () => {
             setActionLoading(true);
             await logAction('delete_event', selected.title);
@@ -197,10 +199,10 @@ export default function AdminEventsScreen() {
 
   const filtered = applyFilters(events);
   const TABS: { key: FilterTab; label: string }[] = [
-    { key: 'all', label: 'All' },
-    { key: 'active', label: 'Active' },
-    { key: 'cancelled', label: 'Cancelled' },
-    { key: 'past', label: 'Past' },
+    { key: 'all', label: 'Všetky' },
+    { key: 'active', label: 'Aktívne' },
+    { key: 'cancelled', label: 'Zrušené' },
+    { key: 'past', label: 'Minulé' },
   ];
 
   const renderEvent = ({ item }: { item: EventRow }) => {
@@ -223,7 +225,7 @@ export default function AdminEventsScreen() {
           isPast && item.status !== 'cancelled' && styles.statusPast,
         ]}>
           <Text style={styles.statusText}>
-            {item.status === 'cancelled' ? 'CANCELLED' : isPast ? 'PAST' : 'ACTIVE'}
+            {item.status === 'cancelled' ? 'ZRUŠENÉ' : isPast ? 'MINULÉ' : 'AKTÍVNE'}
           </Text>
         </View>
       </TouchableOpacity>
@@ -241,7 +243,7 @@ export default function AdminEventsScreen() {
       <View style={styles.searchWrap}>
         <TextInput
           style={styles.search}
-          placeholder="Search title, creator, city..."
+          placeholder="Hľadaj názov, organizátor, mesto..."
           placeholderTextColor={Colors.gray}
           value={search}
           onChangeText={setSearch}
@@ -282,7 +284,7 @@ export default function AdminEventsScreen() {
               <TouchableOpacity onPress={() => setSelected(null)}>
                 <Text style={styles.modalClose}>✕</Text>
               </TouchableOpacity>
-              <Text style={styles.modalTitle}>Event detail</Text>
+              <Text style={styles.modalTitle}>Detail podujatia</Text>
               <View style={{ width: 32 }} />
             </View>
 
@@ -296,6 +298,14 @@ export default function AdminEventsScreen() {
               <Text style={styles.detailSub}>by {selected.creator_name} · {selected.city}</Text>
               <Text style={styles.detailSub}>{selected.date} at {selected.time}</Text>
 
+              <TouchableOpacity
+                style={styles.viewEventBtn}
+                onPress={() => { setSelected(null); router.push(`/event/${selected.id}` as any); }}
+                activeOpacity={0.8}
+              >
+                <Text style={styles.viewEventBtnText}>Zobraziť podujatie →</Text>
+              </TouchableOpacity>
+
               {selected.status === 'cancelled' && selected.cancellationReason && (
                 <View style={styles.cancelledBox}>
                   <Text style={styles.cancelledLabel}>CANCELLED</Text>
@@ -307,11 +317,11 @@ export default function AdminEventsScreen() {
               <View style={styles.statsRow}>
                 <View style={styles.statBox}>
                   <Text style={styles.statNum}>{selected.attendeeCount}</Text>
-                  <Text style={styles.statLbl}>Attendees</Text>
+                  <Text style={styles.statLbl}>Účastníci</Text>
                 </View>
                 <View style={styles.statBox}>
                   <Text style={styles.statNum}>{selected.paidCount}</Text>
-                  <Text style={styles.statLbl}>Paid tickets</Text>
+                  <Text style={styles.statLbl}>Zaplatené lístky</Text>
                 </View>
                 <View style={styles.statBox}>
                   <Text style={styles.statNum}>€{selected.gross.toFixed(0)}</Text>
@@ -322,10 +332,10 @@ export default function AdminEventsScreen() {
               {/* Cancel action */}
               {selected.status === 'active' && (
                 <View style={styles.actionSection}>
-                  <Text style={styles.actionSectionTitle}>CANCEL EVENT</Text>
+                  <Text style={styles.actionSectionTitle}>ZRUŠIŤ PODUJATIE</Text>
                   <TextInput
                     style={styles.reasonInput}
-                    placeholder="Reason for cancellation (required)"
+                    placeholder="Dôvod zrušenia (povinné)"
                     placeholderTextColor={Colors.gray}
                     value={cancelReason}
                     onChangeText={setCancelReason}
@@ -336,20 +346,20 @@ export default function AdminEventsScreen() {
                     onPress={cancelEvent}
                     disabled={actionLoading}
                   >
-                    <Text style={[styles.actionBtnText, { color: '#E85D04' }]}>Cancel event & notify attendees</Text>
+                    <Text style={[styles.actionBtnText, { color: '#E85D04' }]}>Zrušiť podujatie a notifikovať účastníkov</Text>
                   </TouchableOpacity>
                 </View>
               )}
 
               {/* Delete action */}
               <View style={styles.actionSection}>
-                <Text style={styles.actionSectionTitle}>DANGER ZONE</Text>
+                <Text style={styles.actionSectionTitle}>NEBEZPEČNÁ ZÓNA</Text>
                 <TouchableOpacity
                   style={[styles.actionBtn, { backgroundColor: '#FFF0F0' }]}
                   onPress={deleteEventConfirm1}
                   disabled={actionLoading}
                 >
-                  <Text style={[styles.actionBtnText, { color: '#CC0000' }]}>Delete event permanently</Text>
+                  <Text style={[styles.actionBtnText, { color: '#CC0000' }]}>Natrvalo vymazať podujatie</Text>
                 </TouchableOpacity>
               </View>
             </ScrollView>
@@ -401,4 +411,6 @@ const styles = StyleSheet.create({
   reasonInput: { borderWidth: 1.5, borderColor: Colors.grayBorder, borderRadius: 12, padding: 12, fontSize: 14, color: Colors.black, fontFamily: Fonts.regular, minHeight: 60 },
   actionBtn: { borderRadius: 14, padding: 14, alignItems: 'center' },
   actionBtnText: { fontSize: 14, fontWeight: '600', fontFamily: Fonts.semibold, color: Colors.black },
+  viewEventBtn: { backgroundColor: Colors.grayLight, borderRadius: 12, paddingVertical: 12, alignItems: 'center' },
+  viewEventBtnText: { fontSize: 14, fontWeight: '600', fontFamily: Fonts.semibold, color: Colors.black },
 });

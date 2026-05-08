@@ -46,20 +46,20 @@ export default function AdminBroadcastScreen() {
     const needsEmail = channel === 'email' || channel === 'both';
 
     if (needsPush && (!pushTitle.trim() || !pushBody.trim())) {
-      Alert.alert('Missing fields', 'Please fill in push title and body.'); return;
+      Alert.alert('Chýbajúce polia', 'Vyplň prosím nadpis a text push notifikácie.'); return;
     }
     if (needsEmail && (!emailSubject.trim() || !emailBody.trim())) {
-      Alert.alert('Missing fields', 'Please fill in email subject and body.'); return;
+      Alert.alert('Chýbajúce polia', 'Vyplň prosím predmet a telo emailu.'); return;
     }
 
     const count = recipientCount ?? '?';
     Alert.alert(
-      'Send broadcast',
-      `Send to ~${count} users via ${channel}?`,
+      'Odoslať broadcast',
+      `Odoslať ~${count} používateľom cez ${channel}?`,
       [
-        { text: 'Cancel', style: 'cancel' },
+        { text: 'Zrušiť', style: 'cancel' },
         {
-          text: 'Send', onPress: async () => {
+          text: 'Odoslať', onPress: async () => {
             setSending(true);
 
             // Fetch recipients
@@ -97,7 +97,7 @@ export default function AdminBroadcastScreen() {
             });
 
             setSending(false);
-            Alert.alert('Sent!', `Broadcast sent to ~${count} users.`);
+            Alert.alert('Odoslané!', `Broadcast odoslaný ~${count} používateľom.`);
             setPushTitle(''); setPushBody(''); setEmailSubject(''); setEmailBody('');
             setRecipientCount(null);
           }
@@ -107,14 +107,14 @@ export default function AdminBroadcastScreen() {
   }
 
   const TARGETS: { key: Target; label: string; icon: string }[] = [
-    { key: 'all', label: 'All users', icon: '🌍' },
-    { key: 'city', label: 'By city', icon: '📍' },
-    { key: 'interest', label: 'By interest', icon: '🏷' },
+    { key: 'all', label: 'Všetci', icon: '🌍' },
+    { key: 'city', label: 'Podľa mesta', icon: '📍' },
+    { key: 'interest', label: 'Podľa záujmu', icon: '🏷' },
   ];
 
   const CHANNELS: { key: Channel; label: string }[] = [
-    { key: 'push', label: 'Push only' },
-    { key: 'email', label: 'Email only' },
+    { key: 'push', label: 'Iba push' },
+    { key: 'email', label: 'Iba email' },
     { key: 'both', label: 'Push + Email' },
   ];
 
@@ -128,7 +128,7 @@ export default function AdminBroadcastScreen() {
 
       <ScrollView contentContainerStyle={[styles.scroll, { paddingBottom: insets.bottom + 40 }]} showsVerticalScrollIndicator={false}>
         {/* Target */}
-        <Text style={styles.sectionLabel}>TARGET AUDIENCE</Text>
+        <Text style={styles.sectionLabel}>CIEĽOVÁ SKUPINA</Text>
         <View style={styles.pillRow}>
           {TARGETS.map(t => (
             <TouchableOpacity
@@ -145,7 +145,7 @@ export default function AdminBroadcastScreen() {
         {target === 'city' && (
           <TextInput
             style={styles.input}
-            placeholder="City (e.g. Bratislava)"
+            placeholder="Mesto (napr. Bratislava)"
             placeholderTextColor={Colors.gray}
             value={targetCity}
             onChangeText={t => { setTargetCity(t); setRecipientCount(null); }}
@@ -154,7 +154,7 @@ export default function AdminBroadcastScreen() {
         {target === 'interest' && (
           <TextInput
             style={styles.input}
-            placeholder="Interest (e.g. Yoga)"
+            placeholder="Záujem (napr. Joga)"
             placeholderTextColor={Colors.gray}
             value={targetInterest}
             onChangeText={t => { setTargetInterest(t); setRecipientCount(null); }}
@@ -165,13 +165,13 @@ export default function AdminBroadcastScreen() {
           {counting
             ? <ActivityIndicator color={Colors.black} size="small" />
             : <Text style={styles.countBtnText}>
-                {recipientCount !== null ? `~${recipientCount} recipients` : 'Count recipients'}
+                {recipientCount !== null ? `~${recipientCount} príjemcov` : 'Spočítať príjemcov'}
               </Text>
           }
         </TouchableOpacity>
 
         {/* Channel */}
-        <Text style={styles.sectionLabel}>CHANNEL</Text>
+        <Text style={styles.sectionLabel}>KANÁL</Text>
         <View style={styles.pillRow}>
           {CHANNELS.map(c => (
             <TouchableOpacity
@@ -187,17 +187,17 @@ export default function AdminBroadcastScreen() {
         {/* Push fields */}
         {(channel === 'push' || channel === 'both') && (
           <>
-            <Text style={styles.sectionLabel}>PUSH NOTIFICATION</Text>
+            <Text style={styles.sectionLabel}>PUSH NOTIFIKÁCIA</Text>
             <TextInput
               style={styles.input}
-              placeholder="Title"
+              placeholder="Nadpis"
               placeholderTextColor={Colors.gray}
               value={pushTitle}
               onChangeText={setPushTitle}
             />
             <TextInput
               style={[styles.input, styles.multiline]}
-              placeholder="Body message"
+              placeholder="Text správy"
               placeholderTextColor={Colors.gray}
               value={pushBody}
               onChangeText={setPushBody}
@@ -212,14 +212,14 @@ export default function AdminBroadcastScreen() {
             <Text style={styles.sectionLabel}>EMAIL</Text>
             <TextInput
               style={styles.input}
-              placeholder="Subject"
+              placeholder="Predmet"
               placeholderTextColor={Colors.gray}
               value={emailSubject}
               onChangeText={setEmailSubject}
             />
             <TextInput
               style={[styles.input, styles.multiline, { minHeight: 120 }]}
-              placeholder="Email body (plain text or HTML)"
+              placeholder="Telo emailu (plain text alebo HTML)"
               placeholderTextColor={Colors.gray}
               value={emailBody}
               onChangeText={setEmailBody}
@@ -236,7 +236,7 @@ export default function AdminBroadcastScreen() {
         >
           {sending
             ? <ActivityIndicator color={Colors.black} />
-            : <Text style={styles.sendBtnText}>Send broadcast</Text>
+            : <Text style={styles.sendBtnText}>Odoslať broadcast</Text>
           }
         </TouchableOpacity>
       </ScrollView>

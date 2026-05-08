@@ -26,12 +26,6 @@ const { height: SCREEN_H } = Dimensions.get('window');
 const COVER_HEIGHT = Math.round(SCREEN_H * 0.48);
 const AV = 32;
 
-const SAMPLE_AVATARS = [
-  require('@/assets/images/sample_av1.jpg'),
-  require('@/assets/images/sample_av2.jpg'),
-  require('@/assets/images/sample_av3.jpg'),
-  require('@/assets/images/sample_av4.jpg'),
-];
 
 type Attendee = { id: string; user_id: string; profile: { name: string | null; avatar_url: string | null } | null };
 
@@ -431,8 +425,13 @@ export default function EventDetailScreen() {
                   {/* Other attendees — always show 3 */}
                   {Array.from({ length: 3 }).map((_, i) => {
                     const att = otherAtts[i];
-                    const src = att?.profile?.avatar_url ? { uri: att.profile.avatar_url } : SAMPLE_AVATARS[i % SAMPLE_AVATARS.length];
-                    return <View key={i} style={[s.goingAv, s.goingAvOther, { marginLeft: -6, zIndex: 9 - i }]}><Image source={src} style={s.goingAvImg} /></View>;
+                    const avatarUrl = att?.profile?.avatar_url;
+                    const initial = (att?.profile?.name ?? '?').charAt(0).toUpperCase();
+                    return (
+                      <View key={i} style={[s.goingAv, s.goingAvOther, { marginLeft: -6, zIndex: 9 - i }]}>
+                        {avatarUrl ? <Image source={{ uri: avatarUrl }} style={s.goingAvImg} /> : <Text style={s.goingAvInitial}>{initial}</Text>}
+                      </View>
+                    );
                   })}
                   {overflow > 0 && <View style={[s.goingAv, s.goingAvOverflow, { marginLeft: -6, zIndex: 8 }]}><Text style={s.goingAvOverflowText}>+{overflow}</Text></View>}
                 </View>
@@ -492,8 +491,13 @@ export default function EventDetailScreen() {
                 <View style={s.avatarStack}>
                   {Array.from({ length: 3 }).map((_, i) => {
                     const att = attendees[i];
-                    const src = att?.profile?.avatar_url ? { uri: att.profile.avatar_url } : SAMPLE_AVATARS[i % SAMPLE_AVATARS.length];
-                    return <View key={i} style={[s.av, { marginLeft: i === 0 ? 0 : -10, zIndex: 10 - i }]}><Image source={src} style={s.avImg} /></View>;
+                    const avatarUrl = att?.profile?.avatar_url;
+                    const initial = (att?.profile?.name ?? '?').charAt(0).toUpperCase();
+                    return (
+                      <View key={i} style={[s.av, { marginLeft: i === 0 ? 0 : -10, zIndex: 10 - i }, !avatarUrl && { backgroundColor: '#888', alignItems: 'center', justifyContent: 'center' }]}>
+                        {avatarUrl ? <Image source={{ uri: avatarUrl }} style={s.avImg} /> : <Text style={{ fontSize: 11, fontWeight: '700', color: Colors.white }}>{initial}</Text>}
+                      </View>
+                    );
                   })}
                   {overflow > 0 && <View style={[s.av, s.avOverflow, { marginLeft: -6 }]}><Text style={s.avOverflowText}>+{overflow}</Text></View>}
                 </View>

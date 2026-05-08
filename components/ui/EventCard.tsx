@@ -139,12 +139,6 @@ export function EventCard({ event, featured, attending }: EventCardProps) {
   );
 }
 
-const SAMPLE_AVATARS = [
-  require('@/assets/images/sample_av1.jpg'),
-  require('@/assets/images/sample_av2.jpg'),
-  require('@/assets/images/sample_av3.jpg'),
-  require('@/assets/images/sample_av4.jpg'),
-];
 
 type AttendeeProfile = { id: string; name: string; avatar_url: string | null } | null | undefined;
 
@@ -188,7 +182,12 @@ function GoingAvatars({ count, attendees, attending, userProfile, userId }: {
         if (att?.profile?.avatar_url) {
           return <Image key={i} source={{ uri: att.profile.avatar_url }} style={[avStyles.circle, { marginLeft: ml, zIndex: zIdx }] as ImageStyle} />;
         }
-        return <Image key={i} source={SAMPLE_AVATARS[i % SAMPLE_AVATARS.length]} style={[avStyles.circle, { marginLeft: ml, zIndex: zIdx }] as ImageStyle} />;
+        const initial = (att?.profile?.name ?? '?').charAt(0).toUpperCase();
+        return (
+          <View key={i} style={[avStyles.circle, avStyles.overflow, { marginLeft: ml, zIndex: zIdx }]}>
+            <Text style={avStyles.overflowText}>{initial}</Text>
+          </View>
+        );
       })}
       {overflow > 0 && (
         <View style={[avStyles.circle, avStyles.overflow, { marginLeft: -3 }]}>

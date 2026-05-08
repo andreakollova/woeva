@@ -8,10 +8,10 @@ import { Colors } from '@/constants/colors';
 import { Fonts } from '@/constants/fonts';
 import { supabase } from '@/lib/supabase';
 import { useAuth } from '@/context/AuthContext';
-import { BackButton } from '@/components/ui/BackButton';
+import { AdminTabBar } from '@/components/admin/AdminTabBar';
 import { generateFormalInvoice } from '@/lib/generateInvoice';
 
-type Period = 'month' | 'last_month' | 'year' | 'all';
+type Period = '7days' | 'month' | '3months' | 'year' | 'all';
 
 type InvoiceRow = {
   id: string;
@@ -58,14 +58,18 @@ function dateFmt(dateStr: string) {
 
 function getPeriodRange(period: Period): { start: Date | null; end: Date | null } {
   const now = new Date();
+  if (period === '7days') {
+    const start = new Date(now);
+    start.setDate(start.getDate() - 7);
+    return { start, end: null };
+  }
   if (period === 'month') {
     const start = new Date(now.getFullYear(), now.getMonth(), 1);
     return { start, end: null };
   }
-  if (period === 'last_month') {
-    const start = new Date(now.getFullYear(), now.getMonth() - 1, 1);
-    const end = new Date(now.getFullYear(), now.getMonth(), 1);
-    return { start, end };
+  if (period === '3months') {
+    const start = new Date(now.getFullYear(), now.getMonth() - 3, 1);
+    return { start, end: null };
   }
   if (period === 'year') {
     const start = new Date(now.getFullYear(), 0, 1);
@@ -77,7 +81,7 @@ function getPeriodRange(period: Period): { start: Date | null; end: Date | null 
 export default function AdminBillingScreen() {
   const insets = useSafeAreaInsets();
   const { user: adminUser } = useAuth();
-  const [period, setPeriod] = useState<Period>('month');
+  const [period, setPeriod] = useState<Period>('7days');
   const [invoices, setInvoices] = useState<InvoiceRow[]>([]);
   const [revenue, setRevenue] = useState<Revenue>({ gross: 0, woeva_fee: 0, stripe_fee: 0, net: 0 });
   const [loading, setLoading] = useState(true);
@@ -137,12 +141,12 @@ export default function AdminBillingScreen() {
 
   async function markAsPaid(inv: InvoiceRow) {
     Alert.alert(
-      'Mark as paid',
-      `Mark invoice ${inv.invoice_number} as paid?`,
+      'Označiť ako zaplatené',
+      `Označiť faktúru ${inv.invoice_number} ako zaplatenú?`,
       [
-        { text: 'Cancel', style: 'cancel' },
+        { text: 'Zrušiť', style: 'cancel' },
         {
-          text: 'Mark paid', onPress: async () => {
+          text: 'Zaplatené', onPress: async () => {
             setSaving(true);
             await supabase.from('invoices').update({ status: 'paid' }).eq('id', inv.id);
             await supabase.from('admin_log').insert({
@@ -178,10 +182,11 @@ export default function AdminBillingScreen() {
   }
 
   const PERIODS: { key: Period; label: string }[] = [
-    { key: 'month', label: 'This month' },
-    { key: 'last_month', label: 'Last month' },
-    { key: 'year', label: 'This year' },
-    { key: 'all', label: 'All time' },
+    { key: '7days',   label: '7 dní' },
+    { key: 'month',   label: 'Tento mesiac' },
+    { key: '3months', label: '3 mesiace' },
+    { key: 'year',    label: 'Tento rok' },
+    { key: 'all',     label: 'Celkovo' },
   ];
 
   const counts = {
@@ -211,9 +216,7 @@ export default function AdminBillingScreen() {
   return (
     <View style={[styles.container, { paddingTop: insets.top }]}>
       <View style={styles.header}>
-        <BackButton />
-        <Text style={styles.title}>Billing</Text>
-        <View style={{ width: 36 }} />
+        <Text style={styles.title}>Fakturácia</Text>
       </View>
 
       {/* Period filter */}
@@ -249,21 +252,25 @@ export default function AdminBillingScreen() {
             <>
               {/* Revenue summary */}
               <View style={styles.revenueGrid}>
-                <View style={[styles.revCard, { backgroundColor: Colors.lime }]}>
-                  <Text style={styles.revNum}>{fmt(revenue.woeva_fee)}</Text>
-                  <Text style={styles.revLabel}>Woeva fees</Text>
+                <View style={styles.revenueRow}>
+                  <View style={[styles.revCard, { backgroundColor: Colors.lime }]}>
+                    <Text style={[styles.revNum, { color: Colors.black }]}>{fmt(revenue.woeva_fee)}</Text>
+                    <Text style={[styles.revLabel, { color: 'rgba(0,0,0,0.55)' }]}>Woeva poplatky</Text>
+                  </View>
+                  <View style={styles.revCard}>
+                    <Text style={styles.revNum}>{fmt(revenue.gross)}</Text>
+                    <Text style={styles.revLabel}>Hrubý príjem</Text>
+                  </View>
                 </View>
-                <View style={styles.revCard}>
-                  <Text style={styles.revNum}>{fmt(revenue.gross)}</Text>
-                  <Text style={styles.revLabel}>Gross revenue</Text>
-                </View>
-                <View style={styles.revCard}>
-                  <Text style={styles.revNum}>{fmt(revenue.stripe_fee)}</Text>
-                  <Text style={styles.revLabel}>Stripe fees</Text>
-                </View>
-                <View style={[styles.revCard, { backgroundColor: Colors.black }]}>
-                  <Text style={[styles.revNum, { color: Colors.white }]}>{fmt(revenue.net)}</Text>
-                  <Text style={[styles.revLabel, { color: 'rgba(255,255,255,0.6)' }]}>Net to creators</Text>
+                <View style={styles.revenueRow}>
+                  <View style={styles.revCard}>
+                    <Text style={styles.revNum}>{fmt(revenue.stripe_fee)}</Text>
+                    <Text style={styles.revLabel}>Poplatky Stripe</Text>
+                  </View>
+                  <View style={[styles.revCard, { backgroundColor: '#1A1A1A' }]}>
+                    <Text style={[styles.revNum, { color: Colors.white }]}>{fmt(revenue.net)}</Text>
+                    <Text style={[styles.revLabel, { color: 'rgba(255,255,255,0.5)' }]}>Čistý príjem tvorcov</Text>
+                  </View>
                 </View>
               </View>
 
@@ -271,28 +278,28 @@ export default function AdminBillingScreen() {
               <View style={styles.invoiceSummary}>
                 <View style={styles.invoiceSummaryItem}>
                   <Text style={styles.invoiceSummaryNum}>{counts.draft}</Text>
-                  <Text style={styles.invoiceSummaryLabel}>Draft</Text>
+                  <Text style={styles.invoiceSummaryLabel}>Návrh</Text>
                 </View>
                 <View style={[styles.invoiceSummaryDivider]} />
                 <View style={styles.invoiceSummaryItem}>
                   <Text style={[styles.invoiceSummaryNum, { color: '#B86000' }]}>{counts.issued}</Text>
-                  <Text style={styles.invoiceSummaryLabel}>Issued</Text>
+                  <Text style={styles.invoiceSummaryLabel}>Vystavené</Text>
                 </View>
                 <View style={styles.invoiceSummaryDivider} />
                 <View style={styles.invoiceSummaryItem}>
                   <Text style={[styles.invoiceSummaryNum, { color: '#006B28' }]}>{counts.paid}</Text>
-                  <Text style={styles.invoiceSummaryLabel}>Paid</Text>
+                  <Text style={styles.invoiceSummaryLabel}>Zaplatené</Text>
                 </View>
               </View>
 
               {invoices.length > 0 && (
-                <Text style={styles.listHeader}>INVOICES ({invoices.length})</Text>
+                <Text style={styles.listHeader}>FAKTÚRY ({invoices.length})</Text>
               )}
             </>
           )}
           ListEmptyComponent={() => (
             <View style={styles.empty}>
-              <Text style={styles.emptyText}>No invoices for this period</Text>
+              <Text style={styles.emptyText}>Žiadne faktúry za toto obdobie</Text>
             </View>
           )}
         />
@@ -323,10 +330,10 @@ export default function AdminBillingScreen() {
               {/* Details */}
               <View style={styles.detailSection}>
                 {[
-                  { label: 'Creator', value: selected.creator_name },
+                  { label: 'Tvorca', value: selected.creator_name },
                   { label: 'Email', value: selected.creator_email ?? '—' },
-                  { label: 'Period', value: selected.period_label },
-                  { label: 'Issued', value: dateFmt(selected.created_at) },
+                  { label: 'Obdobie', value: selected.period_label },
+                  { label: 'Vystavená', value: dateFmt(selected.created_at) },
                 ].map(row => (
                   <View key={row.label} style={styles.detailRow}>
                     <Text style={styles.detailLabel}>{row.label}</Text>
@@ -338,19 +345,19 @@ export default function AdminBillingScreen() {
               {/* Amounts */}
               <View style={styles.amountSection}>
                 <View style={styles.amountRow}>
-                  <Text style={styles.amountLabel}>Gross revenue</Text>
+                  <Text style={styles.amountLabel}>Hrubý príjem</Text>
                   <Text style={styles.amountValue}>{fmt(selected.gross)}</Text>
                 </View>
                 <View style={styles.amountRow}>
-                  <Text style={styles.amountLabel}>Stripe fees</Text>
+                  <Text style={styles.amountLabel}>Poplatky Stripe</Text>
                   <Text style={[styles.amountValue, { color: Colors.gray }]}>− {fmt(selected.stripe_fee)}</Text>
                 </View>
                 <View style={styles.amountRow}>
-                  <Text style={styles.amountLabel}>Woeva fee (5%)</Text>
+                  <Text style={styles.amountLabel}>Woeva poplatok (5%)</Text>
                   <Text style={[styles.amountValue, { color: Colors.gray }]}>− {fmt(selected.woeva_fee)}</Text>
                 </View>
                 <View style={[styles.amountRow, styles.amountRowTotal]}>
-                  <Text style={styles.amountTotalLabel}>Net to creator</Text>
+                  <Text style={styles.amountTotalLabel}>Čistý príjem tvorcu</Text>
                   <Text style={styles.amountTotalValue}>{fmt(selected.net)}</Text>
                 </View>
               </View>
@@ -375,7 +382,7 @@ export default function AdminBillingScreen() {
                   style={styles.pdfBtn}
                   onPress={() => viewPdf(selected)}
                 >
-                  <Text style={styles.pdfBtnText}>View / Download PDF</Text>
+                  <Text style={styles.pdfBtnText}>Zobraziť / Stiahnuť PDF</Text>
                 </TouchableOpacity>
 
                 {selected.status !== 'paid' && (
@@ -386,7 +393,7 @@ export default function AdminBillingScreen() {
                   >
                     {saving
                       ? <ActivityIndicator color={Colors.black} />
-                      : <Text style={styles.paidBtnText}>Mark as paid</Text>
+                      : <Text style={styles.paidBtnText}>Označiť ako zaplatené</Text>
                     }
                   </TouchableOpacity>
                 )}
@@ -395,36 +402,38 @@ export default function AdminBillingScreen() {
           </View>
         )}
       </Modal>
+      <AdminTabBar active="billing" />
     </View>
   );
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: Colors.white },
-  header: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 20, paddingBottom: 12 },
-  title: { fontSize: 18, fontWeight: '700', fontFamily: Fonts.bold, color: Colors.black },
-  periodRow: { paddingHorizontal: 16, paddingBottom: 12, gap: 8, flexDirection: 'row' },
-  periodPill: { paddingHorizontal: 14, paddingVertical: 8, borderRadius: 20, backgroundColor: Colors.grayLight },
-  periodPillActive: { backgroundColor: Colors.black },
-  periodPillText: { fontSize: 13, fontWeight: '500', fontFamily: Fonts.medium, color: Colors.gray },
-  periodPillTextActive: { color: Colors.lime },
-  revenueGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 10, paddingHorizontal: 16, marginBottom: 12 },
-  revCard: { width: '47%', backgroundColor: Colors.grayLight, borderRadius: 14, padding: 14, gap: 4 },
-  revNum: { fontSize: 20, fontWeight: '800', fontFamily: Fonts.extrabold, color: Colors.black },
-  revLabel: { fontSize: 11, color: Colors.gray, fontFamily: Fonts.regular },
-  invoiceSummary: { flexDirection: 'row', marginHorizontal: 16, backgroundColor: Colors.grayLight, borderRadius: 14, padding: 16, marginBottom: 20 },
+  container: { flex: 1, backgroundColor: Colors.black },
+  header: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 20, paddingBottom: 8, paddingTop: 14 },
+  title: { fontSize: 22, fontWeight: '800', fontFamily: Fonts.extrabold, color: Colors.white },
+  periodRow: { paddingHorizontal: 16, paddingBottom: 8, gap: 8, flexDirection: 'row', alignItems: 'center' },
+  periodPill: { paddingHorizontal: 14, paddingVertical: 8, borderRadius: 20, backgroundColor: '#1C1C1C' },
+  periodPillActive: { backgroundColor: Colors.lime },
+  periodPillText: { fontSize: 13, fontWeight: '500', fontFamily: Fonts.medium, color: 'rgba(255,255,255,0.5)' },
+  periodPillTextActive: { color: Colors.black, fontWeight: '700' },
+  revenueGrid: { gap: 8, paddingHorizontal: 16, marginBottom: 8 },
+  revenueRow: { flexDirection: 'row', gap: 10 },
+  revCard: { flex: 1, backgroundColor: '#1A1A1A', borderRadius: 14, padding: 14, gap: 4 },
+  revNum: { fontSize: 20, fontWeight: '800', fontFamily: Fonts.extrabold, color: Colors.white },
+  revLabel: { fontSize: 11, color: 'rgba(255,255,255,0.4)', fontFamily: Fonts.regular },
+  invoiceSummary: { flexDirection: 'row', marginHorizontal: 16, backgroundColor: '#1A1A1A', borderRadius: 14, padding: 16, marginBottom: 12 },
   invoiceSummaryItem: { flex: 1, alignItems: 'center', gap: 4 },
-  invoiceSummaryNum: { fontSize: 20, fontWeight: '800', fontFamily: Fonts.extrabold, color: Colors.black },
-  invoiceSummaryLabel: { fontSize: 11, color: Colors.gray, fontFamily: Fonts.regular },
-  invoiceSummaryDivider: { width: 1, backgroundColor: Colors.grayBorder },
-  listHeader: { fontSize: 11, fontWeight: '700', fontFamily: Fonts.semibold, color: Colors.gray, letterSpacing: 1, textTransform: 'uppercase', paddingHorizontal: 20, marginBottom: 8 },
+  invoiceSummaryNum: { fontSize: 20, fontWeight: '800', fontFamily: Fonts.extrabold, color: Colors.white },
+  invoiceSummaryLabel: { fontSize: 11, color: 'rgba(255,255,255,0.4)', fontFamily: Fonts.regular },
+  invoiceSummaryDivider: { width: 1, backgroundColor: '#333' },
+  listHeader: { fontSize: 11, fontWeight: '700', fontFamily: Fonts.semibold, color: 'rgba(255,255,255,0.35)', letterSpacing: 1, textTransform: 'uppercase', paddingHorizontal: 20, marginBottom: 8 },
   row: { flexDirection: 'row', alignItems: 'center', gap: 12, paddingHorizontal: 20, paddingVertical: 14 },
-  sep: { height: 1, backgroundColor: Colors.grayBorder, marginLeft: 20 },
-  invoiceNumBox: { backgroundColor: Colors.grayLight, borderRadius: 10, paddingHorizontal: 8, paddingVertical: 6, minWidth: 80, alignItems: 'center' },
-  invoiceNumText: { fontSize: 10, fontWeight: '700', fontFamily: Fonts.bold, color: Colors.black, letterSpacing: 0.3 },
-  rowTitle: { fontSize: 14, fontWeight: '600', fontFamily: Fonts.semibold, color: Colors.black },
-  rowSub: { fontSize: 12, color: Colors.gray, fontFamily: Fonts.regular, marginTop: 1 },
-  rowAmount: { fontSize: 13, fontWeight: '700', fontFamily: Fonts.bold, color: Colors.black, marginTop: 2 },
+  sep: { height: 1, backgroundColor: '#1C1C1C', marginLeft: 20 },
+  invoiceNumBox: { backgroundColor: '#1C1C1C', borderRadius: 10, paddingHorizontal: 8, paddingVertical: 6, minWidth: 80, alignItems: 'center' },
+  invoiceNumText: { fontSize: 10, fontWeight: '700', fontFamily: Fonts.bold, color: Colors.white, letterSpacing: 0.3 },
+  rowTitle: { fontSize: 14, fontWeight: '600', fontFamily: Fonts.semibold, color: Colors.white },
+  rowSub: { fontSize: 12, color: 'rgba(255,255,255,0.4)', fontFamily: Fonts.regular, marginTop: 1 },
+  rowAmount: { fontSize: 13, fontWeight: '700', fontFamily: Fonts.bold, color: Colors.white, marginTop: 2 },
   statusBadge: { borderRadius: 8, paddingHorizontal: 8, paddingVertical: 4, alignSelf: 'flex-start' },
   statusBadgeText: { fontSize: 10, fontWeight: '700', letterSpacing: 0.5 },
   empty: { flex: 1, alignItems: 'center', justifyContent: 'center', paddingVertical: 60 },

@@ -73,6 +73,8 @@ export const translations = {
       notifications: 'Notifications',
       search: 'Search',
       share: 'Share',
+      decline: 'Decline',
+      accept: 'Accept',
     },
 
     // ── Home / Feed ───────────────────────────────────────────────
@@ -192,7 +194,6 @@ export const translations = {
       newEventSub: 'Run, party, brunch',
       youreOutThere: "You're out there.",
       eventPublishedSub: "Event published.\nYour people will find it.",
-      editEvent: 'Edit event',
       eventNamePlaceholderEdit: "What's happening?",
       descriptionPlaceholderEdit: 'Tell people what to expect...',
       priceFree: 'Price (€) — leave 0 for free',
@@ -472,7 +473,6 @@ export const translations = {
       submitRating: 'Submit rating',
       ratingThanks: 'Thanks for the rating!',
       rateLabels: ['', 'Poor', 'Fair', 'Good', 'Great', 'Amazing'],
-      rateEvent: 'Rate the event',
       howWasIt: 'How was it?',
       hostedByName: (name: string) => `by ${name}`,
       anythingToAdd: 'Anything to add?',
@@ -662,6 +662,8 @@ export const translations = {
       notifications: 'Notifikácie',
       search: 'Hľadať',
       share: 'Zdieľať',
+      decline: 'Odmietnuť',
+      accept: 'Prijať',
     },
 
     home: {
@@ -779,7 +781,6 @@ export const translations = {
       newEventSub: 'Beh, párty, brunch',
       youreOutThere: 'Si vonku.',
       eventPublishedSub: "Udalosť zverejnená.\nĽudia ťa nájdu.",
-      editEvent: 'Upraviť udalosť',
       eventNamePlaceholderEdit: 'Čo sa deje?',
       descriptionPlaceholderEdit: 'Povedz ľuďom, čo ich čaká...',
       priceFree: 'Cena (€) — nechaj 0 pre zadarmo',
@@ -1055,7 +1056,6 @@ export const translations = {
       submitRating: 'Odoslať hodnotenie',
       ratingThanks: 'Ďakujeme za hodnotenie!',
       rateLabels: ['', 'Slabé', 'Ujde', 'Dobré', 'Super', 'Výborné'],
-      rateEvent: 'Ohodnoť udalosť',
       howWasIt: 'Ako to bolo?',
       hostedByName: (name: string) => `od ${name}`,
       anythingToAdd: 'Chceš niečo dodať?',

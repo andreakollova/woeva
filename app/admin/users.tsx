@@ -9,7 +9,7 @@ import { Colors } from '@/constants/colors';
 import { Fonts } from '@/constants/fonts';
 import { supabase } from '@/lib/supabase';
 import { useAuth } from '@/context/AuthContext';
-import { BackButton } from '@/components/ui/BackButton';
+import { AdminTabBar } from '@/components/admin/AdminTabBar';
 
 type UserRow = {
   id: string;
@@ -134,12 +134,12 @@ export default function AdminUsersScreen() {
   async function blacklistUser() {
     if (!selected) return;
     Alert.alert(
-      'Blacklist user',
-      `Block ${selected.name || selected.email} from the platform?`,
+      'Zablokovať používateľa',
+      `Zablokovať ${selected.name || selected.email} z platformy?`,
       [
-        { text: 'Cancel', style: 'cancel' },
+        { text: 'Zrušiť', style: 'cancel' },
         {
-          text: 'Blacklist', style: 'destructive',
+          text: 'Zablokovať', style: 'destructive',
           onPress: async () => {
             setActionLoading(true);
             await supabase.from('blacklist').insert({
@@ -171,11 +171,11 @@ export default function AdminUsersScreen() {
   async function deleteUserConfirm1() {
     if (!selected) return;
     Alert.alert(
-      'Delete account',
-      `Delete ${selected.name || selected.email}? All their events, clubs and data will be removed.`,
+      'Vymazať účet',
+      `Vymazať ${selected.name || selected.email}? Všetky podujatia, kluby a dáta budú odstránené.`,
       [
-        { text: 'Cancel', style: 'cancel' },
-        { text: 'Continue', style: 'destructive', onPress: deleteUserConfirm2 },
+        { text: 'Zrušiť', style: 'cancel' },
+        { text: 'Pokračovať', style: 'destructive', onPress: deleteUserConfirm2 },
       ]
     );
   }
@@ -183,12 +183,12 @@ export default function AdminUsersScreen() {
   async function deleteUserConfirm2() {
     if (!selected) return;
     Alert.alert(
-      'Final confirmation',
-      `This CANNOT be undone. "${selected.name || selected.email}" will be permanently deleted from the platform.`,
+      'Posledné potvrdenie',
+      `Toto sa NEDÁ vrátiť späť. "${selected.name || selected.email}" bude natrvalo vymazaný z platformy.`,
       [
-        { text: 'Cancel', style: 'cancel' },
+        { text: 'Zrušiť', style: 'cancel' },
         {
-          text: 'Delete forever', style: 'destructive',
+          text: 'Vymazať natrvalo', style: 'destructive',
           onPress: async () => {
             setActionLoading(true);
             await logAction('delete_user', selected.name || selected.email || '', 'Admin-initiated deletion');
@@ -207,7 +207,7 @@ export default function AdminUsersScreen() {
       <Avatar name={item.name} avatar_url={item.avatar_url} />
       <View style={{ flex: 1 }}>
         <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-          <Text style={styles.rowName} numberOfLines={1}>{item.name || '(no name)'}</Text>
+          <Text style={styles.rowName} numberOfLines={1}>{item.name || '(bez mena)'}</Text>
           {item.is_admin && <View style={styles.adminBadge}><Text style={styles.adminBadgeText}>ADMIN</Text></View>}
           {item.blacklisted && <View style={styles.blacklistBadge}><Text style={styles.blacklistBadgeText}>BLOCKED</Text></View>}
         </View>
@@ -220,15 +220,14 @@ export default function AdminUsersScreen() {
   return (
     <View style={[styles.container, { paddingTop: insets.top }]}>
       <View style={styles.header}>
-        <BackButton />
-        <Text style={styles.title}>Users</Text>
+        <Text style={styles.title}>Používatelia</Text>
         <Text style={styles.count}>{filtered.length}</Text>
       </View>
 
       <View style={styles.searchWrap}>
         <TextInput
           style={styles.search}
-          placeholder="Search name, email, city..."
+          placeholder="Hľadaj meno, email, mesto..."
           placeholderTextColor={Colors.gray}
           value={search}
           onChangeText={setSearch}
@@ -257,7 +256,7 @@ export default function AdminUsersScreen() {
               <TouchableOpacity onPress={() => setSelected(null)}>
                 <Text style={styles.modalClose}>✕</Text>
               </TouchableOpacity>
-              <Text style={styles.modalTitle}>User detail</Text>
+              <Text style={styles.modalTitle}>Detail používateľa</Text>
               <View style={{ width: 32 }} />
             </View>
 
@@ -270,10 +269,10 @@ export default function AdminUsersScreen() {
                   <View style={styles.profileRow}>
                     <Avatar name={selected.name} avatar_url={selected.avatar_url} size={56} />
                     <View style={{ flex: 1 }}>
-                      <Text style={styles.profileName}>{selected.name || '(no name)'}</Text>
+                      <Text style={styles.profileName}>{selected.name || '(bez mena)'}</Text>
                       <Text style={styles.profileEmail}>{selected.email || '—'}</Text>
                       {selected.city ? <Text style={styles.profileSub}>{selected.city}</Text> : null}
-                      <Text style={styles.profileSub}>Joined {timeAgo(selected.created_at)}</Text>
+                      <Text style={styles.profileSub}>Registrovaný {timeAgo(selected.created_at)}</Text>
                     </View>
                   </View>
 
@@ -287,39 +286,39 @@ export default function AdminUsersScreen() {
                   <View style={styles.statsRow}>
                     <View style={styles.statBox}>
                       <Text style={styles.statNum}>{selected.eventsCreated}</Text>
-                      <Text style={styles.statLbl}>Events created</Text>
+                      <Text style={styles.statLbl}>Podujatia</Text>
                     </View>
                     <View style={styles.statBox}>
                       <Text style={styles.statNum}>{selected.eventsAttended}</Text>
-                      <Text style={styles.statLbl}>Events attended</Text>
+                      <Text style={styles.statLbl}>Zúčastnil sa</Text>
                     </View>
                     <View style={styles.statBox}>
                       <Text style={styles.statNum}>{selected.clubsCreated}</Text>
-                      <Text style={styles.statLbl}>Clubs created</Text>
+                      <Text style={styles.statLbl}>Kluby</Text>
                     </View>
                   </View>
 
                   {/* Blacklist section */}
                   <View style={styles.actionSection}>
-                    <Text style={styles.actionSectionTitle}>BLACKLIST</Text>
+                    <Text style={styles.actionSectionTitle}>BLOKOVANIE</Text>
                     {selected.blacklistId ? (
                       <>
                         {selected.blacklistReason ? (
-                          <Text style={styles.blacklistReasonText}>Reason: {selected.blacklistReason}</Text>
+                          <Text style={styles.blacklistReasonText}>Dôvod: {selected.blacklistReason}</Text>
                         ) : null}
                         <TouchableOpacity
                           style={[styles.actionBtn, { backgroundColor: Colors.grayLight }]}
                           onPress={unblacklistUser}
                           disabled={actionLoading}
                         >
-                          <Text style={styles.actionBtnText}>Remove from blacklist</Text>
+                          <Text style={styles.actionBtnText}>Odstrániť blokovanie</Text>
                         </TouchableOpacity>
                       </>
                     ) : (
                       <>
                         <TextInput
                           style={styles.reasonInput}
-                          placeholder="Reason (optional)"
+                          placeholder="Dôvod (voliteľné)"
                           placeholderTextColor={Colors.gray}
                           value={blacklistReason}
                           onChangeText={setBlacklistReason}
@@ -329,7 +328,7 @@ export default function AdminUsersScreen() {
                           onPress={blacklistUser}
                           disabled={actionLoading}
                         >
-                          <Text style={[styles.actionBtnText, { color: '#E85D04' }]}>Blacklist user</Text>
+                          <Text style={[styles.actionBtnText, { color: '#E85D04' }]}>Zablokovať používateľa</Text>
                         </TouchableOpacity>
                       </>
                     )}
@@ -337,13 +336,13 @@ export default function AdminUsersScreen() {
 
                   {/* Delete section */}
                   <View style={styles.actionSection}>
-                    <Text style={styles.actionSectionTitle}>DANGER ZONE</Text>
+                    <Text style={styles.actionSectionTitle}>NEBEZPEČNÁ ZÓNA</Text>
                     <TouchableOpacity
                       style={[styles.actionBtn, { backgroundColor: '#FFF0F0' }]}
                       onPress={deleteUserConfirm1}
                       disabled={actionLoading}
                     >
-                      <Text style={[styles.actionBtnText, { color: '#CC0000' }]}>Delete account permanently</Text>
+                      <Text style={[styles.actionBtnText, { color: '#CC0000' }]}>Natrvalo vymazať účet</Text>
                     </TouchableOpacity>
                   </View>
                 </>
@@ -352,21 +351,22 @@ export default function AdminUsersScreen() {
           </View>
         )}
       </Modal>
+      <AdminTabBar active="users" />
     </View>
   );
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: Colors.white },
-  header: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 20, paddingBottom: 12 },
-  title: { fontSize: 18, fontWeight: '700', fontFamily: Fonts.bold, color: Colors.black },
+  container: { flex: 1, backgroundColor: Colors.black },
+  header: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 20, paddingBottom: 8, paddingTop: 14 },
+  title: { fontSize: 22, fontWeight: '800', fontFamily: Fonts.extrabold, color: Colors.white },
   count: { fontSize: 14, color: Colors.gray, fontFamily: Fonts.regular },
   searchWrap: { paddingHorizontal: 20, paddingBottom: 12 },
   search: { backgroundColor: Colors.grayLight, borderRadius: 12, paddingHorizontal: 14, paddingVertical: 10, fontSize: 14, color: Colors.black, fontFamily: Fonts.regular },
   row: { flexDirection: 'row', alignItems: 'center', gap: 12, paddingHorizontal: 20, paddingVertical: 12 },
   sep: { height: 1, backgroundColor: Colors.grayBorder, marginLeft: 72 },
-  rowName: { fontSize: 15, fontWeight: '600', fontFamily: Fonts.semibold, color: Colors.black },
-  rowEmail: { fontSize: 12, color: Colors.gray, fontFamily: Fonts.regular, marginTop: 1 },
+  rowName: { fontSize: 15, fontWeight: '600', fontFamily: Fonts.semibold, color: Colors.white },
+  rowEmail: { fontSize: 12, color: 'rgba(255,255,255,0.4)', fontFamily: Fonts.regular, marginTop: 1 },
   rowDate: { fontSize: 11, color: Colors.gray, fontFamily: Fonts.regular },
   adminBadge: { backgroundColor: Colors.lime, borderRadius: 6, paddingHorizontal: 6, paddingVertical: 2 },
   adminBadgeText: { fontSize: 9, fontWeight: '800', fontFamily: Fonts.extrabold, color: Colors.black },

@@ -8,7 +8,7 @@ import { Colors } from '@/constants/colors';
 import { Fonts } from '@/constants/fonts';
 import { supabase } from '@/lib/supabase';
 import { useAuth } from '@/context/AuthContext';
-import { BackButton } from '@/components/ui/BackButton';
+import { AdminTabBar } from '@/components/admin/AdminTabBar';
 
 type ReportRow = {
   id: string;
@@ -104,15 +104,15 @@ export default function AdminReportsScreen() {
   }
 
   const typeLabels: Record<string, string> = {
-    inappropriate: '⚠️ Inappropriate',
+    inappropriate: '⚠️ Nevhodný obsah',
     spam: '🗑 Spam',
-    harassment: '🚫 Harassment',
+    harassment: '🚫 Obťažovanie',
   };
 
   const TABS: { key: StatusTab; label: string }[] = [
-    { key: 'open', label: `Open (${counts.open})` },
-    { key: 'in_review', label: `In review (${counts.in_review})` },
-    { key: 'closed', label: `Closed (${counts.closed})` },
+    { key: 'open', label: `Otvorené (${counts.open})` },
+    { key: 'in_review', label: `V riešení (${counts.in_review})` },
+    { key: 'closed', label: `Uzavreté (${counts.closed})` },
   ];
 
   const renderReport = ({ item }: { item: ReportRow }) => (
@@ -123,8 +123,8 @@ export default function AdminReportsScreen() {
         </Text>
       </View>
       <View style={{ flex: 1 }}>
-        <Text style={styles.rowTitle} numberOfLines={1}>{item.reason || '(no reason given)'}</Text>
-        <Text style={styles.rowSub}>Reported by {item.reporter_name} · {timeFmt(item.created_at)}</Text>
+        <Text style={styles.rowTitle} numberOfLines={1}>{item.reason || '(bez dôvodu)'}</Text>
+        <Text style={styles.rowSub}>Nahlásil {item.reporter_name} · {timeFmt(item.created_at)}</Text>
       </View>
     </TouchableOpacity>
   );
@@ -132,9 +132,7 @@ export default function AdminReportsScreen() {
   return (
     <View style={[styles.container, { paddingTop: insets.top }]}>
       <View style={styles.header}>
-        <BackButton />
         <Text style={styles.title}>Reports</Text>
-        <View style={{ width: 36 }} />
       </View>
 
       <View style={styles.tabs}>
@@ -149,7 +147,7 @@ export default function AdminReportsScreen() {
         <ActivityIndicator style={{ marginTop: 40 }} color={Colors.black} />
       ) : filtered.length === 0 ? (
         <View style={styles.empty}>
-          <Text style={styles.emptyText}>No {tab.replace('_', ' ')} reports</Text>
+          <Text style={styles.emptyText}>Žiadne hlásenia</Text>
         </View>
       ) : (
         <FlatList
@@ -169,37 +167,37 @@ export default function AdminReportsScreen() {
               <TouchableOpacity onPress={() => setSelected(null)}>
                 <Text style={styles.modalClose}>✕</Text>
               </TouchableOpacity>
-              <Text style={styles.modalTitle}>Report detail</Text>
+              <Text style={styles.modalTitle}>Detail hlásenia</Text>
               <View style={{ width: 32 }} />
             </View>
 
             <ScrollView contentContainerStyle={{ paddingHorizontal: 20, paddingBottom: 40, gap: 20 }}>
               <View style={styles.detailRow}>
-                <Text style={styles.detailLabel}>Type</Text>
+                <Text style={styles.detailLabel}>Typ</Text>
                 <Text style={styles.detailValue}>{typeLabels[selected.type]}</Text>
               </View>
               <View style={styles.detailRow}>
-                <Text style={styles.detailLabel}>Reported by</Text>
+                <Text style={styles.detailLabel}>Nahlásil</Text>
                 <Text style={styles.detailValue}>{selected.reporter_name}</Text>
               </View>
               <View style={styles.detailRow}>
-                <Text style={styles.detailLabel}>Date</Text>
+                <Text style={styles.detailLabel}>Dátum</Text>
                 <Text style={styles.detailValue}>{timeFmt(selected.created_at)}</Text>
               </View>
               <View style={styles.detailRow}>
-                <Text style={styles.detailLabel}>Target ID</Text>
+                <Text style={styles.detailLabel}>Cieľ ID</Text>
                 <Text style={[styles.detailValue, { fontSize: 11, fontFamily: 'monospace' }]}>{selected.target_id}</Text>
               </View>
               {selected.reason ? (
                 <View style={styles.reasonBox}>
-                  <Text style={styles.detailLabel}>Reason</Text>
+                  <Text style={styles.detailLabel}>Dôvod</Text>
                   <Text style={styles.reasonText}>{selected.reason}</Text>
                 </View>
               ) : null}
 
               {/* Status actions */}
               <View style={styles.actionSection}>
-                <Text style={styles.actionSectionTitle}>STATUS</Text>
+                <Text style={styles.actionSectionTitle}>STAV</Text>
                 <View style={{ flexDirection: 'row', gap: 8 }}>
                   {(['open', 'in_review', 'closed'] as StatusTab[]).map(s => (
                     <TouchableOpacity
@@ -209,7 +207,7 @@ export default function AdminReportsScreen() {
                       disabled={saving}
                     >
                       <Text style={[styles.statusBtnText, selected.status === s && styles.statusBtnTextActive]}>
-                        {s.replace('_', ' ')}
+                        {{ open: 'Otvorené', in_review: 'V riešení', closed: 'Uzavreté' }[s]}
                       </Text>
                     </TouchableOpacity>
                   ))}
@@ -218,12 +216,12 @@ export default function AdminReportsScreen() {
 
               {/* Admin note */}
               <View style={styles.actionSection}>
-                <Text style={styles.actionSectionTitle}>ADMIN NOTE</Text>
+                <Text style={styles.actionSectionTitle}>POZNÁMKA</Text>
                 <TextInput
                   style={styles.noteInput}
                   value={adminNote}
                   onChangeText={setAdminNote}
-                  placeholder="Add an internal note..."
+                  placeholder="Pridaj internú poznámku..."
                   placeholderTextColor={Colors.gray}
                   multiline
                 />
@@ -232,13 +230,13 @@ export default function AdminReportsScreen() {
                   onPress={saveNote}
                   disabled={saving}
                 >
-                  <Text style={styles.saveNoteBtnText}>Save note</Text>
+                  <Text style={styles.saveNoteBtnText}>Uložiť poznámku</Text>
                 </TouchableOpacity>
               </View>
 
               {selected.admin_note ? (
                 <View style={styles.savedNote}>
-                  <Text style={styles.savedNoteLabel}>Saved note:</Text>
+                  <Text style={styles.savedNoteLabel}>Uložená poznámka:</Text>
                   <Text style={styles.savedNoteText}>{selected.admin_note}</Text>
                 </View>
               ) : null}
@@ -246,14 +244,15 @@ export default function AdminReportsScreen() {
           </View>
         )}
       </Modal>
+      <AdminTabBar active="more" />
     </View>
   );
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: Colors.white },
-  header: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 20, paddingBottom: 8 },
-  title: { fontSize: 18, fontWeight: '700', fontFamily: Fonts.bold, color: Colors.black },
+  container: { flex: 1, backgroundColor: Colors.black },
+  header: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 20, paddingBottom: 8, paddingTop: 14 },
+  title: { fontSize: 22, fontWeight: '800', fontFamily: Fonts.extrabold, color: Colors.white },
   tabs: { flexDirection: 'row', paddingHorizontal: 16, gap: 6, marginBottom: 8 },
   tab: { flex: 1, paddingVertical: 8, borderRadius: 10, backgroundColor: Colors.grayLight, alignItems: 'center' },
   tabActive: { backgroundColor: Colors.black },

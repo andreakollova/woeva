@@ -41,7 +41,7 @@ export default function AdminCategoriesScreen() {
   useEffect(() => { loadCategories(); }, []);
 
   async function saveCategory() {
-    if (!newName.trim()) { Alert.alert('Name required'); return; }
+    if (!newName.trim()) { Alert.alert('Povinné pole', 'Zadaj prosím názov kategórie.'); return; }
     setSaving(true);
     if (editTarget) {
       await supabase.from('categories').update({ name: newName.trim(), icon: newIcon }).eq('id', editTarget.id);
@@ -91,12 +91,12 @@ export default function AdminCategoriesScreen() {
 
   function deleteConfirm(cat: CategoryRow) {
     Alert.alert(
-      'Delete category',
-      `Delete "${cat.name}"? This won't affect existing events/clubs that already use it.`,
+      'Vymazať kategóriu',
+      `Vymazať "${cat.name}"? Existujúce podujatia a kluby s touto kategóriou nie sú ovplyvnené.`,
       [
-        { text: 'Cancel', style: 'cancel' },
+        { text: 'Zrušiť', style: 'cancel' },
         {
-          text: 'Delete', style: 'destructive',
+          text: 'Vymazať', style: 'destructive',
           onPress: async () => {
             await supabase.from('categories').delete().eq('id', cat.id);
             setCategories(prev => prev.filter(c => c.id !== cat.id));
@@ -142,16 +142,16 @@ export default function AdminCategoriesScreen() {
     <View style={[styles.container, { paddingTop: insets.top }]}>
       <View style={styles.header}>
         <BackButton />
-        <Text style={styles.title}>Categories</Text>
+        <Text style={styles.title}>Kategórie</Text>
         <TouchableOpacity
           style={styles.addBtn}
           onPress={() => { setEditTarget(null); setNewName(''); setNewIcon('●'); setShowAdd(true); }}
         >
-          <Text style={styles.addBtnText}>+ Add</Text>
+          <Text style={styles.addBtnText}>+ Pridať</Text>
         </TouchableOpacity>
       </View>
 
-      <Text style={styles.hint}>Active categories appear in the app. Tap ● to toggle.</Text>
+      <Text style={styles.hint}>Aktívne kategórie sa zobrazujú v aplikácii. Ťukni ● na prepnutie.</Text>
 
       {loading ? (
         <ActivityIndicator style={{ marginTop: 40 }} color={Colors.black} />
@@ -170,26 +170,26 @@ export default function AdminCategoriesScreen() {
         <View style={[styles.formModal, { paddingTop: 24, paddingBottom: insets.bottom + 24 }]}>
           <View style={styles.formHeader}>
             <TouchableOpacity onPress={() => { setShowAdd(false); setEditTarget(null); }}>
-              <Text style={styles.modalClose}>Cancel</Text>
+              <Text style={styles.modalClose}>Zrušiť</Text>
             </TouchableOpacity>
-            <Text style={styles.formTitle}>{editTarget ? 'Edit category' : 'New category'}</Text>
+            <Text style={styles.formTitle}>{editTarget ? 'Upraviť kategóriu' : 'Nová kategória'}</Text>
             <TouchableOpacity onPress={saveCategory} disabled={saving}>
-              <Text style={[styles.saveBtn, saving && { opacity: 0.5 }]}>Save</Text>
+              <Text style={[styles.saveBtn, saving && { opacity: 0.5 }]}>Uložiť</Text>
             </TouchableOpacity>
           </View>
 
           <View style={styles.formBody}>
-            <Text style={styles.formLabel}>Name</Text>
+            <Text style={styles.formLabel}>Názov</Text>
             <TextInput
               style={styles.formInput}
               value={newName}
               onChangeText={setNewName}
-              placeholder="e.g. Coffee"
+              placeholder="napr. Káva"
               placeholderTextColor={Colors.gray}
               autoFocus
             />
 
-            <Text style={styles.formLabel}>Icon</Text>
+            <Text style={styles.formLabel}>Ikona</Text>
             <View style={styles.iconGrid}>
               {ICON_OPTIONS.map(icon => (
                 <TouchableOpacity
