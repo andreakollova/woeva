@@ -109,7 +109,7 @@ export function EventCard({ event, featured, attending }: EventCardProps) {
           {event.venue ? (
             <>
               <Text style={styles.rowDot}>·</Text>
-              <Text style={styles.rowMeta} numberOfLines={1}>
+              <Text style={[styles.rowMeta, { flex: 1 }]} numberOfLines={1} ellipsizeMode="tail">
                 {(() => {
                   const parts = event.venue.split(',').map(p => p.trim());
                   return parts.find(p => !/^[\d/\s]+$/.test(p)) ?? parts[0];
