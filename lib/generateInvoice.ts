@@ -1,6 +1,6 @@
 // Generates HTML invoices for expo-print
 // generateCreatorInvoice  — earnings summary (Woeva → Creator)
-// generateFormalInvoice   — formal invoice (Creator → Woeva s.r.o.) with WOE-YYYY-NNNNN numbering
+// generateFormalInvoice   — formal invoice (Creator → Sportqo s. r. o.) with WOE-YYYY-NNNNN numbering
 
 export type BillingInfo = {
   company_name: string;
@@ -90,8 +90,8 @@ export function generateCreatorInvoice(
   <div class="billing">
     <div class="billing-block">
       <h3>Platforma</h3>
-      <p class="main">Woeva s.r.o.</p>
-      <p>IČO: 12345678</p>
+      <p class="main">Sportqo s. r. o.</p>
+      <p>IČO: 56132433</p>
       <p>woeva.app</p>
     </div>
     <div class="billing-block">
@@ -137,7 +137,7 @@ export function generateCreatorInvoice(
 </html>`;
 }
 
-// ─── Formal invoice: Creator (dodávateľ) → Woeva s.r.o. (odberateľ) ───────────
+// ─── Formal invoice: Creator (dodávateľ) → Sportqo s. r. o. (odberateľ) ───────────
 
 export function generateFormalInvoice(
   billing: BillingInfo,
@@ -216,11 +216,11 @@ export function generateFormalInvoice(
     </div>
     <div class="billing-block">
       <h3>Odberateľ</h3>
-      <p class="main">Woeva s.r.o.</p>
-      <p>IČO: 12345678</p>
-      <p>DIČ: SK2024000000</p>
-      <p>Hlavná 1</p>
-      <p>811 01 Bratislava, SK</p>
+      <p class="main">Sportqo s. r. o.</p>
+      <p>IČO: 56132433</p>
+      <p>DIČ: SK2122213775</p>
+      <p>Mudrochova 7480/15</p>
+      <p>831 06 Bratislava, SK</p>
     </div>
   </div>
 
