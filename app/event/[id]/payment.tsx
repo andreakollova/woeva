@@ -67,6 +67,9 @@ export default function PaymentScreen() {
         payment_intent_id: data.paymentIntentId,
       });
       await supabase.from('events').update({ going_count: (event.going_count ?? 0) + 1 }).eq('id', id);
+      supabase.functions.invoke('send-receipt', {
+        body: { eventId: id, paymentIntentId: data.paymentIntentId },
+      });
       setToast(true);
       setTimeout(() => router.replace(`/event/${id}`), 2000);
     }
