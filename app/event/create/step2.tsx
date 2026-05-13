@@ -21,9 +21,8 @@ export default function CreateStep2Screen() {
   const { categories } = useCategories();
   const [title, setTitle] = useState('');
   const [tagline, setTagline] = useState('');
-  const [category, setCategory] = useState('');
+  const [tags, setTags] = useState<string[]>([]);
   const [cover, setCover] = useState<string | null>(null);
-  const [showCategories, setShowCategories] = useState(false);
   const [clubName, setClubName] = useState<string | null>(null);
   const [postAs, setPostAs] = useState<'club' | 'individual'>('club');
 
@@ -40,9 +39,15 @@ export default function CreateStep2Screen() {
     if (!result.canceled) setCover(result.assets[0].uri);
   }
 
+  function toggleTag(cat: string) {
+    setTags(prev =>
+      prev.includes(cat) ? prev.filter(t => t !== cat) : prev.length < 3 ? [...prev, cat] : prev
+    );
+  }
+
   function handleNext() {
-    if (!title || !cover) return;
-    router.push({ pathname: '/event/create/step3', params: { title, tagline, category, cover, postAs } });
+    if (!title || !cover || tags.length === 0) return;
+    router.push({ pathname: '/event/create/step3', params: { title, tagline, tags: JSON.stringify(tags), cover, postAs } });
   }
 
   return (
@@ -99,7 +104,7 @@ export default function CreateStep2Screen() {
                 <Text style={styles.posterLabel}>{t.event.postedAs}</Text>
                 <Text style={styles.posterName}>{profile?.name || t.chat.you}</Text>
               </View>
-              <TouchableOpacity onPress={() => router.push('/club/create/index' as any)} activeOpacity={0.7}>
+              <TouchableOpacity onPress={() => router.push('/club/create' as any)} activeOpacity={0.7}>
                 <Text style={styles.createClubLink}>{t.event.createClubLink}</Text>
               </TouchableOpacity>
             </View>
@@ -127,27 +132,28 @@ export default function CreateStep2Screen() {
             )}
           </View>
 
-          {/* Category picker */}
+          {/* Tags picker */}
           <View>
-            <Text style={styles.label}>{t.event.category}</Text>
-            <TouchableOpacity style={styles.selector} onPress={() => setShowCategories(!showCategories)}>
-              <Text style={category ? styles.selectorValue : styles.selectorPlaceholder}>
-                {category || t.event.selectCategory}
-              </Text>
-            </TouchableOpacity>
-            {showCategories && (
-              <View style={styles.dropdown}>
-                {categories.map(cat => (
+            <View style={styles.labelRow}>
+              <Text style={[styles.label, { marginBottom: 0 }]}>{t.event.category}</Text>
+              <Text style={styles.labelRequired}>{tags.length}/3</Text>
+            </View>
+            <View style={styles.chipsWrap}>
+              {categories.map(cat => {
+                const active = tags.includes(cat);
+                const disabled = !active && tags.length >= 3;
+                return (
                   <TouchableOpacity
                     key={cat}
-                    style={styles.dropdownItem}
-                    onPress={() => { setCategory(cat); setShowCategories(false); }}
+                    style={[styles.chip, active && styles.chipActive, disabled && styles.chipDisabled]}
+                    onPress={() => !disabled && toggleTag(cat)}
+                    activeOpacity={0.7}
                   >
-                    <Text style={[styles.dropdownText, category === cat && styles.dropdownTextActive]}>{cat}</Text>
+                    <Text style={[styles.chipText, active && styles.chipTextActive]}>{cat}</Text>
                   </TouchableOpacity>
-                ))}
-              </View>
-            )}
+                );
+              })}
+            </View>
           </View>
 
           {/* Cover photo */}
@@ -171,7 +177,7 @@ export default function CreateStep2Screen() {
       </ScrollView>
 
       <View style={[styles.footer, { paddingBottom: insets.bottom + 16 }]}>
-        <Button label={t.common.next} onPress={handleNext} disabled={!title || !cover} variant="black" />
+        <Button label={t.common.next} onPress={handleNext} disabled={!title || !cover || tags.length === 0} variant="black" />
         <Button label={t.common.back} onPress={() => router.back()} variant="ghost" />
       </View>
     </KeyboardAvoidingView>
@@ -187,13 +193,12 @@ const styles = StyleSheet.create({
   title: { fontSize: 28, fontWeight: '700', color: Colors.black, marginBottom: 28, letterSpacing: -0.5 },
   form: { gap: 20 },
   label: { fontSize: 13, fontWeight: '500', color: Colors.black, marginBottom: 6 },
-  selector: { height: 44, borderWidth: 1.5, borderColor: Colors.grayBorder, borderRadius: 12, paddingHorizontal: 14, justifyContent: 'center' },
-  selectorValue: { fontSize: 14, color: Colors.black },
-  selectorPlaceholder: { fontSize: 14, color: Colors.gray },
-  dropdown: { borderWidth: 1.5, borderColor: Colors.grayBorder, borderRadius: 12, marginTop: 4, overflow: 'hidden' },
-  dropdownItem: { padding: 14, borderBottomWidth: 1, borderColor: Colors.grayBorder },
-  dropdownText: { fontSize: 15, color: Colors.black },
-  dropdownTextActive: { fontWeight: '700', color: Colors.lime },
+  chipsWrap: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginTop: 8 },
+  chip: { paddingHorizontal: 14, paddingVertical: 8, borderRadius: 50, backgroundColor: Colors.grayLight, borderWidth: 1.5, borderColor: 'transparent' },
+  chipActive: { backgroundColor: Colors.black, borderColor: Colors.black },
+  chipDisabled: { opacity: 0.35 },
+  chipText: { fontSize: 13, color: Colors.black, fontWeight: '500', fontFamily: Fonts.medium },
+  chipTextActive: { color: Colors.lime, fontWeight: '700', fontFamily: Fonts.bold },
   labelRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 6 },
   labelRequired: { fontSize: 11, fontWeight: '600', color: Colors.gray, fontFamily: Fonts.semibold, letterSpacing: 0.4 },
   labelRequiredOver: { color: '#EF4444' },

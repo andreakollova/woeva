@@ -86,7 +86,7 @@ export default function EventDetailScreen() {
   async function load() {
     const { data } = await supabase
       .from('events')
-      .select('*, club:clubs(id, name, cover_url)')
+      .select('*, club:clubs(id, name, cover_url, logo_url)')
       .eq('id', id).single();
     setEvent(data as any);
 
@@ -422,9 +422,8 @@ export default function EventDetailScreen() {
                     <Text style={s.goingAvInitial}>{(profile?.name ?? user?.email ?? '?').charAt(0).toUpperCase()}</Text>
                     {profile?.avatar_url ? <Image source={{ uri: profile.avatar_url }} style={[StyleSheet.absoluteFill, { borderRadius: 13 }]} /> : null}
                   </View>
-                  {/* Other attendees — always show 3 */}
-                  {Array.from({ length: 3 }).map((_, i) => {
-                    const att = otherAtts[i];
+                  {/* Other attendees — only real ones */}
+                  {otherAtts.slice(0, 3).map((att, i) => {
                     const avatarUrl = att?.profile?.avatar_url;
                     const initial = (att?.profile?.name ?? '?').charAt(0).toUpperCase();
                     return (
@@ -489,8 +488,7 @@ export default function EventDetailScreen() {
             {!isAttending && (
               <View style={s.infoRow}>
                 <View style={s.avatarStack}>
-                  {Array.from({ length: 3 }).map((_, i) => {
-                    const att = attendees[i];
+                  {attendees.slice(0, 3).map((att, i) => {
                     const avatarUrl = att?.profile?.avatar_url;
                     const initial = (att?.profile?.name ?? '?').charAt(0).toUpperCase();
                     return (
@@ -525,8 +523,8 @@ export default function EventDetailScreen() {
                 onPress={() => event.club ? router.push(`/club/${event.club!.id}`) : null}
                 activeOpacity={event.club ? 0.7 : 1}
               >
-                {event.club?.cover_url
-                  ? <Image source={{ uri: event.club.cover_url }} style={s.hostAvatar} />
+                {(event.club?.logo_url ?? event.club?.cover_url)
+                  ? <Image source={{ uri: (event.club.logo_url ?? event.club.cover_url)! }} style={s.hostAvatar} />
                   : <View style={[s.hostAvatar, s.hostAvatarFallback]}><Text style={s.hostAvatarInitial}>{hostInitial}</Text></View>
                 }
                 <View style={{ flex: 1 }}>

@@ -177,6 +177,56 @@ export const notify = {
     ]);
   },
 
+  /**
+   * New public event created — notify users who want events matching these tags,
+   * or all events in the city. Respects per-user notif preferences.
+   */
+  async newEvent(params: {
+    creatorId: string;
+    eventId: string;
+    eventTitle: string;
+    tags: string[];
+    city: string;
+  }) {
+    if (!params.tags.length && !params.city) return;
+
+    // 1. Users who want ALL new events in their city
+    const { data: allSubs } = await supabase
+      .from('profiles')
+      .select('id, push_token')
+      .eq('notifications_enabled', true)
+      .eq('notif_new_event_all', true)
+      .eq('city', params.city)
+      .neq('id', params.creatorId)
+      .not('push_token', 'is', null);
+
+    // 2. Users who want only events matching their interests
+    const { data: tagSubs } = params.tags.length
+      ? await supabase
+          .from('profiles')
+          .select('id, push_token')
+          .eq('notifications_enabled', true)
+          .eq('notif_new_event_my_tags', true)
+          .eq('city', params.city)
+          .neq('id', params.creatorId)
+          .overlaps('interests', params.tags)
+          .not('push_token', 'is', null)
+      : { data: [] };
+
+    // Deduplicate by id
+    const seen = new Set<string>();
+    const tokens: string[] = [];
+    for (const row of [...(allSubs ?? []), ...(tagSubs ?? [])]) {
+      if (!seen.has(row.id) && row.push_token) {
+        seen.add(row.id);
+        tokens.push(row.push_token);
+      }
+    }
+
+    if (!tokens.length) return;
+    await sendPush(tokens, params.eventTitle, 'New event in your city', { event_id: params.eventId, type: 'new_event' });
+  },
+
   /** Welcome email on signup */
   async welcome(params: { email: string; name: string }) {
     await sendEmail(params.email, 'Welcome to Woeva!', emailTemplates.welcome({ name: params.name }));

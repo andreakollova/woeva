@@ -26,7 +26,7 @@ export default function ClubEditScreen() {
   const [name, setName] = useState('');
   const [tagline, setTagline] = useState('');
   const [description, setDescription] = useState('');
-  const [category, setCategory] = useState('');
+  const [tags, setTags] = useState<string[]>([]);
   const [cover, setCover] = useState<string | null>(null);
   const [existingCoverUrl, setExistingCoverUrl] = useState<string | null>(null);
   const [logo, setLogo] = useState<string | null>(null);
@@ -43,7 +43,7 @@ export default function ClubEditScreen() {
         setName(data.name ?? '');
         setTagline(data.tagline ?? '');
         setDescription(data.description ?? '');
-        setCategory(data.category ?? '');
+        setTags(data.tags?.length ? data.tags : (data.category ? [data.category] : []));
         setExistingCoverUrl(data.cover_url ?? null);
         setExistingLogoUrl(data.logo_url ?? null);
       });
@@ -69,18 +69,31 @@ export default function ClubEditScreen() {
 
     if (cover) {
       const ext = (cover.split('.').pop() ?? 'jpg').toLowerCase().replace('heic', 'jpg');
-      cover_url = await uploadImage(cover, 'club-covers', `${id}_cover_${ts}.${ext}`) ?? existingCoverUrl;
+      const uploaded = await uploadImage(cover, 'club-covers', `${id}_cover_${ts}.${ext}`);
+      if (!uploaded) {
+        setLoading(false);
+        Alert.alert('Upload failed', 'Could not upload the cover image. Check that the "club-covers" bucket exists in Supabase Storage and is public.');
+        return;
+      }
+      cover_url = uploaded;
     }
     if (logo) {
       const ext = (logo.split('.').pop() ?? 'jpg').toLowerCase().replace('heic', 'jpg');
-      logo_url = await uploadImage(logo, 'club-logos', `${id}_logo_${ts}.${ext}`) ?? existingLogoUrl;
+      const uploaded = await uploadImage(logo, 'club-logos', `${id}_logo_${ts}.${ext}`);
+      if (!uploaded) {
+        setLoading(false);
+        Alert.alert('Upload failed', 'Could not upload the logo image. Check that the "club-logos" bucket exists in Supabase Storage and is public.');
+        return;
+      }
+      logo_url = uploaded;
     }
 
     const { error } = await supabase.from('clubs').update({
       name: name.trim(),
       tagline: tagline.trim() || null,
       description: description.trim() || null,
-      category: category || null,
+      tags,
+      category: tags[0] || null,
       cover_url,
       logo_url,
     }).eq('id', id);
@@ -251,17 +264,24 @@ export default function ClubEditScreen() {
             </View>
           </View>
 
-          {/* Category chips */}
+          {/* Category chips — multi (max 3) */}
           <View style={{ gap: 6 }}>
-            <Text style={styles.label}>{t.club.category}</Text>
+            <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
+              <Text style={styles.label}>{t.club.category}</Text>
+              <Text style={{ fontSize: 11, color: Colors.gray }}>{tags.length}/3</Text>
+            </View>
             <View style={styles.chipsWrap}>
               {categories.map(cat => {
-                const active = category === cat;
+                const active = tags.includes(cat);
+                const disabled = !active && tags.length >= 3;
                 return (
                   <TouchableOpacity
                     key={cat}
-                    style={[styles.chip, active && styles.chipActive]}
-                    onPress={() => setCategory(active ? '' : cat)}
+                    style={[styles.chip, active && styles.chipActive, disabled && { opacity: 0.35 }]}
+                    onPress={() => {
+                      if (disabled) return;
+                      setTags(prev => prev.includes(cat) ? prev.filter(t => t !== cat) : [...prev, cat]);
+                    }}
                     activeOpacity={0.7}
                   >
                     <Text style={[styles.chipText, active && styles.chipTextActive]}>{cat}</Text>

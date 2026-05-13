@@ -9,6 +9,11 @@ export interface Profile {
   phone: string | null;
   push_token: string | null;
   notifications_enabled: boolean;
+  notif_new_event_my_tags: boolean;
+  notif_new_event_all: boolean;
+  notif_club_events: boolean;
+  notif_chat: boolean;
+  notif_attendees: boolean;
   is_admin: boolean;
   created_at: string;
 }
@@ -66,6 +71,7 @@ export interface Event {
   title: string;
   tagline: string | null;
   category: string;
+  tags: string[];
   cover_url: string | null;
   date: string;
   time: string;
@@ -106,6 +112,7 @@ export interface Club {
   tagline: string | null;
   description: string | null;
   category: string;
+  tags: string[];
   cover_url: string | null;
   logo_url: string | null;
   member_count: number;

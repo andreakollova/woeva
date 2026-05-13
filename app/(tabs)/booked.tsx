@@ -236,8 +236,9 @@ function TicketCard({ event, userId, userAvatar, userName, isPast, isRated, onPr
   const [goingCount, setGoingCount] = useState(event.going_count ?? 0);
 
   useEffect(() => {
+    const channelName = `event_going_${event.id}_${Math.random().toString(36).slice(2)}`;
     const channel = supabase
-      .channel(`event_going_${event.id}`)
+      .channel(channelName)
       .on('postgres_changes', {
         event: 'UPDATE',
         schema: 'public',

@@ -46,7 +46,7 @@ export default function RootLayout() {
             <Stack.Screen name="event/create/published" options={{ animation: 'fade', gestureEnabled: false }} />
             <Stack.Screen name="club/[id]" options={{ animation: 'slide_from_right' }} />
             <Stack.Screen name="club/[id]/members" options={{ animation: 'slide_from_right' }} />
-            <Stack.Screen name="club/create/index" options={{ animation: 'slide_from_right' }} />
+            <Stack.Screen name="club/create" options={{ animation: 'slide_from_right' }} />
             <Stack.Screen name="chat/[roomId]" options={{ animation: 'slide_from_right' }} />
             <Stack.Screen name="settings/index" options={{ animation: 'slide_from_right' }} />
             <Stack.Screen name="settings/profile" options={{ animation: 'slide_from_right' }} />

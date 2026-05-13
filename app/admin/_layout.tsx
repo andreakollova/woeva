@@ -7,7 +7,12 @@ export default function AdminLayout() {
   const router = useRouter();
 
   useEffect(() => {
-    if (!loading && profile !== null && !profile.is_admin) {
+    if (loading) return;
+    if (profile === null) {
+      router.replace('/(auth)');
+      return;
+    }
+    if (!profile.is_admin) {
       router.replace('/(tabs)');
     }
   }, [profile, loading]);

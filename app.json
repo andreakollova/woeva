@@ -60,7 +60,8 @@
           "enableGooglePay": true
         }
       ],
-      "expo-location"
+      "expo-location",
+      "expo-apple-authentication"
     ],
     "experiments": {
       "typedRoutes": true

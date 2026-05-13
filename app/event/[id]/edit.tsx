@@ -11,6 +11,7 @@ import { Button } from '@/components/ui/Button';
 import { Toast } from '@/components/ui/Toast';
 import { supabase } from '@/lib/supabase';
 import { useTranslations } from '@/context/LanguageContext';
+import { useCategories } from '@/hooks/useCategories';
 
 export default function EditEventScreen() {
   const router = useRouter();
@@ -18,8 +19,10 @@ export default function EditEventScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const { t } = useTranslations();
 
+  const { categories } = useCategories();
   const [title, setTitle] = useState('');
   const [tagline, setTagline] = useState('');
+  const [tags, setTags] = useState<string[]>([]);
   const [date, setDate] = useState(new Date());
   const [time, setTime] = useState(new Date());
   const [venue, setVenue] = useState('');
@@ -41,6 +44,7 @@ export default function EditEventScreen() {
     if (!data) return;
     setTitle(data.title);
     setTagline(data.tagline ?? '');
+    setTags(data.tags?.length ? data.tags : (data.category ? [data.category] : []));
     setPrice(String(data.price ?? 0));
     setVenue(data.venue ?? '');
     setVenueLat(data.lat ?? undefined);
@@ -70,6 +74,8 @@ export default function EditEventScreen() {
     const { error } = await supabase.from('events').update({
       title: title.trim(),
       tagline: tagline.trim(),
+      tags,
+      category: tags[0] ?? 'Other',
       date: eventDate,
       time: eventTime,
       venue: venue.trim(),
@@ -169,6 +175,33 @@ export default function EditEventScreen() {
             keyboardType="numeric"
           />
 
+          {/* Tags */}
+          <View>
+            <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginBottom: 8 }}>
+              <Text style={styles.label}>{t.event.category}</Text>
+              <Text style={{ fontSize: 11, color: Colors.gray }}>{tags.length}/3</Text>
+            </View>
+            <View style={styles.chipsWrap}>
+              {categories.map(cat => {
+                const active = tags.includes(cat);
+                const disabled = !active && tags.length >= 3;
+                return (
+                  <TouchableOpacity
+                    key={cat}
+                    style={[styles.chip, active && styles.chipActive, disabled && styles.chipDisabled]}
+                    onPress={() => {
+                      if (disabled) return;
+                      setTags(prev => prev.includes(cat) ? prev.filter(t => t !== cat) : [...prev, cat]);
+                    }}
+                    activeOpacity={0.7}
+                  >
+                    <Text style={[styles.chipText, active && styles.chipTextActive]}>{cat}</Text>
+                  </TouchableOpacity>
+                );
+              })}
+            </View>
+          </View>
+
           {/* Recurring toggle */}
           <TouchableOpacity style={styles.recurringRow} onPress={() => setIsRecurring(r => !r)} activeOpacity={0.7}>
             <View style={styles.recurringText}>
@@ -202,6 +235,12 @@ const styles = StyleSheet.create({
   field: { height: 52, borderWidth: 1.5, borderColor: Colors.grayBorder, borderRadius: 12, paddingHorizontal: 16, justifyContent: 'center' },
   fieldValue: { fontSize: 16, color: Colors.black },
   footer: { paddingHorizontal: 24, paddingTop: 12, borderTopWidth: 1, borderColor: Colors.grayBorder, backgroundColor: Colors.white },
+  chipsWrap: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
+  chip: { paddingHorizontal: 14, paddingVertical: 8, borderRadius: 50, backgroundColor: Colors.grayLight, borderWidth: 1.5, borderColor: 'transparent' },
+  chipActive: { backgroundColor: Colors.black },
+  chipDisabled: { opacity: 0.35 },
+  chipText: { fontSize: 13, color: Colors.black, fontWeight: '500' },
+  chipTextActive: { color: Colors.lime, fontWeight: '700' },
   recurringRow: { flexDirection: 'row', alignItems: 'center', gap: 14, backgroundColor: Colors.grayLight, borderRadius: 12, padding: 14 },
   recurringText: { flex: 1 },
   recurringTitle: { fontSize: 15, fontWeight: '600', fontFamily: Fonts.semibold, color: Colors.black },

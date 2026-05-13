@@ -22,12 +22,11 @@ export default function CreateClubScreen() {
   const { categories } = useCategories();
   const [name, setName] = useState('');
   const [tagline, setTagline] = useState('');
-  const [category, setCategory] = useState('');
+  const [tags, setTags] = useState<string[]>([]);
   const [description, setDescription] = useState('');
   const [cover, setCover] = useState<string | null>(null);
   const [logo, setLogo] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
-  const [showCategories, setShowCategories] = useState(false);
 
   async function pickCover() {
     const result = await ImagePicker.launchImageLibraryAsync({ mediaTypes: ['images'], quality: 0.8, aspect: [16, 9] });
@@ -61,7 +60,8 @@ export default function CreateClubScreen() {
       name,
       tagline,
       description: description.trim() || null,
-      category,
+      tags,
+      category: tags[0] ?? '',
       cover_url,
       logo_url,
       member_count: 1,
@@ -103,19 +103,29 @@ export default function CreateClubScreen() {
           <Input label={t.club.tagline} value={tagline} onChangeText={setTagline} placeholder={t.club.taglinePlaceholder} />
 
           <View>
-            <Text style={styles.label}>{t.club.category}</Text>
-            <TouchableOpacity style={styles.selector} onPress={() => setShowCategories(!showCategories)}>
-              <Text style={category ? styles.selectorValue : styles.selectorPlaceholder}>{category || t.event.selectCategory}</Text>
-            </TouchableOpacity>
-            {showCategories && (
-              <View style={styles.dropdown}>
-                {categories.map(cat => (
-                  <TouchableOpacity key={cat} style={styles.dropdownItem} onPress={() => { setCategory(cat); setShowCategories(false); }}>
-                    <Text style={[styles.dropdownText, category === cat && styles.dropdownTextActive]}>{cat}</Text>
+            <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginBottom: 8 }}>
+              <Text style={styles.label}>{t.club.category}</Text>
+              <Text style={{ fontSize: 11, color: Colors.gray }}>{tags.length}/3</Text>
+            </View>
+            <View style={styles.chipsWrap}>
+              {categories.map(cat => {
+                const active = tags.includes(cat);
+                const disabled = !active && tags.length >= 3;
+                return (
+                  <TouchableOpacity
+                    key={cat}
+                    style={[styles.chip, active && styles.chipActive, disabled && styles.chipDisabled]}
+                    onPress={() => {
+                      if (disabled) return;
+                      setTags(prev => prev.includes(cat) ? prev.filter(t => t !== cat) : [...prev, cat]);
+                    }}
+                    activeOpacity={0.7}
+                  >
+                    <Text style={[styles.chipText, active && styles.chipTextActive]}>{cat}</Text>
                   </TouchableOpacity>
-                ))}
-              </View>
-            )}
+                );
+              })}
+            </View>
           </View>
 
           {/* Logo + Cover row */}
@@ -179,13 +189,12 @@ const styles = StyleSheet.create({
   title: { fontSize: 28, fontWeight: '700', color: Colors.black, marginBottom: 28, letterSpacing: -0.5 },
   form: { gap: 20 },
   label: { fontSize: 13, fontWeight: '500', color: Colors.black, marginBottom: 6 },
-  selector: { height: 44, borderWidth: 1.5, borderColor: Colors.grayBorder, borderRadius: 12, paddingHorizontal: 14, justifyContent: 'center' },
-  selectorValue: { fontSize: 14, color: Colors.black },
-  selectorPlaceholder: { fontSize: 14, color: Colors.gray },
-  dropdown: { borderWidth: 1.5, borderColor: Colors.grayBorder, borderRadius: 12, marginTop: 4, overflow: 'hidden', maxHeight: 200 },
-  dropdownItem: { padding: 14, borderBottomWidth: 1, borderColor: Colors.grayBorder },
-  dropdownText: { fontSize: 15, color: Colors.black },
-  dropdownTextActive: { fontWeight: '700', color: Colors.lime },
+  chipsWrap: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
+  chip: { paddingHorizontal: 14, paddingVertical: 8, borderRadius: 50, backgroundColor: Colors.grayLight, borderWidth: 1.5, borderColor: 'transparent' },
+  chipActive: { backgroundColor: Colors.black },
+  chipDisabled: { opacity: 0.35 },
+  chipText: { fontSize: 13, color: Colors.black, fontWeight: '500' },
+  chipTextActive: { color: Colors.lime, fontWeight: '700' },
   photosRow: { flexDirection: 'row', gap: 12, alignItems: 'flex-start' },
   logoPicker: {
     width: 80, height: 80, borderRadius: 20,

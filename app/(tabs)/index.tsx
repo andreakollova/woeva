@@ -63,7 +63,8 @@ export default function HomeScreen() {
   }, [filter, city, user?.id]));
 
   async function loadEvents() {
-    let query = supabase.from('events').select('*, club:clubs(id, name, cover_url), attendees:event_attendees(profile:profiles(id, name, avatar_url))').order('date', { ascending: true }).limit(50);
+    const today = new Date().toISOString().split('T')[0];
+    let query = supabase.from('events').select('*, club:clubs(id, name, cover_url), attendees:event_attendees(profile:profiles(id, name, avatar_url))').gte('date', today).order('date', { ascending: true }).limit(50);
     if (filter === 'Free') query = query.eq('is_free', true);
     else if (filter !== 'All') query = query.eq('category', filter);
     if (city && city !== 'Your city' && city !== 'Select city') query = query.eq('city', city);

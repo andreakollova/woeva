@@ -37,7 +37,7 @@ export default function CreateStep1Screen() {
 
         <TouchableOpacity
           style={styles.option}
-          onPress={() => { router.dismiss(); router.push('/club/create/index'); }}
+          onPress={() => { router.dismiss(); router.push('/club/create'); }}
           activeOpacity={0.85}
         >
           <View style={[styles.optionThumb, { backgroundColor: Colors.grayBorder }]} />

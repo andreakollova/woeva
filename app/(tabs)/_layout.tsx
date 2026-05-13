@@ -97,7 +97,7 @@ function TabBar({ state, descriptors, navigation }: any) {
       {/* Create menu sheet */}
       <Modal visible={showMenu} transparent animationType="fade" onRequestClose={() => setShowMenu(false)}>
         <Pressable style={styles.modalOverlay} onPress={() => setShowMenu(false)}>
-          <View style={[styles.menuSheet, { paddingBottom: insets.bottom + 16 }]}>
+          <View style={[styles.menuSheet, { paddingBottom: insets.bottom + 4 }]}>
             {/* New Event — dominant */}
             <TouchableOpacity
               style={styles.menuItemHero}
@@ -144,24 +144,20 @@ function TabBar({ state, descriptors, navigation }: any) {
                 </TouchableOpacity>
               )}
 
-              {/* My dashboard — only if has club(s) */}
-              {myClubs.length > 0 && (
-                <>
-                  <View style={styles.menuSecondaryDivider} />
-                  <TouchableOpacity
-                    style={styles.menuSecondaryItem}
-                    onPress={() => { setShowMenu(false); router.push('/dashboard'); }}
-                    activeOpacity={0.7}
-                  >
-                    <Svg width={16} height={16} viewBox="0 0 24 24" fill="none">
-                      <Rect x={3} y={12} width={4} height={9} rx={1} stroke={Colors.gray} strokeWidth={1.8} />
-                      <Rect x={10} y={7} width={4} height={14} rx={1} stroke={Colors.gray} strokeWidth={1.8} />
-                      <Rect x={17} y={3} width={4} height={18} rx={1} stroke={Colors.gray} strokeWidth={1.8} />
-                    </Svg>
-                    <Text style={styles.menuSecondaryTitle}>Dashboard</Text>
-                  </TouchableOpacity>
-                </>
-              )}
+              {/* Dashboard — always visible */}
+              <View style={styles.menuSecondaryDivider} />
+              <TouchableOpacity
+                style={styles.menuSecondaryItem}
+                onPress={() => { setShowMenu(false); router.push('/dashboard'); }}
+                activeOpacity={0.7}
+              >
+                <Svg width={16} height={16} viewBox="0 0 24 24" fill="none">
+                  <Rect x={3} y={12} width={4} height={9} rx={1} stroke={Colors.gray} strokeWidth={1.8} />
+                  <Rect x={10} y={7} width={4} height={14} rx={1} stroke={Colors.gray} strokeWidth={1.8} />
+                  <Rect x={17} y={3} width={4} height={18} rx={1} stroke={Colors.gray} strokeWidth={1.8} />
+                </Svg>
+                <Text style={styles.menuSecondaryTitle}>Dashboard</Text>
+              </TouchableOpacity>
             </View>
           </View>
         </Pressable>
