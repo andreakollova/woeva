@@ -1,12 +1,16 @@
 import * as FileSystem from 'expo-file-system/legacy';
+import * as ImageManipulator from 'expo-image-manipulator';
 import { supabase } from './supabase';
 
 const SUPABASE_URL = process.env.EXPO_PUBLIC_SUPABASE_URL ?? '';
 
+// Max dimensions and quality for uploaded images
+const MAX_SIZE = 1200;
+const COMPRESS_QUALITY = 0.82;
+
 /**
  * Uploads a local image URI to Supabase Storage.
- * Handles ph:// URIs (iOS simulator/Photos Library) by copying to cache first.
- * Uses FileSystem.uploadAsync (native, most reliable in Expo).
+ * Compresses and resizes to max 1200px before upload (handles HEIC from iPhone).
  * Returns the public URL or null on failure.
  */
 export async function uploadImage(
@@ -19,14 +23,21 @@ export async function uploadImage(
 
     // ph:// URIs (iOS Photos Library / simulator) must be copied to a file:// path first
     if (uri.startsWith('ph://')) {
-      const ext = (uri.split('.').pop() ?? 'jpg').toLowerCase().replace('heic', 'jpg');
-      const dest = `${FileSystem.cacheDirectory}img_${Date.now()}.${ext}`;
+      const dest = `${FileSystem.cacheDirectory}img_${Date.now()}.jpg`;
       await FileSystem.copyAsync({ from: uri, to: dest });
       uri = dest;
     }
 
-    const ext = (uri.split('.').pop() ?? 'jpg').toLowerCase().replace('heic', 'jpg');
-    const mime = ext === 'png' ? 'image/png' : 'image/jpeg';
+    // Compress + resize + convert to JPEG (handles HEIC automatically)
+    const compressed = await ImageManipulator.manipulateAsync(
+      uri,
+      [{ resize: { width: MAX_SIZE } }],
+      { compress: COMPRESS_QUALITY, format: ImageManipulator.SaveFormat.JPEG }
+    );
+    uri = compressed.uri;
+
+    const ext = 'jpg';
+    const mime = 'image/jpeg';
 
     // Get auth token for the upload request
     const { data: sessionData } = await supabase.auth.getSession();
@@ -34,7 +45,7 @@ export async function uploadImage(
       ?? process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY
       ?? '';
 
-    const uploadUrl = `${SUPABASE_URL}/storage/v1/object/${bucket}/${fileName}`;
+    const uploadUrl = `${SUPABASE_URL}/storage/v1/object/${bucket}/${fileName.replace(/\.[^.]+$/, '.jpg')}`;
 
     const result = await FileSystem.uploadAsync(uploadUrl, uri, {
       httpMethod: 'POST',
