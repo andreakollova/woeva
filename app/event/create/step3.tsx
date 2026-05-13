@@ -21,7 +21,7 @@ export default function CreateStep3Screen() {
   const insets = useSafeAreaInsets();
   const { user, profile } = useAuth();
   const { t } = useTranslations();
-  const params = useLocalSearchParams<{ title: string; tagline: string; category: string; cover: string; postAs: string }>();
+  const params = useLocalSearchParams<{ title: string; tagline: string; tags: string; cover: string; postAs: string }>();
 
   const [date, setDate] = useState(new Date());
   const [time, setTime] = useState(new Date());
@@ -48,6 +48,11 @@ export default function CreateStep3Screen() {
     const eventDate = date.toISOString().split('T')[0];
     const eventTime = `${time.getHours().toString().padStart(2, '0')}:${time.getMinutes().toString().padStart(2, '0')}`;
     const priceNum = parseFloat(price) || 0;
+    if (priceNum > 0 && priceNum < 0.5) {
+      setLoading(false);
+      Alert.alert('Minimálna cena', 'Minimálna cena ticketu je €0.50.');
+      return;
+    }
 
     // Find creator's club (only if posting as club)
     const postAsClub = params.postAs !== 'individual';
@@ -67,7 +72,8 @@ export default function CreateStep3Screen() {
       club_id: clubData?.id ?? null,
       title: String(params.title),
       tagline: String(params.tagline || ''),
-      category: String(params.category || 'Other'),
+      tags: (() => { try { return JSON.parse(params.tags || '[]'); } catch { return []; } })(),
+      category: (() => { try { return JSON.parse(params.tags || '[]')[0] || 'Other'; } catch { return 'Other'; } })(),
       cover_url,
       date: eventDate,
       time: eventTime,
@@ -84,6 +90,16 @@ export default function CreateStep3Screen() {
 
     if (!error && data) {
       await supabase.from('event_attendees').insert({ event_id: data.id, user_id: currentUser.id, paid: true });
+
+      // Notify users interested in new events (my tags / all)
+      const eventTags = (() => { try { return JSON.parse(params.tags || '[]'); } catch { return []; } })();
+      notify.newEvent({
+        creatorId: currentUser.id,
+        eventId: data.id,
+        eventTitle: String(params.title),
+        tags: eventTags,
+        city: profile?.city ?? 'Bratislava',
+      });
 
       // Send push + in-app notifications to club members
       if (clubData?.id) {
@@ -230,10 +246,21 @@ export default function CreateStep3Screen() {
           <Input
             label={t.event.price}
             value={price}
-            onChangeText={setPrice}
+            onChangeText={(v) => {
+              setPrice(v);
+            }}
+            onBlur={() => {
+              const n = parseFloat(price);
+              if (n > 0 && n < 0.5) setPrice('0.50');
+            }}
             placeholder="0"
             keyboardType="numeric"
           />
+          {parseFloat(price) > 0 && parseFloat(price) < 0.5 && (
+            <Text style={{ fontSize: 12, color: '#FF3B30', marginTop: -8, marginBottom: 4 }}>
+              Minimálna cena je €0.50
+            </Text>
+          )}
           {parseFloat(price) > 0 && (
             <View style={styles.stripeNotice}>
               <Text style={styles.stripeIcon}>💳</Text>

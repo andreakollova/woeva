@@ -109,7 +109,7 @@ serve(async (req) => {
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({
-        from: 'Woeva <noreply@woeva.app>',
+        from: 'Woeva <admin@woeva.com>',
         to: [user.email!],
         subject: `Potvrdenie — ${event.title}`,
         html: finalHtml,
