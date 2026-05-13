@@ -16,7 +16,7 @@ export default function AboutScreen() {
   const PLAY_STORE_ID = 'com.woeva.app';
 
   const LEGAL_ITEMS = [
-    { label: t.about.privacyPolicy, onPress: () => router.push('/settings/legal?type=privacy' as any) },
+    { label: t.about.privacyPolicy, onPress: () => Linking.openURL('https://woeva.com/privacy').catch(() => {}) },
     { label: t.about.termsOfService, onPress: () => router.push('/settings/legal?type=terms' as any) },
     { label: t.about.contactUs, onPress: () => Linking.openURL('mailto:hello@woeva.app').catch(() => {}) },
   ];
