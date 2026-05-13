@@ -1,6 +1,6 @@
 import { BackButton } from '@/components/ui/BackButton';
 import React, { useEffect, useState } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, ScrollView } from 'react-native';
+import { View, Text, StyleSheet, ScrollView } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useStripe } from '@stripe/stripe-react-native';
@@ -21,7 +21,6 @@ export default function PaymentScreen() {
   const [event, setEvent] = useState<Event | null>(null);
   const [loading, setLoading] = useState(false);
   const [toast, setToast] = useState(false);
-  const [selectedMethod, setSelectedMethod] = useState<'card' | 'apple'>('card');
 
   useEffect(() => {
     loadEvent();
@@ -89,29 +88,13 @@ export default function PaymentScreen() {
       <ScrollView contentContainerStyle={[styles.scroll, { paddingBottom: insets.bottom + 100 }]}>
         <Text style={styles.sectionLabel}>Order summary</Text>
         <View style={styles.summaryBox}>
-          <Text style={styles.summaryTitle}>Woeva {event.title}</Text>
-          <Text style={styles.summaryMeta}>Ticket · €{event.price}</Text>
+          <Text style={styles.summaryTitle}>{event.title}</Text>
+          <Text style={styles.summaryMeta}>Ticket · €{event.price.toFixed(2)}</Text>
         </View>
 
-        <Text style={styles.sectionLabel}>Pay with</Text>
-
-        <TouchableOpacity
-          style={[styles.methodRow, selectedMethod === 'card' && styles.methodSelected]}
-          onPress={() => setSelectedMethod('card')}
-        >
-          <View style={styles.cardThumb} />
-          <Text style={styles.methodText}>••• ••• •••547{'\n'}VISA</Text>
-          {selectedMethod === 'card' && <Text style={styles.checkmark}>✓</Text>}
-        </TouchableOpacity>
-
-        <TouchableOpacity
-          style={[styles.methodRow, selectedMethod === 'apple' && styles.methodSelected]}
-          onPress={() => setSelectedMethod('apple')}
-        >
-          <View style={[styles.cardThumb, { backgroundColor: Colors.grayLight }]} />
-          <Text style={styles.methodText}>Apple Pay</Text>
-          {selectedMethod === 'apple' && <Text style={styles.checkmark}>✓</Text>}
-        </TouchableOpacity>
+        <View style={styles.infoBox}>
+          <Text style={styles.infoText}>Po kliknutí na Pay zadáš údaje karty bezpečne cez Stripe. Podporované: Visa, Mastercard, Apple Pay.</Text>
+        </View>
       </ScrollView>
 
       <View style={[styles.footer, { paddingBottom: insets.bottom + 16 }]}>
@@ -124,27 +107,13 @@ export default function PaymentScreen() {
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: Colors.white },
   header: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 20, paddingBottom: 16, gap: 12 },
-  backBtn: { padding: 4 },
-  backIcon: { fontSize: 20, color: Colors.black },
   headerTitle: { fontSize: 20, fontWeight: '700', color: Colors.black },
-  scroll: { paddingHorizontal: 20, gap: 0 },
+  scroll: { paddingHorizontal: 20 },
   sectionLabel: { fontSize: 13, color: Colors.gray, fontWeight: '500', marginTop: 20, marginBottom: 10, letterSpacing: 0.3 },
   summaryBox: { backgroundColor: Colors.grayLight, borderRadius: 14, padding: 16, gap: 4 },
   summaryTitle: { fontSize: 16, fontWeight: '700', color: Colors.black },
   summaryMeta: { fontSize: 13, color: Colors.gray },
-  methodRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 14,
-    borderWidth: 1.5,
-    borderColor: Colors.grayBorder,
-    borderRadius: 14,
-    padding: 16,
-    marginBottom: 10,
-  },
-  methodSelected: { borderColor: Colors.black },
-  cardThumb: { width: 44, height: 32, borderRadius: 6, backgroundColor: Colors.gray },
-  methodText: { flex: 1, fontSize: 15, fontWeight: '500', color: Colors.black, lineHeight: 20 },
-  checkmark: { fontSize: 18, color: Colors.black, fontWeight: '700' },
+  infoBox: { marginTop: 20, padding: 14, backgroundColor: Colors.grayLight, borderRadius: 12 },
+  infoText: { fontSize: 13, color: Colors.gray, lineHeight: 19 },
   footer: { paddingHorizontal: 20, paddingTop: 12, borderTopWidth: 1, borderColor: Colors.grayBorder },
 });
