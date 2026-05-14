@@ -18,7 +18,13 @@ import { useTranslations } from '@/context/LanguageContext';
 
 
 const FILTER_TAGS = ['All', 'Free', 'Coffee', 'Sport', 'Party', 'Music', 'Art', 'Yoga'];
-const CITIES = ['Bratislava', 'Košice', 'Prešov', 'Žilina', 'Nitra', 'Banská Bystrica', 'Trnava', 'Trenčín', 'Martin', 'Poprad'];
+
+const COUNTRY_CITIES: { code: string; flag: string; name: string; cities: string[] }[] = [
+  { code: 'SK', flag: '🇸🇰', name: 'Slovensko', cities: ['Bratislava', 'Košice', 'Prešov', 'Žilina', 'Nitra', 'Banská Bystrica', 'Trnava', 'Trenčín', 'Martin', 'Poprad'] },
+  { code: 'AT', flag: '🇦🇹', name: 'Austria', cities: ['Vienna'] },
+  { code: 'CZ', flag: '🇨🇿', name: 'Czech Republic', cities: ['Prague'] },
+  { code: 'GB', flag: '🇬🇧', name: 'United Kingdom', cities: ['London'] },
+];
 
 export default function HomeScreen() {
   const insets = useSafeAreaInsets();
@@ -34,6 +40,7 @@ export default function HomeScreen() {
 
   const [city, setCity] = useState('');
   const [showCityPicker, setShowCityPicker] = useState(false);
+  const [expandedCountries, setExpandedCountries] = useState<Set<string>>(new Set(['SK']));
   const [unreadNotifs, setUnreadNotifs] = useState(0);
 
   useEffect(() => {
@@ -184,21 +191,52 @@ export default function HomeScreen() {
       {/* City picker modal */}
       <Modal visible={showCityPicker} transparent animationType="slide" onRequestClose={() => setShowCityPicker(false)}>
         <TouchableOpacity style={styles.cityModalBg} activeOpacity={1} onPress={() => setShowCityPicker(false)}>
-          <View style={styles.cityModalSheet}>
+          <ScrollView
+            style={styles.cityModalSheet}
+            contentContainerStyle={styles.cityModalContent}
+            bounces={false}
+            showsVerticalScrollIndicator={false}
+            onStartShouldSetResponder={() => true}
+          >
             <View style={styles.cityModalHandle} />
             <Text style={styles.cityModalTitle}>{t.home.selectCity}</Text>
-            {CITIES.map((c) => (
-              <TouchableOpacity
-                key={c}
-                style={[styles.cityModalRow, city === c && styles.cityModalRowActive]}
-                onPress={() => selectCity(c)}
-                activeOpacity={0.7}
-              >
-                <Text style={[styles.cityModalLabel, city === c && styles.cityModalLabelActive]}>{c}</Text>
-                {city === c && <Text style={styles.cityModalCheck}>✓</Text>}
-              </TouchableOpacity>
-            ))}
-          </View>
+            {COUNTRY_CITIES.map((country) => {
+              const isExpanded = expandedCountries.has(country.code);
+              return (
+                <View key={country.code}>
+                  <TouchableOpacity
+                    style={styles.countryRow}
+                    onPress={() => {
+                      setExpandedCountries(prev => {
+                        const next = new Set(prev);
+                        isExpanded ? next.delete(country.code) : next.add(country.code);
+                        return next;
+                      });
+                    }}
+                    activeOpacity={0.7}
+                  >
+                    <Text style={styles.countryFlag}>{country.flag}</Text>
+                    <Text style={styles.countryName}>{country.name}</Text>
+                    <Svg width={16} height={16} viewBox="0 0 24 24" fill="none" style={{ transform: [{ rotate: isExpanded ? '180deg' : '0deg' }] }}>
+                      <Path d="M6 9l6 6 6-6" stroke={Colors.gray} strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" />
+                    </Svg>
+                  </TouchableOpacity>
+                  {isExpanded && country.cities.map((c) => (
+                    <TouchableOpacity
+                      key={c}
+                      style={[styles.cityModalRow, city === c && styles.cityModalRowActive]}
+                      onPress={() => selectCity(c)}
+                      activeOpacity={0.7}
+                    >
+                      <Text style={[styles.cityModalLabel, city === c && styles.cityModalLabelActive]}>{c}</Text>
+                      {city === c && <Text style={styles.cityModalCheck}>✓</Text>}
+                    </TouchableOpacity>
+                  ))}
+                </View>
+              );
+            })}
+            <View style={{ height: 20 }} />
+          </ScrollView>
         </TouchableOpacity>
       </Modal>
     </View>
@@ -227,12 +265,16 @@ const styles = StyleSheet.create({
   emptyTitle: { fontSize: 18, fontWeight: '600', color: Colors.black, fontFamily: Fonts.semibold },
   emptyText: { fontSize: 14, color: Colors.gray, textAlign: 'center', fontFamily: Fonts.regular },
   cityModalBg: { flex: 1, backgroundColor: 'rgba(0,0,0,0.4)', justifyContent: 'flex-end' },
-  cityModalSheet: { backgroundColor: Colors.white, borderTopLeftRadius: 28, borderTopRightRadius: 28, paddingHorizontal: 24, paddingBottom: 40, paddingTop: 16 },
+  cityModalSheet: { backgroundColor: Colors.white, borderTopLeftRadius: 28, borderTopRightRadius: 28, maxHeight: '75%' },
+  cityModalContent: { paddingHorizontal: 24, paddingTop: 16 },
   cityModalHandle: { width: 36, height: 4, borderRadius: 2, backgroundColor: Colors.grayBorder, alignSelf: 'center', marginBottom: 20 },
   cityModalTitle: { fontSize: 18, fontWeight: '700', fontFamily: Fonts.bold, color: Colors.black, marginBottom: 12 },
-  cityModalRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingVertical: 14, borderBottomWidth: 1, borderBottomColor: Colors.grayBorder },
+  countryRow: { flexDirection: 'row', alignItems: 'center', gap: 10, paddingVertical: 14, borderBottomWidth: 1, borderBottomColor: Colors.grayBorder },
+  countryFlag: { fontSize: 20 },
+  countryName: { flex: 1, fontSize: 15, fontWeight: '600', fontFamily: Fonts.semibold, color: Colors.black },
+  cityModalRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingVertical: 13, paddingLeft: 36, borderBottomWidth: 1, borderBottomColor: Colors.grayBorder },
   cityModalRowActive: { },
-  cityModalLabel: { fontSize: 16, fontFamily: Fonts.regular, color: Colors.black },
+  cityModalLabel: { fontSize: 15, fontFamily: Fonts.regular, color: Colors.black },
   cityModalLabelActive: { fontWeight: '700', fontFamily: Fonts.bold },
   cityModalCheck: { fontSize: 16, color: Colors.lime, fontWeight: '700' },
 });
