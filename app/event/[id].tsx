@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import * as FileSystem from 'expo-file-system';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { View, Text, StyleSheet, TouchableOpacity, Image, Alert, Dimensions, Modal, Share, Platform, TextInput, ScrollView as RNScrollView } from 'react-native';
 import QRCode from 'react-native-qrcode-svg';
@@ -213,8 +214,17 @@ export default function EventDetailScreen() {
       : 'https://play.google.com/store/apps/details?id=com.woeva.app';
     const message = `Hey! Join me at ${event.title} 🎉\n${dateStr}${venueStr}\n\nOpen in Woeva: ${deepLink}\n\nDon't have the app? Download here: ${storeLink}`;
     try {
+      let sharePayload: { title: string; message: string; url?: string } = { title: event.title, message };
+      if (event.cover_url) {
+        try {
+          const ext = event.cover_url.split('?')[0].split('.').pop() ?? 'jpg';
+          const localUri = `${FileSystem.cacheDirectory}event_cover_${id}.${ext}`;
+          await FileSystem.downloadAsync(event.cover_url, localUri);
+          sharePayload.url = localUri;
+        } catch (_) {}
+      }
       await Share.share(
-        { title: event.title, message },
+        sharePayload,
         { dialogTitle: 'Invite a friend' }
       );
     } catch {}
