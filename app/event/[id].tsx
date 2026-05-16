@@ -590,11 +590,7 @@ export default function EventDetailScreen() {
           {user && isAttending && eventPast
             ? (
               <View style={s.attendingRow}>
-                <Button label={t.event.youWent} onPress={() => {}} variant="lime" disabled style={s.attendingBtn} textStyle={{ fontSize: 13 }} />
-                <TouchableOpacity style={s.ticketBtn} onPress={() => router.push(`/event/${id}/rate` as any)} activeOpacity={0.8}>
-                  <Text style={s.ticketBtnEmoji}>★</Text>
-                  <Text style={s.ticketBtnText}>{t.tickets.rateEvent}</Text>
-                </TouchableOpacity>
+                <Button label="🔴 Práve prebieha" onPress={() => {}} variant="lime" disabled style={s.attendingBtn} textStyle={{ fontSize: 13 }} />
               </View>
             )
             : user && isAttending
