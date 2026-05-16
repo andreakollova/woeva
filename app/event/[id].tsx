@@ -214,7 +214,7 @@ export default function EventDetailScreen() {
     const message = `Hey! Join me at ${event.title} 🎉\n${dateStr}${venueStr}\n\nOpen in Woeva: ${deepLink}\n\nDon't have the app? Download here: ${storeLink}`;
     try {
       await Share.share(
-        { title: event.title, message, url: event.cover_url ?? storeLink },
+        { title: event.title, message },
         { dialogTitle: 'Invite a friend' }
       );
     } catch {}
