@@ -25,7 +25,7 @@ export function EventCard({ event, featured, attending }: EventCardProps) {
 
   const priceLabel = event.is_free || event.price === 0 ? 'Free' : `€${event.price}`;
   const isFree = event.is_free || event.price === 0;
-  const clubName = event.club?.name ?? null;
+  const clubName = event.club?.name ?? (event as any).creator?.name ?? null;
   // Use attendees length as fallback if going_count is stale/0
   const goingCount = Math.max(event.going_count ?? 0, event.attendees?.length ?? 0, attending ? 1 : 0);
 
@@ -105,7 +105,7 @@ export function EventCard({ event, featured, attending }: EventCardProps) {
       <View style={styles.rowInfo}>
         <Text style={styles.rowTitle} numberOfLines={2}>{event.title}</Text>
         <View style={styles.rowMetaRow}>
-          {event.time ? <Text style={styles.rowMeta}>{event.time}</Text> : null}
+          <Text style={styles.rowMeta}>{formatTime(event.time)}</Text>
           {event.venue ? (
             <>
               <Text style={styles.rowDot}>·</Text>
@@ -239,12 +239,17 @@ function FeaturedContent({ event, isToday, dayName, dayNum, monthShort, priceLab
         <View style={styles.featuredTextCol}>
           <Text style={[styles.featuredTitle, { color: textColor }]} numberOfLines={2}>{event.title}</Text>
           <Text style={[styles.featuredMeta, { color: subColor }]} numberOfLines={1}>
-            {clubName ? `${clubName}  ·  ` : ''}{event.time}{goingCount > 0 ? `  ·  ${goingCount} going` : ''}
+            {clubName ? `${clubName}  ·  ` : ''}{formatTime(event.time)}{goingCount > 0 ? `  ·  ${goingCount} going` : ''}
           </Text>
         </View>
       </View>
     </View>
   );
+}
+
+function formatTime(time?: string | null): string {
+  if (!time || time === '00:00' || time === '0:00') return 'Celý deň';
+  return time;
 }
 
 function getEventDate(date: string, isRecurring?: boolean): Date {
@@ -314,7 +319,7 @@ const styles = StyleSheet.create({
   rowTitle: { fontSize: 15, fontWeight: '700', color: Colors.black, fontFamily: Fonts.semibold, letterSpacing: -0.2 },
   rowMetaRow: { flexDirection: 'row', alignItems: 'center', gap: 5 },
   rowMeta: { fontSize: 12, color: Colors.gray, fontFamily: Fonts.regular, flexShrink: 1 },
-  rowDot: { fontSize: 12, color: Colors.grayBorder },
+  rowDot: { fontSize: 10, fontWeight: '900', color: Colors.gray, marginHorizontal: -1 },
   rowBottomRow: { flexDirection: 'row', alignItems: 'center', gap: 6, flexWrap: 'nowrap' },
   rowClub: { fontSize: 10, color: Colors.gray, fontFamily: Fonts.medium, flexShrink: 1, flexGrow: 0 },
   pricePill: {

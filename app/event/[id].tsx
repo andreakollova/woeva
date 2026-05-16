@@ -523,8 +523,8 @@ export default function EventDetailScreen() {
                 onPress={() => event.club ? router.push(`/club/${event.club!.id}`) : null}
                 activeOpacity={event.club ? 0.7 : 1}
               >
-                {(event.club?.logo_url ?? event.club?.cover_url)
-                  ? <Image source={{ uri: (event.club.logo_url ?? event.club.cover_url)! }} style={s.hostAvatar} />
+                {(event.club?.logo_url ?? event.club?.cover_url ?? creator?.avatar_url)
+                  ? <Image source={{ uri: (event.club?.logo_url ?? event.club?.cover_url ?? creator?.avatar_url)! }} style={s.hostAvatar} />
                   : <View style={[s.hostAvatar, s.hostAvatarFallback]}><Text style={s.hostAvatarInitial}>{hostInitial}</Text></View>
                 }
                 <View style={{ flex: 1 }}>

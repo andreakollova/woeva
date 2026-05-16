@@ -30,7 +30,7 @@ export default function RegisterScreen() {
     const fn = provider === 'google' ? signInWithGoogle : signInWithApple;
     const { error } = await fn();
     setSocialLoading(null);
-    if (!error) router.replace('/(tabs)');
+    if (!error) router.replace('/(auth)/profile-setup');
   }
 
   function validate() {
@@ -81,7 +81,7 @@ export default function RegisterScreen() {
       notify.welcome({ email: email.trim().toLowerCase(), name: name.trim() });
     }
 
-    router.push('/(auth)/interests');
+    router.push('/(auth)/profile-setup');
   }
 
   return (

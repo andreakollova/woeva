@@ -28,9 +28,14 @@ export default function SearchScreen() {
   }, []);
 
   async function loadMapEvents() {
+    const today = new Date().toISOString().split('T')[0];
     const { data } = await supabase
       .from('events')
       .select('*')
+      .neq('status', 'cancelled')
+      .gte('date', today)
+      .not('lat', 'is', null)
+      .not('lng', 'is', null)
       .limit(50);
     setMapEvents(data ?? []);
   }
@@ -82,12 +87,12 @@ export default function SearchScreen() {
           }}
           customMapStyle={mapStyle}
         >
-          {mapEvents.map((event, i) => (
+          {mapEvents.map((event) => (
             <Marker
               key={event.id}
               coordinate={{
-                latitude: event.lat ?? (48.1486 + (i % 5) * 0.003 - 0.006),
-                longitude: event.lng ?? (17.1077 + (i % 3) * 0.004 - 0.004),
+                latitude: event.lat!,
+                longitude: event.lng!,
               }}
               onPress={() => router.push(`/event/${event.id}`)}
             >

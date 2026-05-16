@@ -17,14 +17,30 @@ import { useAuth } from '@/context/AuthContext';
 import { useTranslations } from '@/context/LanguageContext';
 
 
-const FILTER_TAGS = ['All', 'Free', 'Coffee', 'Sport', 'Party', 'Music', 'Art', 'Yoga'];
+const FILTER_TAGS = ['My Interests', 'Free', 'Coffee', 'Sport', 'Party', 'Music', 'Art', 'Yoga', 'All Events'];
 
-const COUNTRY_CITIES: { code: string; flag: string; name: string; cities: string[] }[] = [
-  { code: 'SK', flag: '🇸🇰', name: 'Slovensko', cities: ['Bratislava', 'Košice', 'Prešov', 'Žilina', 'Nitra', 'Banská Bystrica', 'Trnava', 'Trenčín', 'Martin', 'Poprad'] },
+const COUNTRY_META: { code: string; flag: string; name: string }[] = [
+  { code: 'SK', flag: '🇸🇰', name: 'Slovensko' },
+  { code: 'AT', flag: '🇦🇹', name: 'Austria' },
+  { code: 'CZ', flag: '🇨🇿', name: 'Czech Republic' },
+  { code: 'GB', flag: '🇬🇧', name: 'United Kingdom' },
+];
+
+const FALLBACK_CITIES: { code: string; flag: string; name: string; cities: string[] }[] = [
+  { code: 'SK', flag: '🇸🇰', name: 'Slovensko', cities: ['Bratislava', 'Košice', 'Nitra'] },
   { code: 'AT', flag: '🇦🇹', name: 'Austria', cities: ['Vienna'] },
   { code: 'CZ', flag: '🇨🇿', name: 'Czech Republic', cities: ['Prague'] },
   { code: 'GB', flag: '🇬🇧', name: 'United Kingdom', cities: ['London'] },
 ];
+
+// city → country mapping for grouping
+const CITY_COUNTRY: Record<string, string> = {
+  Bratislava: 'SK', Košice: 'SK', Prešov: 'SK', Žilina: 'SK', Nitra: 'SK',
+  'Banská Bystrica': 'SK', Trnava: 'SK', Trenčín: 'SK', Martin: 'SK', Poprad: 'SK',
+  Vienna: 'AT', Wien: 'AT',
+  Prague: 'CZ', Praha: 'CZ',
+  London: 'GB',
+};
 
 export default function HomeScreen() {
   const insets = useSafeAreaInsets();
@@ -35,28 +51,52 @@ export default function HomeScreen() {
   const [avatarError, setAvatarError] = useState(false);
   const [events, setEvents] = useState<Event[]>([]);
   const [attendingIds, setAttendingIds] = useState<Set<string>>(new Set());
-  const [filter, setFilter] = useState('All');
+  const [filter, setFilter] = useState('My Interests');
   const [refreshing, setRefreshing] = useState(false);
 
   const [city, setCity] = useState('');
   const [showCityPicker, setShowCityPicker] = useState(false);
   const [expandedCountries, setExpandedCountries] = useState<Set<string>>(new Set(['SK']));
   const [unreadNotifs, setUnreadNotifs] = useState(0);
+  const [availableCities, setAvailableCities] = useState<{ code: string; flag: string; name: string; cities: string[] }[]>([]);
 
   useEffect(() => {
     (async () => {
-      // Try profile city first
-      const { data: { user: u } } = await supabase.auth.getUser();
-      if (u) {
-        const { data } = await supabase.from('profiles').select('city').eq('id', u.id).single();
-        if (data?.city) { setCity(data.city); return; }
-      }
-      // Fallback to GPS
-      const { status } = await Location.requestForegroundPermissionsAsync();
-      if (status !== 'granted') { setCity('Your city'); return; }
-      const loc = await Location.getCurrentPositionAsync({});
-      const [geo] = await Location.reverseGeocodeAsync(loc.coords);
-      setCity(geo?.city ?? geo?.region ?? 'Your city');
+      try {
+        const today = new Date().toISOString().split('T')[0];
+        const { data: cityRows } = await supabase
+          .from('events')
+          .select('city, country')
+          .neq('status', 'cancelled')
+          .gte('date', today)
+          .not('city', 'is', null);
+
+        const citySet = new Set<string>((cityRows ?? []).map((r: any) => r.city).filter(Boolean));
+        const grouped = COUNTRY_META.map(c => ({
+          ...c,
+          cities: [...citySet].filter(city => (CITY_COUNTRY[city] ?? 'SK') === c.code).sort(),
+        })).filter(c => c.cities.length > 0);
+        setAvailableCities(grouped);
+      } catch (_) {}
+    })();
+  }, []);
+
+  useEffect(() => {
+    (async () => {
+      try {
+        // Try profile city first
+        const { data: { user: u } } = await supabase.auth.getUser();
+        if (u) {
+          const { data } = await supabase.from('profiles').select('city').eq('id', u.id).single();
+          if (data?.city) { setCity(data.city); return; }
+        }
+        // Fallback to GPS
+        const { status } = await Location.requestForegroundPermissionsAsync();
+        if (status !== 'granted') { setCity('Your city'); return; }
+        const loc = await Location.getCurrentPositionAsync({});
+        const [geo] = await Location.reverseGeocodeAsync(loc.coords);
+        setCity(geo?.city ?? geo?.region ?? 'Your city');
+      } catch (_) { setCity('Your city'); }
     })();
   }, []);
 
@@ -71,9 +111,10 @@ export default function HomeScreen() {
 
   async function loadEvents() {
     const today = new Date().toISOString().split('T')[0];
-    let query = supabase.from('events').select('*, club:clubs(id, name, cover_url), attendees:event_attendees(profile:profiles(id, name, avatar_url))').gte('date', today).order('date', { ascending: true }).limit(50);
+    let query = supabase.from('events').select('*, club:clubs(id, name, cover_url), creator:profiles!creator_id(id, name, avatar_url), attendees:event_attendees(profile:profiles(id, name, avatar_url))').or(`date.gte.${today},and(is_recurring.eq.true,recurring_end_date.gte.${today})`).order('date', { ascending: true }).limit(50);
     if (filter === 'Free') query = query.eq('is_free', true);
-    else if (filter !== 'All') query = query.eq('category', filter);
+    else if (filter !== 'My Interests' && filter !== 'All Events') query = query.eq('category', filter);
+    // All filters (including All Events) filter by city
     if (city && city !== 'Your city' && city !== 'Select city') query = query.eq('city', city);
     const { data } = await query;
     setEvents(((data ?? []) as any).filter((e: any) => e.status !== 'cancelled'));
@@ -155,7 +196,7 @@ export default function HomeScreen() {
           {FILTER_TAGS.map(tag => (
             <Tag
               key={tag}
-              label={tag === 'All' ? t.home.all : tag === 'Free' ? t.home.free : tag}
+              label={tag === 'My Interests' ? 'My Interests' : tag === 'All Events' ? 'All Events' : tag === 'Free' ? t.home.free : tag}
               selected={filter === tag}
               onPress={() => setFilter(tag)}
               small
@@ -200,7 +241,7 @@ export default function HomeScreen() {
           >
             <View style={styles.cityModalHandle} />
             <Text style={styles.cityModalTitle}>{t.home.selectCity}</Text>
-            {COUNTRY_CITIES.map((country) => {
+            {(availableCities.length > 0 ? availableCities : FALLBACK_CITIES).map((country) => {
               const isExpanded = expandedCountries.has(country.code);
               return (
                 <View key={country.code}>
