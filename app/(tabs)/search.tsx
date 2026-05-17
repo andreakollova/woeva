@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, StyleSheet, TextInput, ScrollView, TouchableOpacity } from 'react-native';
+import { View, Text, StyleSheet, TextInput, ScrollView, TouchableOpacity, Platform } from 'react-native';
+import { BlurView } from 'expo-blur';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import MapView, { Marker, PROVIDER_DEFAULT } from 'react-native-maps';
@@ -60,32 +61,14 @@ export default function SearchScreen() {
     setMode('list');
   }
 
-  return (
-    <View style={[styles.container, { paddingTop: insets.top }]}>
-      {/* Header */}
-      <View style={styles.topBar}>
-        <TouchableOpacity onPress={() => router.push('/(tabs)')} activeOpacity={0.7}>
-          <WMark size={34} color={Colors.lime} />
-        </TouchableOpacity>
-      </View>
-      <View style={styles.header}>
-        <Text style={styles.title}>{t.search.discover}</Text>
-        <View style={styles.searchBar}>
-          <TextInput
-            style={styles.searchInput}
-            placeholder={t.search.searchBarPlaceholder}
-            placeholderTextColor={Colors.gray}
-            value={query}
-            onChangeText={setQuery}
-            onSubmitEditing={handleSearch}
-            returnKeyType="search"
-          />
-        </View>
-      </View>
+  const headerHeight = insets.top + 120;
 
+  return (
+    <View style={styles.container}>
+      {/* Map — full screen */}
       {mode === 'map' && (
         <MapView
-          style={[styles.map, { marginBottom: insets.bottom + 60 }]}
+          style={StyleSheet.absoluteFill}
           provider={PROVIDER_DEFAULT}
           initialRegion={{
             latitude: 48.1486,
@@ -99,10 +82,7 @@ export default function SearchScreen() {
           {mapEvents.map((event) => (
             <Marker
               key={event.id}
-              coordinate={{
-                latitude: event.lat!,
-                longitude: event.lng!,
-              }}
+              coordinate={{ latitude: event.lat!, longitude: event.lng! }}
               onPress={() => router.push(`/event/${event.id}`)}
             >
               <View style={styles.pin}>
@@ -113,40 +93,59 @@ export default function SearchScreen() {
         </MapView>
       )}
 
-      {mode === 'list' && searched && (
-        <TouchableOpacity style={styles.backToMap} onPress={() => { setMode('map'); setSearched(false); setQuery(''); }} activeOpacity={0.8}>
-          <Text style={styles.backToMapText}>← Mapa</Text>
-        </TouchableOpacity>
-      )}
+      {/* Floating header — blur background */}
+      <BlurView
+        intensity={80}
+        tint="light"
+        style={[styles.floatingHeader, { paddingTop: insets.top }]}
+      >
+        <View style={styles.topBar}>
+          <TouchableOpacity onPress={() => router.push('/(tabs)')} activeOpacity={0.7}>
+            <WMark size={34} color={Colors.lime} />
+          </TouchableOpacity>
+        </View>
+        <View style={styles.header}>
+          <Text style={styles.title}>{t.search.discover}</Text>
+          <View style={styles.searchBar}>
+            <TextInput
+              style={styles.searchInput}
+              placeholder={t.search.searchBarPlaceholder}
+              placeholderTextColor={Colors.gray}
+              value={query}
+              onChangeText={setQuery}
+              onSubmitEditing={handleSearch}
+              returnKeyType="search"
+            />
+          </View>
+        </View>
+      </BlurView>
 
+      {/* List results */}
       {mode === 'list' && searched && (
-        <ScrollView contentContainerStyle={styles.results}>
-          {results.length === 0 ? (
-            <Animated.View entering={FadeInDown} style={styles.empty}>
-              <Text style={styles.emptyTitle}>{t.search.nothingMatches}</Text>
-              <Text style={styles.emptyText}>{t.search.nothingMatchesFor(query)}</Text>
-              <View style={styles.emptyActions}>
-                <Button
-                  label={t.search.startClub(query)}
-                  onPress={() => router.push('/club/create')}
-                  variant="lime"
-                />
-                <Button
-                  label={t.search.browsePopular}
-                  onPress={() => { setMode('map'); setSearched(false); setQuery(''); }}
-                  variant="ghost"
-                />
-              </View>
-            </Animated.View>
-          ) : (
-            results.map((event, i) => (
-              <Animated.View key={event.id} entering={FadeInDown.delay(i * 50)}>
-                <EventCard event={event} />
-                {i < results.length - 1 && <View style={styles.divider} />}
+        <View style={[styles.listContainer, { paddingTop: headerHeight }]}>
+          <TouchableOpacity style={styles.backToMap} onPress={() => { setMode('map'); setSearched(false); setQuery(''); }} activeOpacity={0.8}>
+            <Text style={styles.backToMapText}>← Mapa</Text>
+          </TouchableOpacity>
+          <ScrollView contentContainerStyle={[styles.results, { paddingBottom: insets.bottom + 80 }]}>
+            {results.length === 0 ? (
+              <Animated.View entering={FadeInDown} style={styles.empty}>
+                <Text style={styles.emptyTitle}>{t.search.nothingMatches}</Text>
+                <Text style={styles.emptyText}>{t.search.nothingMatchesFor(query)}</Text>
+                <View style={styles.emptyActions}>
+                  <Button label={t.search.startClub(query)} onPress={() => router.push('/club/create')} variant="lime" />
+                  <Button label={t.search.browsePopular} onPress={() => { setMode('map'); setSearched(false); setQuery(''); }} variant="ghost" />
+                </View>
               </Animated.View>
-            ))
-          )}
-        </ScrollView>
+            ) : (
+              results.map((event, i) => (
+                <Animated.View key={event.id} entering={FadeInDown.delay(i * 50)}>
+                  <EventCard event={event} />
+                  {i < results.length - 1 && <View style={styles.divider} />}
+                </Animated.View>
+              ))
+            )}
+          </ScrollView>
+        </View>
       )}
     </View>
   );
@@ -162,18 +161,23 @@ const mapStyle = [
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: Colors.white },
+  floatingHeader: {
+    position: 'absolute', top: 0, left: 0, right: 0,
+    zIndex: 10,
+    overflow: 'hidden',
+  },
   topBar: { alignItems: 'center', paddingVertical: 10 },
-  header: { paddingHorizontal: 20, paddingBottom: 12 },
+  header: { paddingHorizontal: 20, paddingBottom: 16 },
   title: { fontSize: 28, fontWeight: '700', fontFamily: Fonts.bold, color: Colors.black, marginBottom: 12, letterSpacing: -0.5 },
   searchBar: {
-    backgroundColor: Colors.grayLight,
+    backgroundColor: 'rgba(240,240,240,0.9)',
     borderRadius: 50,
     paddingHorizontal: 20,
     height: 48,
     justifyContent: 'center',
   },
   searchInput: { fontSize: 15, color: Colors.black },
-  map: { flex: 1 },
+  listContainer: { flex: 1, backgroundColor: Colors.white },
   pin: {
     backgroundColor: Colors.lime,
     width: 36,
