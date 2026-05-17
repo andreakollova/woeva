@@ -288,15 +288,14 @@ export default function HomeScreen() {
             return (
               <React.Fragment key={event.id}>
                 {showMonthDivider && (
-                  <View style={styles.monthDivider}>
-                    <View style={styles.monthDividerLine} />
-                    <Text style={styles.monthDividerText}>{formatMonth(event.date!, lang)}</Text>
-                    <View style={styles.monthDividerLine} />
-                  </View>
+                  <Text style={styles.monthDividerText}>{formatMonth(event.date!, lang)}</Text>
                 )}
                 <View>
                   <EventCard event={event} attending={attendingIds.has(event.id)} />
-                  {i < rest.length - 1 && <View style={styles.divider} />}
+                  {i < rest.length - 1 && !(() => {
+                    const next = rest[i + 1];
+                    return next?.date?.slice(0, 7) !== event.date?.slice(0, 7);
+                  })() && <View style={styles.divider} />}
                 </View>
               </React.Fragment>
             );
@@ -383,9 +382,7 @@ const styles = StyleSheet.create({
   featured: { marginHorizontal: 20, marginBottom: 20 },
   list: { paddingHorizontal: 20 },
   divider: { height: 1, backgroundColor: Colors.grayBorder, marginVertical: 2 },
-  monthDivider: { flexDirection: 'row', alignItems: 'center', marginVertical: 20, gap: 10 },
-  monthDividerLine: { flex: 1, height: 1, backgroundColor: Colors.grayBorder },
-  monthDividerText: { fontSize: 12, fontWeight: '700', color: Colors.black, fontFamily: Fonts.bold, letterSpacing: 1, textTransform: 'uppercase' },
+  monthDividerText: { fontSize: 11, fontWeight: '700', color: Colors.gray, fontFamily: Fonts.bold, letterSpacing: 1, textTransform: 'uppercase', marginTop: 20, marginBottom: 8 },
   skeletonFeatured: { height: 240, backgroundColor: Colors.grayLight, borderRadius: 20, marginHorizontal: 20, marginBottom: 20 },
   skeletonRow: { flexDirection: 'row', alignItems: 'center', gap: 12, paddingVertical: 12 },
   skeletonDate: { width: 52, height: 64, borderRadius: 12, backgroundColor: Colors.grayLight },
