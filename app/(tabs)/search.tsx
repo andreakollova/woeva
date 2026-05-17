@@ -105,7 +105,7 @@ export default function SearchScreen() {
             <TextInput
               style={styles.searchInput}
               placeholder={t.search.searchBarPlaceholder}
-              placeholderTextColor={Colors.gray}
+              placeholderTextColor="rgba(255,255,255,0.5)"
               value={query}
               onChangeText={setQuery}
               onSubmitEditing={handleSearch}
@@ -159,30 +159,30 @@ const styles = StyleSheet.create({
   floatingHeader: {
     position: 'absolute', top: 0, left: 0, right: 0,
     zIndex: 10,
-    backgroundColor: 'rgba(255,255,255,0.72)',
+    backgroundColor: 'rgba(0,0,0,0.72)',
     borderBottomLeftRadius: 28,
     borderBottomRightRadius: 28,
     borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.9)',
+    borderColor: 'rgba(255,255,255,0.12)',
     borderTopWidth: 0,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.08,
+    shadowOpacity: 0.25,
     shadowRadius: 16,
   },
   topBar: { alignItems: 'center', paddingVertical: 10 },
   header: { paddingHorizontal: 20, paddingBottom: 16 },
-  title: { fontSize: 28, fontWeight: '700', fontFamily: Fonts.bold, color: Colors.black, marginBottom: 12, letterSpacing: -0.5 },
+  title: { fontSize: 28, fontWeight: '700', fontFamily: Fonts.bold, color: Colors.white, marginBottom: 12, letterSpacing: -0.5 },
   searchBar: {
-    backgroundColor: 'rgba(255,255,255,0.6)',
+    backgroundColor: 'rgba(255,255,255,0.12)',
     borderRadius: 50,
     paddingHorizontal: 20,
     height: 48,
     justifyContent: 'center',
     borderWidth: 1,
-    borderColor: 'rgba(200,200,200,0.5)',
+    borderColor: 'rgba(255,255,255,0.2)',
   },
-  searchInput: { fontSize: 15, color: Colors.black },
+  searchInput: { fontSize: 15, color: Colors.white },
   listContainer: { flex: 1, backgroundColor: Colors.white },
   pin: {
     backgroundColor: Colors.lime,
