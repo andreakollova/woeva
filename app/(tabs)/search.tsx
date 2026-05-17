@@ -113,7 +113,7 @@ export default function SearchScreen() {
             />
           </View>
         </View>
-      </BlurView>
+      </View>
 
       {/* List results */}
       {mode === 'list' && searched && (
