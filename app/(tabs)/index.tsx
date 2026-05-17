@@ -19,6 +19,14 @@ import { useTranslations } from '@/context/LanguageContext';
 
 const FILTER_TAGS = ['My Interests', 'Free', 'Coffee', 'Sport', 'Party', 'Music', 'Art', 'Yoga', 'All Events'];
 
+const SK_MONTHS = ['Január', 'Február', 'Marec', 'Apríl', 'Máj', 'Jún', 'Júl', 'August', 'September', 'Október', 'November', 'December'];
+
+function formatMonth(dateStr: string): string {
+  const [year, month] = dateStr.split('-');
+  const m = parseInt(month, 10) - 1;
+  return `${SK_MONTHS[m]} ${year}`;
+}
+
 const COUNTRY_META: { code: string; flag: string; name: string }[] = [
   { code: 'SK', flag: '🇸🇰', name: 'Slovensko' },
   { code: 'AT', flag: '🇦🇹', name: 'Austria' },
@@ -33,6 +41,21 @@ const FALLBACK_CITIES: { code: string; flag: string; name: string; cities: strin
   { code: 'GB', flag: '🇬🇧', name: 'United Kingdom', cities: ['London'] },
 ];
 
+const COUNTRY_NAMES_SK: Record<string, string> = {
+  SK: 'Slovensko', AT: 'Rakúsko', CZ: 'Česká republika', GB: 'Spojené kráľovstvo',
+};
+const COUNTRY_NAMES_EN: Record<string, string> = {
+  SK: 'Slovakia', AT: 'Austria', CZ: 'Czech Republic', GB: 'United Kingdom',
+};
+const CITY_DISPLAY_SK: Record<string, string> = {
+  Vienna: 'Viedeň', Prague: 'Praha', London: 'Londýn',
+  Bratislava: 'Bratislava', Košice: 'Košice', Nitra: 'Nitra',
+};
+const CITY_DISPLAY_EN: Record<string, string> = {
+  Vienna: 'Vienna', Prague: 'Prague', London: 'London',
+  Bratislava: 'Bratislava', Košice: 'Košice', Nitra: 'Nitra',
+};
+
 // city → country mapping for grouping
 const CITY_COUNTRY: Record<string, string> = {
   Bratislava: 'SK', Košice: 'SK', Prešov: 'SK', Žilina: 'SK', Nitra: 'SK',
@@ -46,7 +69,9 @@ export default function HomeScreen() {
   const insets = useSafeAreaInsets();
   const router = useRouter();
   const { profile, user, refetchProfile } = useAuth();
-  const { t } = useTranslations();
+  const { t, lang } = useTranslations();
+  const countryNames = lang === 'sk' ? COUNTRY_NAMES_SK : COUNTRY_NAMES_EN;
+  const cityDisplay = lang === 'sk' ? CITY_DISPLAY_SK : CITY_DISPLAY_EN;
   const avatarInitial = (profile?.name || (user as any)?.user_metadata?.full_name || '?').charAt(0).toUpperCase();
   const [avatarError, setAvatarError] = useState(false);
   const [events, setEvents] = useState<Event[]>([]);
@@ -215,19 +240,34 @@ export default function HomeScreen() {
 
         {/* Featured event */}
         {featured && (
-          <Animated.View entering={FadeInDown.delay(100).springify()} style={styles.featured}>
+          <Animated.View entering={FadeInDown.delay(100).duration(300)} style={styles.featured}>
             <EventCard event={featured} featured attending={attendingIds.has(featured.id)} />
           </Animated.View>
         )}
 
         {/* Event list */}
         <View style={styles.list}>
-          {rest.map((event, i) => (
-            <Animated.View key={event.id} entering={FadeInDown.delay(i * 60 + 200).springify()}>
-              <EventCard event={event} attending={attendingIds.has(event.id)} />
-              {i < rest.length - 1 && <View style={styles.divider} />}
-            </Animated.View>
-          ))}
+          {rest.map((event, i) => {
+            const prevEvent = i === 0 ? featured : rest[i - 1];
+            const curMonth = event.date?.slice(0, 7);
+            const prevMonth = prevEvent?.date?.slice(0, 7);
+            const showMonthDivider = curMonth && curMonth !== prevMonth;
+            return (
+              <React.Fragment key={event.id}>
+                {showMonthDivider && (
+                  <View style={styles.monthDivider}>
+                    <View style={styles.monthDividerLine} />
+                    <Text style={styles.monthDividerText}>{formatMonth(event.date!)}</Text>
+                    <View style={styles.monthDividerLine} />
+                  </View>
+                )}
+                <Animated.View entering={FadeInDown.delay(i * 60 + 200).duration(300)}>
+                  <EventCard event={event} attending={attendingIds.has(event.id)} />
+                  {i < rest.length - 1 && <View style={styles.divider} />}
+                </Animated.View>
+              </React.Fragment>
+            );
+          })}
           {events.length === 0 && (
             <View style={styles.empty}>
               <Text style={styles.emptyTitle}>{t.home.noEvents}</Text>
@@ -265,7 +305,7 @@ export default function HomeScreen() {
                     activeOpacity={0.7}
                   >
                     <Text style={styles.countryFlag}>{country.flag}</Text>
-                    <Text style={styles.countryName}>{country.name}</Text>
+                    <Text style={styles.countryName}>{countryNames[country.code] ?? country.name}</Text>
                     <Svg width={16} height={16} viewBox="0 0 24 24" fill="none" style={{ transform: [{ rotate: isExpanded ? '180deg' : '0deg' }] }}>
                       <Path d="M6 9l6 6 6-6" stroke={Colors.gray} strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" />
                     </Svg>
@@ -277,7 +317,7 @@ export default function HomeScreen() {
                       onPress={() => selectCity(c)}
                       activeOpacity={0.7}
                     >
-                      <Text style={[styles.cityModalLabel, city === c && styles.cityModalLabelActive]}>{c}</Text>
+                      <Text style={[styles.cityModalLabel, city === c && styles.cityModalLabelActive]}>{cityDisplay[c] ?? c}</Text>
                       {city === c && <Text style={styles.cityModalCheck}>✓</Text>}
                     </TouchableOpacity>
                   ))}
@@ -310,6 +350,9 @@ const styles = StyleSheet.create({
   featured: { marginHorizontal: 20, marginBottom: 20 },
   list: { paddingHorizontal: 20 },
   divider: { height: 1, backgroundColor: Colors.grayBorder, marginVertical: 2 },
+  monthDivider: { flexDirection: 'row', alignItems: 'center', marginVertical: 20, gap: 10 },
+  monthDividerLine: { flex: 1, height: 1, backgroundColor: Colors.grayBorder },
+  monthDividerText: { fontSize: 12, fontWeight: '700', color: Colors.black, fontFamily: Fonts.bold, letterSpacing: 1, textTransform: 'uppercase' },
   empty: { paddingVertical: 60, alignItems: 'center', gap: 8 },
   emptyTitle: { fontSize: 18, fontWeight: '600', color: Colors.black, fontFamily: Fonts.semibold },
   emptyText: { fontSize: 14, color: Colors.gray, textAlign: 'center', fontFamily: Fonts.regular },
