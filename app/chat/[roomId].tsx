@@ -29,7 +29,8 @@ export default function ChatScreen() {
   const listRef = useRef<FlatList>(null);
 
   useEffect(() => {
-    if (user && profile) {
+    if (!user) return;
+    if (profile) {
       setProfileCache(c => ({ ...c, [user.id]: { name: profile.name ?? '', avatar_url: profile.avatar_url ?? null } }));
     }
     loadMessages();
@@ -65,7 +66,7 @@ export default function ChatScreen() {
       .subscribe();
 
     return () => { supabase.removeChannel(channel); };
-  }, [roomId]);
+  }, [roomId, user?.id]);
 
   async function loadMessages() {
     const { data } = await supabase
@@ -118,7 +119,7 @@ export default function ChatScreen() {
     if (!msg || !user) return;
     if (!content) setText('');
 
-    // Optimistic update — show immediately
+    // Optimistic update - show immediately
     const tempMsg: Message = {
       id: `temp-${Date.now()}`,
       room_id: roomId,
@@ -143,13 +144,40 @@ export default function ChatScreen() {
     const { data: attendees } = await supabase
       .from('event_attendees').select('user_id')
       .eq('event_id', roomId).neq('user_id', user.id);
-    const notifs = (attendees ?? []).map((a: any) => ({
-      user_id: a.user_id, type: 'chat',
-      title: eventTitle || 'New message',
-      body: `${(profile?.name ?? 'Someone').split(' ')[0]}: ${msg.length > 60 ? msg.slice(0, 60) + '…' : msg}`,
-      data: { event_id: roomId },
-    }));
-    if (notifs.length > 0) supabase.from('notifications').insert(notifs).then(() => {});
+
+    if ((attendees ?? []).length > 0) {
+      const attendeeIds = (attendees ?? []).map((a: any) => a.user_id);
+
+      // In-app notifications
+      const notifs = attendeeIds.map((uid: string) => ({
+        user_id: uid, type: 'chat',
+        title: eventTitle || 'New message',
+        body: `${(profile?.name ?? 'Someone').split(' ')[0]}: ${msg.length > 60 ? msg.slice(0, 60) + '…' : msg}`,
+        data: { event_id: roomId },
+      }));
+      supabase.from('notifications').insert(notifs).then(() => {});
+
+      // Push notifications
+      const { data: pushProfiles } = await supabase
+        .from('profiles')
+        .select('push_token')
+        .in('id', attendeeIds)
+        .eq('notifications_enabled', true)
+        .not('push_token', 'is', null);
+
+      const tokens = (pushProfiles ?? []).map((p: any) => p.push_token).filter(Boolean);
+      if (tokens.length > 0) {
+        const senderFirst = (profile?.name ?? 'Someone').split(' ')[0];
+        supabase.functions.invoke('send-push', {
+          body: {
+            tokens,
+            title: `💬 ${eventTitle || 'Chat'}`,
+            body: `${senderFirst}: ${msg.length > 60 ? msg.slice(0, 60) + '…' : msg}`,
+            data: { event_id: roomId, type: 'chat' },
+          },
+        });
+      }
+    }
   }
 
   function handleReport() {
