@@ -117,7 +117,15 @@ export default function HomeScreen() {
     // All filters (including All Events) filter by city
     if (city && city !== 'Your city' && city !== 'Select city') query = query.eq('city', city);
     const { data } = await query;
-    setEvents(((data ?? []) as any).filter((e: any) => e.status !== 'cancelled'));
+    const now = new Date();
+    setEvents(((data ?? []) as any).filter((e: any) => {
+      if (e.status === 'cancelled') return false;
+      if (!e.date || !e.time) return true;
+      const start = new Date(`${e.date}T${e.time}`);
+      const durationH = e.duration ?? 3;
+      const hideAfter = new Date(start.getTime() + (durationH + 3) * 60 * 60 * 1000);
+      return now < hideAfter;
+    }));
 
     if (user) {
       const { data: att } = await supabase.from('event_attendees').select('event_id').eq('user_id', user.id);

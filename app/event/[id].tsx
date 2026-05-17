@@ -218,7 +218,7 @@ export default function EventDetailScreen() {
       if (event.cover_url) {
         try {
           const ext = event.cover_url.split('?')[0].split('.').pop() ?? 'jpg';
-          const localUri = `${FileSystem.cacheDirectory}event_cover_${id}.${ext}`;
+          const localUri = `${FileSystem.cacheDirectory as string}event_cover_${id}.${ext}`;
           await FileSystem.downloadAsync(event.cover_url, localUri);
           sharePayload.url = localUri;
         } catch (_) {}
@@ -235,7 +235,11 @@ export default function EventDetailScreen() {
   const isCreator = !!user && event.creator_id === user.id;
   const isFree = event.is_free || event.price === 0;
   const priceLabel = isFree ? t.event.freeLabel : `€${event.price}`;
-  const eventPast = new Date(`${event.date}T${event.time}`) < new Date();
+  const eventStart = new Date(`${event.date}T${event.time || '00:00'}`);
+  const eventDurationH = event.duration ?? 3;
+  const eventEnd = new Date(eventStart.getTime() + eventDurationH * 60 * 60 * 1000);
+  const eventPast = eventStart < new Date();
+  const eventOver = eventEnd < new Date();
   const hostName = event.club?.name ?? creator?.name ?? '';
   const hostInitial = hostName.charAt(0).toUpperCase();
   const goingCount = Math.max(event.going_count ?? 0, attendees.length);
@@ -597,13 +601,13 @@ export default function EventDetailScreen() {
               </TouchableOpacity>
             </View>
           )}
-          {user && isAttending && eventPast
+          {user && isAttending && eventPast && !eventOver
             ? (
               <View style={s.attendingRow}>
                 <Button label="🔴 Práve prebieha" onPress={() => {}} variant="lime" disabled style={s.attendingBtn} textStyle={{ fontSize: 13 }} />
               </View>
             )
-            : user && isAttending
+            : user && isAttending && !eventOver
             ? (
               <View style={s.attendingRow}>
                 <Button label={t.event.youreGoing} onPress={() => {}} variant="lime" disabled style={s.attendingBtn} textStyle={{ fontSize: 13 }} />
