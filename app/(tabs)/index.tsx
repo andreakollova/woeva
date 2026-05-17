@@ -20,11 +20,13 @@ import { useTranslations } from '@/context/LanguageContext';
 const FILTER_TAGS = ['My Interests', 'Free', 'Coffee', 'Sport', 'Party', 'Music', 'Art', 'Yoga', 'All Events'];
 
 const SK_MONTHS = ['Január', 'Február', 'Marec', 'Apríl', 'Máj', 'Jún', 'Júl', 'August', 'September', 'Október', 'November', 'December'];
+const EN_MONTHS = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
 
-function formatMonth(dateStr: string): string {
+function formatMonth(dateStr: string, lang: string): string {
   const [year, month] = dateStr.split('-');
   const m = parseInt(month, 10) - 1;
-  return `${SK_MONTHS[m]} ${year}`;
+  const name = lang === 'sk' ? SK_MONTHS[m] : EN_MONTHS[m];
+  return `${name} ${year}`;
 }
 
 const COUNTRY_META: { code: string; flag: string; name: string }[] = [
@@ -248,7 +250,7 @@ export default function HomeScreen() {
         {/* Event list */}
         <View style={styles.list}>
           {rest.map((event, i) => {
-            const prevEvent = i === 0 ? featured : rest[i - 1];
+            const prevEvent = i === 0 ? null : rest[i - 1];
             const curMonth = event.date?.slice(0, 7);
             const prevMonth = prevEvent?.date?.slice(0, 7);
             const showMonthDivider = curMonth && curMonth !== prevMonth;
@@ -257,7 +259,7 @@ export default function HomeScreen() {
                 {showMonthDivider && (
                   <View style={styles.monthDivider}>
                     <View style={styles.monthDividerLine} />
-                    <Text style={styles.monthDividerText}>{formatMonth(event.date!)}</Text>
+                    <Text style={styles.monthDividerText}>{formatMonth(event.date!, lang)}</Text>
                     <View style={styles.monthDividerLine} />
                   </View>
                 )}
