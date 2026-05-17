@@ -291,6 +291,7 @@ export default function HomeScreen() {
                   <View style={styles.monthDivider}>
                     <View style={styles.monthDividerAccent} />
                     <Text style={styles.monthDividerText}>{formatMonth(event.date!, lang)}</Text>
+                    <View style={styles.monthDividerLine} />
                   </View>
                 )}
                 <View>
@@ -387,6 +388,7 @@ const styles = StyleSheet.create({
   divider: { height: 1, backgroundColor: Colors.grayBorder, marginVertical: 2 },
   monthDivider: { flexDirection: 'row', alignItems: 'center', marginTop: 20, marginBottom: 8, gap: 8 },
   monthDividerAccent: { width: 18, height: 2, borderRadius: 2, backgroundColor: Colors.lime },
+  monthDividerLine: { flex: 1, height: 2, borderRadius: 2, backgroundColor: Colors.lime, opacity: 0.25 },
   monthDividerText: { fontSize: 11, fontWeight: '700', color: Colors.black, fontFamily: Fonts.bold, letterSpacing: 1, textTransform: 'uppercase' },
   skeletonFeatured: { height: 240, backgroundColor: Colors.grayLight, borderRadius: 20, marginHorizontal: 20, marginBottom: 20 },
   skeletonRow: { flexDirection: 'row', alignItems: 'center', gap: 12, paddingVertical: 12 },
