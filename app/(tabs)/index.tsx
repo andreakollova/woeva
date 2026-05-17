@@ -17,16 +17,16 @@ import { useAuth } from '@/context/AuthContext';
 import { useTranslations } from '@/context/LanguageContext';
 
 
-const FILTER_TAGS = ['My Interests', 'Free', 'Coffee', 'Sport', 'Party', 'Music', 'Art', 'Yoga', 'All Events'];
+const FILTER_TAGS = ['My Interests', 'Free', 'Coffee', 'Sport', 'Party', 'Music', 'Art', 'Markets', 'All Events'];
 
-// Maps UI filter label → DB category values (case-insensitive via multiple values)
+// Maps UI filter label → DB category values
 const TAG_CATEGORIES: Record<string, string[]> = {
-  Coffee: ['coffee'],
-  Sport:  ['sport', 'zapasy'],
-  Party:  ['party', 'dancing'],
-  Music:  ['music', 'umenie'],
-  Art:    ['umenie', 'historia'],
-  Yoga:   ['sport'],
+  Coffee:  ['coffee'],
+  Sport:   ['sport', 'zapasy'],
+  Party:   ['party', 'dance'],
+  Music:   ['music', 'umenie'],
+  Art:     ['umenie', 'historia'],
+  Markets: ['markets'],
 };
 
 const SK_MONTHS = ['Január', 'Február', 'Marec', 'Apríl', 'Máj', 'Jún', 'Júl', 'August', 'September', 'Október', 'November', 'December'];
