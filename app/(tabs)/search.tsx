@@ -1,6 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, StyleSheet, TextInput, ScrollView, TouchableOpacity, Platform } from 'react-native';
-import { BlurView } from 'expo-blur';
+import { View, Text, StyleSheet, TextInput, ScrollView, TouchableOpacity } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import MapView, { Marker, PROVIDER_DEFAULT } from 'react-native-maps';
@@ -93,12 +92,8 @@ export default function SearchScreen() {
         </MapView>
       )}
 
-      {/* Floating header — blur background */}
-      <BlurView
-        intensity={80}
-        tint="light"
-        style={[styles.floatingHeader, { paddingTop: insets.top }]}
-      >
+      {/* Floating header */}
+      <View style={[styles.floatingHeader, { paddingTop: insets.top }]}>
         <View style={styles.topBar}>
           <TouchableOpacity onPress={() => router.push('/(tabs)')} activeOpacity={0.7}>
             <WMark size={34} color={Colors.lime} />
@@ -164,7 +159,7 @@ const styles = StyleSheet.create({
   floatingHeader: {
     position: 'absolute', top: 0, left: 0, right: 0,
     zIndex: 10,
-    overflow: 'hidden',
+    backgroundColor: 'rgba(255,255,255,0.88)',
   },
   topBar: { alignItems: 'center', paddingVertical: 10 },
   header: { paddingHorizontal: 20, paddingBottom: 16 },
