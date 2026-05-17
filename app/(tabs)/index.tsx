@@ -90,6 +90,7 @@ export default function HomeScreen() {
   const [attendingIds, setAttendingIds] = useState<Set<string>>(new Set());
   const [filter, setFilter] = useState('My Interests');
   const [refreshing, setRefreshing] = useState(false);
+  const [loading, setLoading] = useState(true);
 
   const [city, setCity] = useState('');
   const [showCityPicker, setShowCityPicker] = useState(false);
@@ -147,6 +148,7 @@ export default function HomeScreen() {
   }, [filter, city, user?.id]));
 
   async function loadEvents() {
+    setLoading(true);
     const today = new Date().toISOString().split('T')[0];
     let query = supabase.from('events').select('*, club:clubs(id, name, cover_url), creator:profiles!creator_id(id, name, avatar_url), attendees:event_attendees(profile:profiles(id, name, avatar_url))').or(`date.gte.${today},and(is_recurring.eq.true,recurring_end_date.gte.${today})`).order('date', { ascending: true }).limit(50);
     if (filter === 'Free') query = query.eq('is_free', true);
@@ -174,6 +176,7 @@ export default function HomeScreen() {
       const { data: att } = await supabase.from('event_attendees').select('event_id').eq('user_id', user.id);
       setAttendingIds(new Set((att ?? []).map((a: any) => a.event_id)));
     }
+    setLoading(false);
   }
 
   async function onRefresh() {
@@ -257,16 +260,28 @@ export default function HomeScreen() {
         </ScrollView>
 
         {/* Featured event */}
-        {featured && (
+        {loading ? (
+          <View style={[styles.featured, styles.skeletonFeatured]} />
+        ) : featured ? (
           <Animated.View entering={FadeInDown.delay(100).duration(300)} style={styles.featured}>
             <EventCard event={featured} featured attending={attendingIds.has(featured.id)} />
           </Animated.View>
-        )}
+        ) : null}
 
         {/* Event list */}
         <View style={styles.list}>
+        {loading && [0,1,2,3].map(i => (
+          <View key={i} style={styles.skeletonRow}>
+            <View style={styles.skeletonDate} />
+            <View style={styles.skeletonInfo}>
+              <View style={[styles.skeletonLine, { width: '70%' }]} />
+              <View style={[styles.skeletonLine, { width: '45%', marginTop: 6 }]} />
+            </View>
+            <View style={styles.skeletonThumb} />
+          </View>
+        ))}
           {rest.map((event, i) => {
-            const prevEvent = i === 0 ? null : rest[i - 1];
+            const prevEvent = i === 0 ? featured : rest[i - 1];
             const curMonth = event.date?.slice(0, 7);
             const prevMonth = prevEvent?.date?.slice(0, 7);
             const showMonthDivider = curMonth && curMonth !== prevMonth;
@@ -279,10 +294,10 @@ export default function HomeScreen() {
                     <View style={styles.monthDividerLine} />
                   </View>
                 )}
-                <Animated.View entering={FadeInDown.delay(i * 60 + 200).duration(300)}>
+                <View>
                   <EventCard event={event} attending={attendingIds.has(event.id)} />
                   {i < rest.length - 1 && <View style={styles.divider} />}
-                </Animated.View>
+                </View>
               </React.Fragment>
             );
           })}
@@ -371,6 +386,12 @@ const styles = StyleSheet.create({
   monthDivider: { flexDirection: 'row', alignItems: 'center', marginVertical: 20, gap: 10 },
   monthDividerLine: { flex: 1, height: 1, backgroundColor: Colors.grayBorder },
   monthDividerText: { fontSize: 12, fontWeight: '700', color: Colors.black, fontFamily: Fonts.bold, letterSpacing: 1, textTransform: 'uppercase' },
+  skeletonFeatured: { height: 240, backgroundColor: Colors.grayLight, borderRadius: 20, marginHorizontal: 20, marginBottom: 20 },
+  skeletonRow: { flexDirection: 'row', alignItems: 'center', gap: 12, paddingVertical: 12 },
+  skeletonDate: { width: 52, height: 64, borderRadius: 12, backgroundColor: Colors.grayLight },
+  skeletonInfo: { flex: 1, gap: 0 },
+  skeletonLine: { height: 14, borderRadius: 7, backgroundColor: Colors.grayLight },
+  skeletonThumb: { width: 64, height: 64, borderRadius: 12, backgroundColor: Colors.grayLight },
   empty: { paddingVertical: 60, alignItems: 'center', gap: 8 },
   emptyTitle: { fontSize: 18, fontWeight: '600', color: Colors.black, fontFamily: Fonts.semibold },
   emptyText: { fontSize: 14, color: Colors.gray, textAlign: 'center', fontFamily: Fonts.regular },
