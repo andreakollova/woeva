@@ -288,7 +288,10 @@ export default function HomeScreen() {
             return (
               <React.Fragment key={event.id}>
                 {showMonthDivider && (
-                  <Text style={styles.monthDividerText}>{formatMonth(event.date!, lang)}</Text>
+                  <View style={styles.monthDivider}>
+                    <View style={styles.monthDividerAccent} />
+                    <Text style={styles.monthDividerText}>{formatMonth(event.date!, lang)}</Text>
+                  </View>
                 )}
                 <View>
                   <EventCard event={event} attending={attendingIds.has(event.id)} />
@@ -382,7 +385,9 @@ const styles = StyleSheet.create({
   featured: { marginHorizontal: 20, marginBottom: 20 },
   list: { paddingHorizontal: 20 },
   divider: { height: 1, backgroundColor: Colors.grayBorder, marginVertical: 2 },
-  monthDividerText: { fontSize: 11, fontWeight: '700', color: Colors.gray, fontFamily: Fonts.bold, letterSpacing: 1, textTransform: 'uppercase', marginTop: 20, marginBottom: 8 },
+  monthDivider: { flexDirection: 'row', alignItems: 'center', marginTop: 20, marginBottom: 8, gap: 8 },
+  monthDividerAccent: { width: 18, height: 2, borderRadius: 2, backgroundColor: Colors.lime },
+  monthDividerText: { fontSize: 11, fontWeight: '700', color: Colors.black, fontFamily: Fonts.bold, letterSpacing: 1, textTransform: 'uppercase' },
   skeletonFeatured: { height: 240, backgroundColor: Colors.grayLight, borderRadius: 20, marginHorizontal: 20, marginBottom: 20 },
   skeletonRow: { flexDirection: 'row', alignItems: 'center', gap: 12, paddingVertical: 12 },
   skeletonDate: { width: 52, height: 64, borderRadius: 12, backgroundColor: Colors.grayLight },
