@@ -36,15 +36,23 @@ export default function SearchScreen() {
       .gte('date', today)
       .not('lat', 'is', null)
       .not('lng', 'is', null)
-      .limit(50);
-    setMapEvents(data ?? []);
+      .order('date', { ascending: true })
+      .limit(200);
+
+    // Pre každú unikátnu lokáciu ukáž iba najbližší event
+    const seen = new Map<string, any>();
+    for (const e of (data ?? [])) {
+      const key = `${(e.lat as number).toFixed(4)}_${(e.lng as number).toFixed(4)}`;
+      if (!seen.has(key)) seen.set(key, e);
+    }
+    setMapEvents(Array.from(seen.values()));
   }
 
   async function handleSearch() {
     if (!query.trim()) return;
     const { data } = await supabase
       .from('events')
-      .select('*')
+      .select('*, attendees:event_attendees(profile:profiles(id, name, avatar_url))')
       .or(`title.ilike.%${query}%,category.ilike.%${query}%,venue.ilike.%${query}%`)
       .limit(20);
     setResults(((data ?? []) as any).filter((e: any) => e.status !== 'cancelled'));
@@ -77,7 +85,7 @@ export default function SearchScreen() {
 
       {mode === 'map' && (
         <MapView
-          style={styles.map}
+          style={[styles.map, { marginBottom: insets.bottom + 60 }]}
           provider={PROVIDER_DEFAULT}
           initialRegion={{
             latitude: 48.1486,
@@ -86,6 +94,7 @@ export default function SearchScreen() {
             longitudeDelta: 0.05,
           }}
           customMapStyle={mapStyle}
+          legalLabelInsets={{ bottom: -999, left: 0, top: 0, right: 0 }}
         >
           {mapEvents.map((event) => (
             <Marker
@@ -105,16 +114,21 @@ export default function SearchScreen() {
       )}
 
       {mode === 'list' && searched && (
+        <TouchableOpacity style={styles.backToMap} onPress={() => { setMode('map'); setSearched(false); setQuery(''); }} activeOpacity={0.8}>
+          <Text style={styles.backToMapText}>← Mapa</Text>
+        </TouchableOpacity>
+      )}
+
+      {mode === 'list' && searched && (
         <ScrollView contentContainerStyle={styles.results}>
           {results.length === 0 ? (
             <Animated.View entering={FadeInDown} style={styles.empty}>
-              <View style={styles.emptyDot} />
               <Text style={styles.emptyTitle}>{t.search.nothingMatches}</Text>
               <Text style={styles.emptyText}>{t.search.nothingMatchesFor(query)}</Text>
               <View style={styles.emptyActions}>
                 <Button
                   label={t.search.startClub(query)}
-                  onPress={() => router.push('/club/create/index')}
+                  onPress={() => router.push('/club/create')}
                   variant="lime"
                 />
                 <Button
@@ -171,10 +185,11 @@ const styles = StyleSheet.create({
     borderColor: Colors.white,
   },
   pinIcon: { fontSize: 16, color: Colors.black },
+  backToMap: { flexDirection: 'row', alignItems: 'center', marginHorizontal: 20, marginBottom: 8, alignSelf: 'flex-start', backgroundColor: Colors.black, borderRadius: 50, paddingHorizontal: 16, paddingVertical: 8 },
+  backToMapText: { fontSize: 13, fontWeight: '700', color: Colors.white, fontFamily: Fonts.semibold },
   results: { padding: 20, paddingBottom: 40 },
   divider: { height: 1, backgroundColor: Colors.grayBorder, marginVertical: 4 },
   empty: { paddingTop: 60, alignItems: 'center', gap: 12 },
-  emptyDot: { width: 56, height: 56, borderRadius: 28, backgroundColor: Colors.grayLight, marginBottom: 8 },
   emptyTitle: { fontSize: 22, fontWeight: '700', color: Colors.black },
   emptyText: { fontSize: 15, color: Colors.gray, textAlign: 'center', lineHeight: 22 },
   emptyActions: { width: '100%', gap: 10, marginTop: 16 },
