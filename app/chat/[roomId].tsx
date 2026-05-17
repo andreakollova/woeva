@@ -26,6 +26,7 @@ export default function ChatScreen() {
   const [headerSub, setHeaderSub] = useState('');
   const [profileCache, setProfileCache] = useState<ProfileCache>({});
   const [adminIds, setAdminIds] = useState<Set<string>>(new Set());
+  const [muted, setMuted] = useState(false);
   const listRef = useRef<FlatList>(null);
 
   useEffect(() => {
@@ -35,6 +36,7 @@ export default function ChatScreen() {
     }
     loadMessages();
     loadEventMeta();
+    loadMuteState();
 
     const channel = supabase
       .channel(`chat:${roomId}`)
@@ -67,6 +69,22 @@ export default function ChatScreen() {
 
     return () => { supabase.removeChannel(channel); };
   }, [roomId, user?.id]);
+
+  async function loadMuteState() {
+    if (!user) return;
+    const { data } = await supabase.from('profiles').select('muted_chats').eq('id', user.id).single();
+    setMuted((data?.muted_chats ?? []).includes(roomId));
+  }
+
+  async function toggleMute() {
+    if (!user) return;
+    const { data } = await supabase.from('profiles').select('muted_chats').eq('id', user.id).single();
+    const current: string[] = data?.muted_chats ?? [];
+    const updated = muted ? current.filter((id: string) => id !== roomId) : [...current, roomId];
+    await supabase.from('profiles').update({ muted_chats: updated }).eq('id', user.id);
+    setMuted(!muted);
+    Alert.alert(muted ? tr.chat.unmuted ?? 'Notifikácie zapnuté' : tr.chat.muted ?? 'Notifikácie vypnuté');
+  }
 
   async function loadMessages() {
     const { data } = await supabase
@@ -160,12 +178,15 @@ export default function ChatScreen() {
       // Push notifications
       const { data: pushProfiles } = await supabase
         .from('profiles')
-        .select('push_token')
+        .select('push_token, muted_chats')
         .in('id', attendeeIds)
         .eq('notifications_enabled', true)
         .not('push_token', 'is', null);
 
-      const tokens = (pushProfiles ?? []).map((p: any) => p.push_token).filter(Boolean);
+      const tokens = (pushProfiles ?? [])
+        .filter((p: any) => !(p.muted_chats ?? []).includes(roomId))
+        .map((p: any) => p.push_token).filter(Boolean);
+
       if (tokens.length > 0) {
         const senderFirst = (profile?.name ?? 'Someone').split(' ')[0];
         supabase.functions.invoke('send-push', {
@@ -180,13 +201,19 @@ export default function ChatScreen() {
     }
   }
 
-  function handleReport() {
-    Alert.alert(tr.chat.reportChat, tr.chat.reportChatMsg, [
-      { text: tr.common.cancel, style: 'cancel' },
-      { text: tr.chat.reportChat, style: 'destructive', onPress: async () => {
-        await supabase.from('reports').insert({ reporter_id: user?.id, target_type: 'chat', target_id: roomId });
-        Alert.alert(tr.chat.reported, tr.chat.reportedMsg);
+  function handleOptions() {
+    Alert.alert('Chat', undefined, [
+      { text: muted ? '🔔 Zapnúť notifikácie' : '🔕 Stlmiť notifikácie', onPress: toggleMute },
+      { text: tr.chat.reportChat, style: 'destructive', onPress: () => {
+        Alert.alert(tr.chat.reportChat, tr.chat.reportChatMsg, [
+          { text: tr.common.cancel, style: 'cancel' },
+          { text: tr.chat.reportChat, style: 'destructive', onPress: async () => {
+            await supabase.from('reports').insert({ reporter_id: user?.id, target_type: 'chat', target_id: roomId });
+            Alert.alert(tr.chat.reported, tr.chat.reportedMsg);
+          }},
+        ]);
       }},
+      { text: tr.common.cancel, style: 'cancel' },
     ]);
   }
 
@@ -246,7 +273,7 @@ export default function ChatScreen() {
           <Text style={styles.headerTitle} numberOfLines={1}>{eventTitle}</Text>
           <Text style={styles.headerSub} numberOfLines={1}>{headerSub || tr.chat.groupChat}</Text>
         </View>
-        <TouchableOpacity onPress={handleReport} style={styles.reportBtn}>
+        <TouchableOpacity onPress={handleOptions} style={styles.reportBtn}>
           <Text style={styles.reportIcon}>⋯</Text>
         </TouchableOpacity>
       </View>

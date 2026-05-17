@@ -159,7 +159,7 @@ const styles = StyleSheet.create({
   floatingHeader: {
     position: 'absolute', top: 0, left: -6, right: -6,
     zIndex: 10,
-    backgroundColor: 'rgba(0,0,0,0.72)',
+    backgroundColor: 'rgba(0,0,0,0.85)',
     borderBottomLeftRadius: 20,
     borderBottomRightRadius: 20,
     borderWidth: 1,
