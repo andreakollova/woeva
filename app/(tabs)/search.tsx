@@ -157,11 +157,11 @@ const mapStyle = [
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: Colors.white },
   floatingHeader: {
-    position: 'absolute', top: 0, left: 0, right: 0,
+    position: 'absolute', top: 0, left: -6, right: -6,
     zIndex: 10,
     backgroundColor: 'rgba(0,0,0,0.72)',
-    borderBottomLeftRadius: 28,
-    borderBottomRightRadius: 28,
+    borderBottomLeftRadius: 20,
+    borderBottomRightRadius: 20,
     borderWidth: 1,
     borderColor: 'rgba(255,255,255,0.12)',
     borderTopWidth: 0,
