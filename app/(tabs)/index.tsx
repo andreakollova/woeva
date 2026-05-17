@@ -19,6 +19,16 @@ import { useTranslations } from '@/context/LanguageContext';
 
 const FILTER_TAGS = ['My Interests', 'Free', 'Coffee', 'Sport', 'Party', 'Music', 'Art', 'Yoga', 'All Events'];
 
+// Maps UI filter label → DB category values (case-insensitive via multiple values)
+const TAG_CATEGORIES: Record<string, string[]> = {
+  Coffee: ['coffee'],
+  Sport:  ['sport', 'zapasy'],
+  Party:  ['party', 'dancing'],
+  Music:  ['music', 'umenie'],
+  Art:    ['umenie', 'historia'],
+  Yoga:   ['sport'],
+};
+
 const SK_MONTHS = ['Január', 'Február', 'Marec', 'Apríl', 'Máj', 'Jún', 'Júl', 'August', 'September', 'Október', 'November', 'December'];
 const EN_MONTHS = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
 
@@ -140,7 +150,13 @@ export default function HomeScreen() {
     const today = new Date().toISOString().split('T')[0];
     let query = supabase.from('events').select('*, club:clubs(id, name, cover_url), creator:profiles!creator_id(id, name, avatar_url), attendees:event_attendees(profile:profiles(id, name, avatar_url))').or(`date.gte.${today},and(is_recurring.eq.true,recurring_end_date.gte.${today})`).order('date', { ascending: true }).limit(50);
     if (filter === 'Free') query = query.eq('is_free', true);
-    else if (filter !== 'My Interests' && filter !== 'All Events') query = query.eq('category', filter);
+    else if (filter !== 'My Interests' && filter !== 'All Events') {
+      const cats = TAG_CATEGORIES[filter];
+      if (cats) {
+        if (cats.length === 1) query = query.eq('category', cats[0]);
+        else query = query.or(cats.map(c => `category.eq.${c}`).join(','));
+      }
+    }
     // All filters (including All Events) filter by city
     if (city && city !== 'Your city' && city !== 'Select city') query = query.eq('city', city);
     const { data } = await query;
