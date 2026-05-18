@@ -31,6 +31,8 @@ export default function CreateStep3Screen() {
   const [venueLng, setVenueLng] = useState<number | undefined>();
   const [price, setPrice] = useState('0');
   const [isRecurring, setIsRecurring] = useState(false);
+  const [recurringEndDate, setRecurringEndDate] = useState(() => { const d = new Date(); d.setMonth(d.getMonth() + 3); return d; });
+  const [showRecurringEnd, setShowRecurringEnd] = useState(false);
   const [loading, setLoading] = useState(false);
   const [showDate, setShowDate] = useState(false);
   const [showTime, setShowTime] = useState(false);
@@ -67,13 +69,17 @@ export default function CreateStep3Screen() {
       cover_url = await uploadImage(params.cover, 'event-covers', `${Date.now()}.${ext}`);
     }
 
+    const parsedTags = (() => { try { return JSON.parse(params.tags || '[]'); } catch { return []; } })();
+    const VALID_CATS = ['Sport', 'Coffee', 'Sober party', 'Party', 'Music', 'Art', 'Film', 'Yoga', 'Tech', 'Gardening', 'Gaming', 'Running', 'Hockey', 'Dance', 'Food', 'Networking', 'Matches', 'Gastro', 'Free', 'Marathon'];
+    const firstTag = parsedTags[0] || '';
+    const safeCategory = VALID_CATS.includes(firstTag) ? firstTag : (parsedTags.find((t: string) => VALID_CATS.includes(t)) ?? 'Sport');
+
     const { data, error } = await supabase.from('events').insert({
       creator_id: currentUser.id,
       club_id: clubData?.id ?? null,
       title: String(params.title),
       tagline: String(params.tagline || ''),
-      tags: (() => { try { return JSON.parse(params.tags || '[]'); } catch { return []; } })(),
-      category: (() => { try { return JSON.parse(params.tags || '[]')[0] || 'Other'; } catch { return 'Other'; } })(),
+      category: safeCategory,
       cover_url,
       date: eventDate,
       time: eventTime,
@@ -84,6 +90,7 @@ export default function CreateStep3Screen() {
       price: priceNum,
       is_free: priceNum === 0,
       is_recurring: isRecurring,
+      recurring_end_date: isRecurring ? recurringEndDate.toISOString().split('T')[0] : null,
       going_count: 1,
       city: profile?.city ?? 'Bratislava',
     }).select().single();
@@ -92,12 +99,11 @@ export default function CreateStep3Screen() {
       await supabase.from('event_attendees').insert({ event_id: data.id, user_id: currentUser.id, paid: true });
 
       // Notify users interested in new events (my tags / all)
-      const eventTags = (() => { try { return JSON.parse(params.tags || '[]'); } catch { return []; } })();
       notify.newEvent({
         creatorId: currentUser.id,
         eventId: data.id,
         eventTitle: String(params.title),
-        tags: eventTags,
+        tags: parsedTags,
         city: profile?.city ?? 'Bratislava',
       });
 
@@ -284,6 +290,26 @@ export default function CreateStep3Screen() {
               <View style={[styles.toggleThumb, isRecurring && styles.toggleThumbOn]} />
             </View>
           </TouchableOpacity>
+
+          {/* Recurring end date — only when recurring is on */}
+          {isRecurring && (
+            <View>
+              <Text style={styles.label}>{t.event.recurringUntil ?? 'Repeat until'}</Text>
+              <TouchableOpacity style={styles.field} onPress={() => setShowRecurringEnd(true)} activeOpacity={0.8}>
+                <Text style={styles.fieldValue}>
+                  {recurringEndDate.toLocaleDateString('en-GB', { day: 'numeric', month: 'long', year: 'numeric' })}
+                </Text>
+              </TouchableOpacity>
+              {showRecurringEnd && (
+                <DateTimePicker
+                  value={recurringEndDate}
+                  mode="date"
+                  minimumDate={date}
+                  onChange={(_, d) => { setShowRecurringEnd(false); if (d) setRecurringEndDate(d); }}
+                />
+              )}
+            </View>
+          )}
         </View>
       </ScrollView>
 

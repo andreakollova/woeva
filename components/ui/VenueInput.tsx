@@ -86,7 +86,7 @@ export function VenueInput({ value, onChange }: VenueInputProps) {
   }
 
   return (
-    <View>
+    <View style={styles.wrapper}>
       <Text style={styles.label}>Venue</Text>
       <View style={[styles.inputWrap, focused && styles.inputFocused, confirmed && styles.inputConfirmed]}>
         <TextInput
@@ -102,7 +102,7 @@ export function VenueInput({ value, onChange }: VenueInputProps) {
         {loading && <ActivityIndicator size="small" color={Colors.gray} style={styles.spinner} />}
         {confirmed && !loading && <Text style={styles.confirmedIcon}>✓</Text>}
       </View>
-      {value.length > 0 && !confirmed && !loading && (
+      {value.length > 0 && !confirmed && !loading && results.length === 0 && (
         <Text style={styles.hint}>↑ Select from the list to pin on map</Text>
       )}
       {confirmed && (
@@ -182,14 +182,26 @@ const styles = StyleSheet.create({
   spinner: {
     marginLeft: 8,
   },
+  wrapper: {
+    zIndex: 10,
+  },
   dropdown: {
-    marginTop: 4,
+    position: 'absolute',
+    top: 72,
+    left: 0,
+    right: 0,
+    zIndex: 100,
     borderWidth: 1.5,
     borderColor: Colors.grayBorder,
     borderRadius: 12,
     backgroundColor: Colors.white,
     overflow: 'hidden',
-    maxHeight: 260,
+    maxHeight: 220,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.10,
+    shadowRadius: 12,
+    elevation: 8,
   },
   item: {
     paddingHorizontal: 16,

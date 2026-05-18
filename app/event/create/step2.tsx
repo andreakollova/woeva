@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, ScrollView, KeyboardAvoidingView, Platform, Image } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, ScrollView, KeyboardAvoidingView, Platform, Image, Alert } from 'react-native';
 import { useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import * as ImagePicker from 'expo-image-picker';
@@ -12,12 +12,13 @@ import { useCategories } from '@/hooks/useCategories';
 import { supabase } from '@/lib/supabase';
 import { useAuth } from '@/context/AuthContext';
 import { useTranslations } from '@/context/LanguageContext';
+import { CATEGORY_SK } from '@/types';
 
 export default function CreateStep2Screen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const { user, profile } = useAuth();
-  const { t } = useTranslations();
+  const { t, lang } = useTranslations();
   const { categories } = useCategories();
   const [title, setTitle] = useState('');
   const [tagline, setTagline] = useState('');
@@ -40,9 +41,11 @@ export default function CreateStep2Screen() {
   }
 
   function toggleTag(cat: string) {
-    setTags(prev =>
-      prev.includes(cat) ? prev.filter(t => t !== cat) : prev.length < 3 ? [...prev, cat] : prev
-    );
+    setTags(prev => {
+      if (prev.includes(cat)) return prev.filter(t => t !== cat);
+      if (prev.length >= 3) { Alert.alert('', 'Max 3 categories allowed'); return prev; }
+      return [...prev, cat];
+    });
   }
 
   function handleNext() {
@@ -51,16 +54,16 @@ export default function CreateStep2Screen() {
   }
 
   return (
-    <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
+    <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : undefined} keyboardVerticalOffset={0}>
       <ScrollView
         style={styles.container}
-        contentContainerStyle={[styles.scroll, { paddingTop: insets.top + 20, paddingBottom: insets.bottom + 100 }]}
+        contentContainerStyle={[styles.scroll, { paddingTop: insets.top + 20, paddingBottom: 16 }]}
         keyboardShouldPersistTaps="handled"
       >
         {/* Step indicator */}
         <View style={styles.stepRow}>
-          <TouchableOpacity onPress={() => router.push('/(tabs)')} activeOpacity={0.7}>
-            <WMark size={28} color={Colors.lime} />
+          <TouchableOpacity onPress={() => router.back()} activeOpacity={0.7} style={styles.backBtn}>
+            <Text style={styles.backArrow}>←</Text>
           </TouchableOpacity>
           <View style={styles.stepBadge}><Text style={styles.stepText}>{t.event.step(2, 3)}</Text></View>
         </View>
@@ -136,7 +139,7 @@ export default function CreateStep2Screen() {
           <View>
             <View style={styles.labelRow}>
               <Text style={[styles.label, { marginBottom: 0 }]}>{t.event.category}</Text>
-              <Text style={styles.labelRequired}>{tags.length}/3</Text>
+              <Text style={styles.labelRequired}>Select all that apply</Text>
             </View>
             <View style={styles.chipsWrap}>
               {categories.map(cat => {
@@ -146,10 +149,10 @@ export default function CreateStep2Screen() {
                   <TouchableOpacity
                     key={cat}
                     style={[styles.chip, active && styles.chipActive, disabled && styles.chipDisabled]}
-                    onPress={() => !disabled && toggleTag(cat)}
+                    onPress={() => toggleTag(cat)}
                     activeOpacity={0.7}
                   >
-                    <Text style={[styles.chipText, active && styles.chipTextActive]}>{cat}</Text>
+                    <Text style={[styles.chipText, active && styles.chipTextActive]}>{lang === 'sk' ? (CATEGORY_SK[cat] ?? cat) : cat}</Text>
                   </TouchableOpacity>
                 );
               })}
@@ -174,12 +177,12 @@ export default function CreateStep2Screen() {
             </TouchableOpacity>
           </View>
         </View>
-      </ScrollView>
 
-      <View style={[styles.footer, { paddingBottom: insets.bottom + 16 }]}>
-        <Button label={t.common.next} onPress={handleNext} disabled={!title || !cover || tags.length === 0} variant="black" />
-        <Button label={t.common.back} onPress={() => router.back()} variant="ghost" />
-      </View>
+        <View style={[styles.footer, { paddingBottom: insets.bottom + 16 }]}>
+          <Button label={t.common.next} onPress={handleNext} disabled={!title || !cover || tags.length === 0} variant="black" />
+          <Button label={t.common.back} onPress={() => router.back()} variant="ghost" />
+        </View>
+      </ScrollView>
     </KeyboardAvoidingView>
   );
 }
@@ -188,6 +191,8 @@ const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: Colors.white },
   scroll: { paddingHorizontal: 24 },
   stepRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 24 },
+  backBtn: { width: 36, height: 36, borderRadius: 18, backgroundColor: Colors.grayLight, alignItems: 'center', justifyContent: 'center' },
+  backArrow: { fontSize: 18, color: Colors.black, marginTop: -1 },
   stepBadge: { backgroundColor: Colors.grayLight, borderRadius: 50, paddingHorizontal: 14, paddingVertical: 6 },
   stepText: { fontSize: 13, fontWeight: '600', color: Colors.black },
   title: { fontSize: 28, fontWeight: '700', color: Colors.black, marginBottom: 28, letterSpacing: -0.5 },
@@ -210,7 +215,7 @@ const styles = StyleSheet.create({
   coverEmpty: { flex: 1, alignItems: 'center', justifyContent: 'center', gap: 8 },
   coverPlus: { fontSize: 32, color: Colors.gray },
   coverHint: { fontSize: 14, color: Colors.gray },
-  footer: { paddingHorizontal: 24, paddingTop: 12, borderTopWidth: 1, borderColor: Colors.grayBorder, gap: 8, backgroundColor: Colors.white },
+  footer: { paddingTop: 24, gap: 8 },
   posterRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', backgroundColor: Colors.grayLight, borderRadius: 12, paddingHorizontal: 14, paddingVertical: 12 },
   posterInfo: { gap: 2 },
   posterLabel: { fontSize: 11, fontWeight: '600', color: Colors.gray, fontFamily: Fonts.medium, textTransform: 'uppercase', letterSpacing: 0.5 },
