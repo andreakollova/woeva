@@ -16,7 +16,8 @@
     },
     "production": {
       "autoIncrement": true,
-      "node": "22.14.0"
+      "node": "22.14.0",
+      "image": "latest"
     }
   },
   "submit": {
