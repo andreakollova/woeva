@@ -143,6 +143,19 @@ export default function AdminEventsScreen() {
             const tokens = (attendees ?? []).map((a: any) => a.profile?.push_token).filter(Boolean);
             const emails = (attendees ?? []).map((a: any) => a.profile?.email).filter(Boolean);
 
+            // In-app notifications
+            if ((attendees ?? []).length > 0) {
+              await supabase.from('notifications').insert(
+                (attendees ?? []).map((a: any) => ({
+                  user_id: a.user_id,
+                  type: 'event_cancelled',
+                  title: `${selected.title} was cancelled`,
+                  body: cancelReason.trim() || 'This event has been cancelled by Woeva Admin.',
+                  data: { event_id: selected.id },
+                }))
+              );
+            }
+
             await notify.eventCancelled({
               eventId: selected.id,
               eventTitle: selected.title,

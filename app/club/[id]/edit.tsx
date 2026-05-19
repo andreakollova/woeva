@@ -3,7 +3,8 @@ import {
   View, Text, StyleSheet, ScrollView, TouchableOpacity,
   KeyboardAvoidingView, Platform, Alert, Image, TextInput, Modal, ActivityIndicator,
 } from 'react-native';
-import { useLocalSearchParams, useRouter } from 'expo-router';
+import { useLocalSearchParams, useRouter, useNavigation } from 'expo-router';
+import { StackActions } from '@react-navigation/native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import * as ImagePicker from 'expo-image-picker';
 import { Colors } from '@/constants/colors';
@@ -13,6 +14,7 @@ import { Button } from '@/components/ui/Button';
 import { BackButton } from '@/components/ui/BackButton';
 import { supabase } from '@/lib/supabase';
 import { uploadImage } from '@/lib/uploadImage';
+import { VenueInput } from '@/components/ui/VenueInput';
 import { useCategories } from '@/hooks/useCategories';
 import { useTranslations } from '@/context/LanguageContext';
 
@@ -20,6 +22,7 @@ export default function ClubEditScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const insets = useSafeAreaInsets();
   const router = useRouter();
+  const navigation = useNavigation();
   const { t } = useTranslations();
   const { categories } = useCategories();
 
@@ -31,23 +34,41 @@ export default function ClubEditScreen() {
   const [existingCoverUrl, setExistingCoverUrl] = useState<string | null>(null);
   const [logo, setLogo] = useState<string | null>(null);
   const [existingLogoUrl, setExistingLogoUrl] = useState<string | null>(null);
+  const [address, setAddress] = useState('');
+  const [addressLat, setAddressLat] = useState<number | undefined>();
+  const [addressLng, setAddressLng] = useState<number | undefined>();
+  const [orig, setOrig] = useState({ name: '', tagline: '', description: '', tags: [] as string[], address: '' });
   const [showCategories, setShowCategories] = useState(false);
   const [loading, setLoading] = useState(false);
   const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [deleting, setDeleting] = useState(false);
 
   useEffect(() => {
-    supabase.from('clubs').select('name, tagline, description, category, cover_url, logo_url').eq('id', id).single()
+    supabase.from('clubs').select('name, tagline, description, category, tags, cover_url, logo_url, address, lat, lng').eq('id', id).single()
       .then(({ data }) => {
         if (!data) return;
-        setName(data.name ?? '');
-        setTagline(data.tagline ?? '');
-        setDescription(data.description ?? '');
-        setTags(data.tags?.length ? data.tags : (data.category ? [data.category] : []));
+        const n = data.name ?? '';
+        const tl = data.tagline ?? '';
+        const desc = data.description ?? '';
+        const tgs = data.tags?.length ? data.tags : (data.category ? [data.category] : []);
+        const addr = data.address ?? '';
+        setName(n); setTagline(tl); setDescription(desc); setTags(tgs);
         setExistingCoverUrl(data.cover_url ?? null);
         setExistingLogoUrl(data.logo_url ?? null);
+        setAddress(addr);
+        setAddressLat(data.lat ?? undefined);
+        setAddressLng(data.lng ?? undefined);
+        setOrig({ name: n, tagline: tl, description: desc, tags: tgs, address: addr });
       });
   }, [id]);
+
+  const isDirty = name !== orig.name
+    || tagline !== orig.tagline
+    || description !== orig.description
+    || address !== orig.address
+    || JSON.stringify(tags) !== JSON.stringify(orig.tags)
+    || cover !== null
+    || logo !== null;
 
   async function pickCover() {
     const result = await ImagePicker.launchImageLibraryAsync({ mediaTypes: ['images'], quality: 0.8, aspect: [16, 9] });
@@ -96,6 +117,9 @@ export default function ClubEditScreen() {
       category: tags[0] || null,
       cover_url,
       logo_url,
+      address: address.trim() || null,
+      lat: addressLat ?? null,
+      lng: addressLng ?? null,
     }).eq('id', id);
 
     setLoading(false);
@@ -160,7 +184,7 @@ export default function ClubEditScreen() {
 
     setDeleting(false);
     setShowDeleteModal(false);
-    router.dismiss(2);
+    navigation.dispatch(StackActions.pop(2));
   }
 
   const coverSource = cover ?? existingCoverUrl;
@@ -219,6 +243,11 @@ export default function ClubEditScreen() {
         <View style={styles.form}>
           <Input label={t.club.clubName} value={name} onChangeText={setName} placeholder={t.club.clubNamePlaceholderEdit} />
           <Input label={t.club.tagline} value={tagline} onChangeText={setTagline} placeholder={t.club.taglinePlaceholderEdit} />
+
+          <VenueInput
+            value={address}
+            onChange={(v, lat, lng) => { setAddress(v); setAddressLat(lat); setAddressLng(lng); }}
+          />
 
           {/* About */}
           <View style={{ gap: 6 }}>
@@ -290,16 +319,20 @@ export default function ClubEditScreen() {
               })}
             </View>
           </View>
+          <View style={{ gap: 8, paddingTop: 8, paddingBottom: insets.bottom + 24 }}>
+            <Button label={t.common.cancel} onPress={() => router.back()} variant="ghost" />
+            <TouchableOpacity style={styles.deleteBtn} onPress={() => setShowDeleteModal(true)}>
+              <Text style={styles.deleteBtnText}>{t.club.deleteClub}</Text>
+            </TouchableOpacity>
+          </View>
         </View>
       </ScrollView>
 
-      <View style={[styles.footer, { paddingBottom: insets.bottom + 16 }]}>
-        <Button label={t.club.saveChanges} onPress={handleSave} loading={loading} variant="black" disabled={!name.trim()} />
-        <Button label={t.common.cancel} onPress={() => router.back()} variant="ghost" />
-        <TouchableOpacity style={styles.deleteBtn} onPress={() => setShowDeleteModal(true)}>
-          <Text style={styles.deleteBtnText}>{t.club.deleteClub}</Text>
-        </TouchableOpacity>
-      </View>
+      {isDirty && (
+        <View style={[styles.stickyFooter, { paddingBottom: insets.bottom + 12 }]}>
+          <Button label={t.club.saveChanges} onPress={handleSave} loading={loading} disabled={!name.trim()} variant="black" />
+        </View>
+      )}
     </KeyboardAvoidingView>
   );
 }
@@ -339,7 +372,6 @@ const styles = StyleSheet.create({
   coverPreview: { width: '100%', height: '100%' },
   coverEmpty: { flex: 1, alignItems: 'center', justifyContent: 'center', gap: 4 },
   coverHint: { fontSize: 11, color: Colors.gray },
-  footer: { paddingHorizontal: 24, paddingTop: 12, borderTopWidth: 1, borderColor: Colors.grayBorder, gap: 8, backgroundColor: Colors.white },
   deleteBtn: { alignItems: 'center', paddingVertical: 10 },
   deleteBtnText: { fontSize: 14, fontWeight: '600', color: '#CC3333' },
   modalOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'flex-end' },
@@ -354,4 +386,10 @@ const styles = StyleSheet.create({
   deleteConfirmText: { fontSize: 15, fontWeight: '700', color: Colors.white, fontFamily: Fonts.bold },
   deleteCancelBtn: { backgroundColor: Colors.grayLight, borderRadius: 14, paddingVertical: 15, alignItems: 'center' },
   deleteCancelText: { fontSize: 15, fontWeight: '600', color: Colors.black, fontFamily: Fonts.semibold },
+  stickyFooter: {
+    position: 'absolute', bottom: 0, left: 0, right: 0,
+    paddingHorizontal: 24, paddingTop: 12,
+    backgroundColor: Colors.white,
+    borderTopWidth: 1, borderTopColor: Colors.grayBorder,
+  },
 });

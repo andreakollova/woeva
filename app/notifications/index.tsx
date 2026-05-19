@@ -61,6 +61,12 @@ export default function NotificationsScreen() {
         <Path d="M9 11a4 4 0 1 0 0-8 4 4 0 0 0 0 8z" stroke={Colors.black} strokeWidth={2} />
       </Svg>
     );
+    if (type === 'join') return (
+      <Svg width={16} height={16} viewBox="0 0 24 24" fill="none">
+        <Path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2" stroke={Colors.black} strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" />
+        <Path d="M12 11a4 4 0 1 0 0-8 4 4 0 0 0 0 8z" stroke={Colors.black} strokeWidth={2} />
+      </Svg>
+    );
     return (
       <Svg width={16} height={16} viewBox="0 0 24 24" fill="none">
         <Path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" stroke={Colors.black} strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" />
@@ -72,6 +78,7 @@ export default function NotificationsScreen() {
     if (type === 'event_cancelled') return '#FFF0F0';
     if (type === 'new_event' || type === 'club_event') return Colors.lime;
     if (type === 'admin_invite') return '#E8F4FF';
+    if (type === 'join') return Colors.lime;
     return Colors.grayLight;
   }
 

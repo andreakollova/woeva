@@ -15,6 +15,7 @@ import { supabase } from '@/lib/supabase';
 import { Event } from '@/types';
 import { useAuth } from '@/context/AuthContext';
 import { useTranslations } from '@/context/LanguageContext';
+import { expandRecurringEvents } from '@/lib/expandRecurring';
 
 
 const FILTER_TAGS = ['My Interests', 'Free', 'Coffee', 'Sport', 'Party', 'Music', 'Art', 'Markets', 'All Events'];
@@ -92,7 +93,7 @@ export default function HomeScreen() {
   const [refreshing, setRefreshing] = useState(false);
   const [loading, setLoading] = useState(true);
 
-  const [city, setCity] = useState('');
+  const [city, setCity] = useState<string | null>(null);
   const [showCityPicker, setShowCityPicker] = useState(false);
   const [expandedCountries, setExpandedCountries] = useState<Set<string>>(new Set(['SK']));
   const [unreadNotifs, setUnreadNotifs] = useState(0);
@@ -139,6 +140,7 @@ export default function HomeScreen() {
   }, []);
 
   useFocusEffect(useCallback(() => {
+    if (city === null) return; // wait for city to be determined
     loadEvents();
     refetchProfile();
     if (user) {
@@ -160,17 +162,18 @@ export default function HomeScreen() {
       }
     }
     // All filters (including All Events) filter by city
-    if (city && city !== 'Your city' && city !== 'Select city') query = query.eq('city', city);
+    if (city && city !== 'Your city' && city !== 'Select city' && city !== null) query = query.eq('city', city);
     const { data } = await query;
     const now = new Date();
-    setEvents(((data ?? []) as any).filter((e: any) => {
+    const filtered = ((data ?? []) as any).filter((e: any) => {
       if (e.status === 'cancelled') return false;
       if (!e.date || !e.time) return true;
       const start = new Date(`${e.date}T${e.time}`);
       const durationH = e.duration ?? 3;
       const hideAfter = new Date(start.getTime() + (durationH + 3) * 60 * 60 * 1000);
       return now < hideAfter;
-    }));
+    });
+    setEvents(expandRecurringEvents(filtered));
 
     if (user) {
       const { data: att } = await supabase.from('event_attendees').select('event_id').eq('user_id', user.id);
@@ -190,6 +193,7 @@ export default function HomeScreen() {
     setShowCityPicker(false);
     const { data: { user: u } } = await supabase.auth.getUser();
     if (u) await supabase.from('profiles').upsert({ id: u.id, city: c });
+    refetchProfile();
   }
 
   const featured = events[0];
@@ -233,7 +237,7 @@ export default function HomeScreen() {
         {/* Header */}
         <View style={styles.header}>
           <TouchableOpacity onPress={() => setShowCityPicker(true)} style={styles.cityRow}>
-            <Text style={styles.cityLabel}>{city || t.home.selectCity}</Text>
+            <Text style={styles.cityLabel}>{city ?? t.home.selectCity}</Text>
             <Svg width={14} height={14} viewBox="0 0 24 24" fill="none">
               <Path d="M6 9l6 6 6-6" stroke={Colors.gray} strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" />
             </Svg>
@@ -307,7 +311,7 @@ export default function HomeScreen() {
           {events.length === 0 && (
             <View style={styles.empty}>
               <Text style={styles.emptyTitle}>{t.home.noEvents}</Text>
-              <Text style={styles.emptyText}>{t.home.noEventsInCity(city)}</Text>
+              <Text style={styles.emptyText}>{t.home.noEventsInCity(city ?? '')}</Text>
             </View>
           )}
         </View>
@@ -372,7 +376,7 @@ const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: Colors.white },
   scroll: { paddingBottom: 20 }, // overridden inline with insets
   topBar: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 20, paddingVertical: 10 },
-  topBarSide: { flex: 1, alignItems: 'flex-end', flexDirection: 'row', justifyContent: 'flex-end', gap: 10 },
+  topBarSide: { flex: 1, alignItems: 'center', flexDirection: 'row', justifyContent: 'flex-end', gap: 10 },
   bellBtn: { width: 36, height: 36, borderRadius: 18, alignItems: 'center', justifyContent: 'center' },
   bellDot: { position: 'absolute', top: 4, right: 4, width: 8, height: 8, borderRadius: 4, backgroundColor: '#FF3B30', borderWidth: 1.5, borderColor: Colors.white },
   header: { paddingHorizontal: 20, marginBottom: 16 },

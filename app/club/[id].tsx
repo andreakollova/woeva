@@ -1,8 +1,8 @@
 import React, { useEffect, useState } from 'react';
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Image, Alert, Modal, FlatList } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Image, Alert, Modal, FlatList, Pressable } from 'react-native';
 import { useLocalSearchParams, useRouter, useFocusEffect } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import Animated, { FadeInDown, FadeInUp } from 'react-native-reanimated';
+import Animated, { FadeInDown, FadeInUp, FadeIn, FadeOut, ZoomIn } from 'react-native-reanimated';
 import Svg, { Path, Circle } from 'react-native-svg';
 import { Colors } from '@/constants/colors';
 import { Fonts } from '@/constants/fonts';
@@ -14,16 +14,26 @@ import { Toast } from '@/components/ui/Toast';
 import { BackButton } from '@/components/ui/BackButton';
 import { useAuth } from '@/context/AuthContext';
 import { useTranslations } from '@/context/LanguageContext';
+import { notify } from '@/lib/notify';
 
 const COVER_HEIGHT = 260;
 const AVATAR_SIZE = 30;
 const AVATAR_OVERLAP = 10;
 
+function detectLangFromCity(city: string | null | undefined): string {
+  if (!city) return 'en';
+  const c = city.toLowerCase();
+  if (['bratislava','košice','kosice','prešov','presov','žilina','zilina','nitra','trnava','trenčín','trencin','banská bystrica','banska bystrica'].some(x => c.includes(x))) return 'sk';
+  if (['praha','brno','ostrava','plzeň','plzen','olomouc','liberec','české budějovice','ceske budejovice','hradec'].some(x => c.includes(x))) return 'cs';
+  if (['wien','vienna','graz','linz','salzburg','innsbruck','klagenfurt','wels'].some(x => c.includes(x))) return 'de';
+  return 'en';
+}
+
 export default function ClubDetailScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const insets = useSafeAreaInsets();
   const router = useRouter();
-  const { user } = useAuth();
+  const { user, profile } = useAuth();
   const { t } = useTranslations();
   const [club, setClub] = useState<Club | null>(null);
   const [members, setMembers] = useState<ClubMember[]>([]);
@@ -33,17 +43,25 @@ export default function ClubDetailScreen() {
   const [loading, setLoading] = useState(false);
   const [toast, setToast] = useState(false);
   const [showMembersModal, setShowMembersModal] = useState(false);
+  const [showJoinCelebration, setShowJoinCelebration] = useState(false);
 
   useFocusEffect(
-    React.useCallback(() => { loadAll(); }, [id, user])
+    React.useCallback(() => { loadAll(); }, [id, user, profile?.city])
   );
 
   async function loadAll() {
-    const [{ data: clubData }, { data: membersData }, { data: eventsData }] = await Promise.all([
+    const [{ data: clubData }, { data: membersData }] = await Promise.all([
       supabase.from('clubs').select('*').eq('id', id).single(),
       supabase.from('club_members').select('*, profile:profiles(name, avatar_url)').eq('club_id', id).eq('status', 'approved'),
-      supabase.from('events').select('*, club:clubs(id, name, cover_url)').eq('club_id', id).order('date', { ascending: true }).limit(5),
     ]);
+
+    const today = new Date().toISOString().slice(0, 10);
+    const city = profile?.city;
+    const base = supabase.from('events').select('*, club:clubs(id, name, cover_url), attendees:event_attendees(profile:profiles(id, name, avatar_url))')
+      .eq('club_id', id).gte('date', today);
+    const { data: eventsData } = await (city ? base.ilike('city', `%${city}%`) : base)
+      .order('date', { ascending: true }).limit(100);
+
     setClub(clubData);
     setMembers(membersData ?? []);
     setEvents(eventsData ?? []);
@@ -73,10 +91,33 @@ export default function ClubDetailScreen() {
     setLoading(true);
     await supabase.from('club_members').insert({ club_id: id, user_id: user.id, role: 'member', status: 'approved' });
     await supabase.from('clubs').update({ member_count: (club?.member_count ?? 0) + 1 }).eq('id', id);
+    // Notify the club creator (in-app + push)
+    if (club?.creator_id && club.creator_id !== user.id) {
+      const firstName = profile?.name?.split(' ')[0] ?? 'Someone';
+      await supabase.from('notifications').insert({
+        user_id: club.creator_id,
+        type: 'join',
+        title: `New member in ${club.name}`,
+        body: `${firstName} joined your club.`,
+        data: { club_id: id },
+      });
+      const { data: creatorProfile } = await supabase.from('profiles').select('push_token').eq('id', club.creator_id).single();
+      if (creatorProfile?.push_token) {
+        supabase.functions.invoke('send-push', {
+          body: {
+            tokens: [creatorProfile.push_token],
+            title: `New member in ${club.name}`,
+            body: `${firstName} joined your club.`,
+            data: { club_id: id, type: 'club_join' },
+          },
+        }).then(() => {});
+      }
+    }
     setIsMember(true);
     setLoading(false);
-    setToast(true);
-    setTimeout(() => router.back(), 1400);
+    setShowJoinCelebration(true);
+    setTimeout(() => setShowJoinCelebration(false), 2800);
+    loadAll();
   }
 
   if (!club) return <View style={{ flex: 1, backgroundColor: Colors.white }} />;
@@ -133,6 +174,24 @@ export default function ClubDetailScreen() {
         </View>
       </Modal>
 
+      {/* Join celebration overlay */}
+      <Modal visible={showJoinCelebration} transparent animationType="none" statusBarTranslucent>
+        <Animated.View entering={FadeIn.duration(300)} exiting={FadeOut.duration(400)} style={styles.celebrationOverlay}>
+          <Animated.View entering={ZoomIn.delay(100).springify()} style={styles.celebrationContent}>
+            {club.logo_url ? (
+              <Image source={{ uri: club.logo_url }} style={styles.celebrationLogo} />
+            ) : (
+              <View style={[styles.celebrationLogo, styles.celebrationLogoFallback]}>
+                <Text style={styles.celebrationLogoInitial}>{initial}</Text>
+              </View>
+            )}
+            <Text style={styles.celebrationEmoji}>🎉</Text>
+            <Text style={styles.celebrationTitle}>{t.club.youreIn}</Text>
+            <Text style={styles.celebrationSub}>{t.club.welcomeTo(club.name)}</Text>
+          </Animated.View>
+        </Animated.View>
+      </Modal>
+
       <ScrollView
         contentContainerStyle={{ paddingBottom: insets.bottom + 120 }}
         showsVerticalScrollIndicator={false}
@@ -164,7 +223,7 @@ export default function ClubDetailScreen() {
         {/* Card */}
         <Animated.View entering={FadeInDown.delay(80).springify()} style={styles.card}>
 
-          {/* Logo — floats up over cover boundary */}
+          {/* Logo - floats up over cover boundary */}
           <View style={styles.topRow}>
             <View style={styles.logoWrap}>
               {club.logo_url ? (
@@ -179,10 +238,25 @@ export default function ClubDetailScreen() {
 
           {/* Club name + tagline + tags */}
           <Text style={styles.clubName}>{club.name}</Text>
-          {club.tagline ? <Text style={styles.clubTagline}>{club.tagline}</Text> : null}
-          {(club.category || club.city) ? (
+          {club.tagline ? (
+            <Text style={styles.clubTagline}>
+              {(() => {
+                const i18n = (club as any).tagline_i18n;
+                if (i18n) {
+                  const lang = detectLangFromCity(profile?.city);
+                  return i18n[lang] ?? i18n['en'] ?? club.tagline;
+                }
+                return club.tagline;
+              })()}
+            </Text>
+          ) : null}
+          {((club.tags?.length ?? 0) > 0 || club.city) ? (
             <View style={styles.tags}>
-              {club.category ? <View style={styles.tag}><Text style={styles.tagText}>{club.category}</Text></View> : null}
+              {(club.tags?.length ?? 0) > 0
+                ? club.tags.map((tag: string) => (
+                    <View key={tag} style={styles.tag}><Text style={styles.tagText}>{tag}</Text></View>
+                  ))
+                : club.category ? <View style={styles.tag}><Text style={styles.tagText}>{club.category}</Text></View> : null}
               {club.city ? <View style={styles.tag}><Text style={styles.tagText}>{club.city}</Text></View> : null}
             </View>
           ) : null}
@@ -198,15 +272,6 @@ export default function ClubDetailScreen() {
               <Text style={styles.statNum}>{memberCount}</Text>
               <Text style={styles.statLabel}>{t.club.members}</Text>
             </View>
-            {(club.rating ?? 0) > 0 && (
-              <>
-                <View style={styles.statDivider} />
-                <View style={styles.statItem}>
-                  <Text style={styles.statNum}>{club.rating?.toFixed(1)}</Text>
-                  <Text style={styles.statLabel}>{t.club.ratingLabel}</Text>
-                </View>
-              </>
-            )}
           </View>
 
           {/* About */}
@@ -214,7 +279,16 @@ export default function ClubDetailScreen() {
             <>
               <View style={styles.divider} />
               <Text style={styles.sectionTitle}>{t.club.aboutTitle}</Text>
-              <Text style={styles.aboutText}>{club.description}</Text>
+              <Text style={styles.aboutText}>
+                {(() => {
+                  const i18n = (club as any).description_i18n;
+                  if (i18n) {
+                    const lang = detectLangFromCity(profile?.city);
+                    return i18n[lang] ?? i18n['en'] ?? club.description;
+                  }
+                  return club.description;
+                })()}
+              </Text>
             </>
           ) : null}
 
@@ -386,7 +460,7 @@ const styles = StyleSheet.create({
     paddingBottom: 16,
   },
 
-  // Logo + members top row — logo sticks out above card edge
+  // Logo + members top row - logo sticks out above card edge
   topRow: {
     flexDirection: 'row',
     alignItems: 'flex-end',
@@ -459,4 +533,14 @@ const styles = StyleSheet.create({
   removeText: { fontSize: 13, color: '#FF4444', fontWeight: '600', fontFamily: Fonts.semibold },
 
   footer: { paddingHorizontal: 20, paddingTop: 12, borderTopWidth: 1, borderColor: Colors.grayBorder, backgroundColor: Colors.white },
+
+  // Join celebration
+  celebrationOverlay: { flex: 1, backgroundColor: '#0a0a0a', alignItems: 'center', justifyContent: 'center' },
+  celebrationContent: { alignItems: 'center', gap: 16, paddingHorizontal: 40 },
+  celebrationLogo: { width: 100, height: 100, borderRadius: 28, borderWidth: 3, borderColor: 'rgba(255,255,255,0.15)' },
+  celebrationLogoFallback: { backgroundColor: '#222', alignItems: 'center', justifyContent: 'center' },
+  celebrationLogoInitial: { fontSize: 44, fontWeight: '800', color: Colors.white, fontFamily: Fonts.extrabold },
+  celebrationEmoji: { fontSize: 52, marginTop: 4 },
+  celebrationTitle: { fontSize: 32, fontWeight: '800', color: Colors.white, fontFamily: Fonts.bold, textAlign: 'center', letterSpacing: -0.5 },
+  celebrationSub: { fontSize: 16, color: 'rgba(255,255,255,0.55)', fontFamily: Fonts.regular, textAlign: 'center' },
 });

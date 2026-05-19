@@ -1,15 +1,16 @@
 import React, { useState } from 'react';
-import * as FileSystem from 'expo-file-system';
+import { StatusBar } from 'expo-status-bar';
+import * as FileSystem from 'expo-file-system/legacy';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { View, Text, StyleSheet, TouchableOpacity, Image, Alert, Dimensions, Modal, Share, Platform, TextInput, ScrollView as RNScrollView } from 'react-native';
 import QRCode from 'react-native-qrcode-svg';
 import { useLocalSearchParams, useRouter, useFocusEffect } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Animated, {
-  FadeInDown, FadeIn,
+  FadeInDown,
   useSharedValue, useAnimatedScrollHandler,
   useAnimatedStyle, interpolate, Extrapolation,
-  withRepeat, withSequence, withTiming, useReducedMotion,
+  withRepeat, withSequence, withTiming,
 } from 'react-native-reanimated';
 import Svg, { Path, Circle, Defs, LinearGradient as SvgGrad, Stop, Rect } from 'react-native-svg';
 import { Colors } from '@/constants/colors';
@@ -27,15 +28,17 @@ const { height: SCREEN_H } = Dimensions.get('window');
 const COVER_HEIGHT = Math.round(SCREEN_H * 0.48);
 const AV = 32;
 
-
 type Attendee = { id: string; user_id: string; profile: { name: string | null; avatar_url: string | null } | null };
 
 export default function EventDetailScreen() {
-  const { id } = useLocalSearchParams<{ id: string }>();
+  const { id: rawId } = useLocalSearchParams<{ id: string }>();
+  const id = rawId?.split('_')[0]; // strip date suffix from recurring occurrences
+  const occurrenceDate = rawId?.includes('_') ? rawId.split(/_(.+)/)[1] : null; // e.g. "2025-05-25"
   const insets = useSafeAreaInsets();
   const router = useRouter();
   const { user, profile, loading: authLoading } = useAuth();
-  const { t } = useTranslations();
+  const { t, lang } = useTranslations();
+  const locale = lang === 'sk' ? 'sk-SK' : 'en-US';
 
   const [event, setEvent] = useState<Event | null>(null);
   const [creator, setCreator] = useState<Profile | null>(null);
@@ -46,6 +49,7 @@ export default function EventDetailScreen() {
   const [isMember, setIsMember] = useState(false);
   const [unreadCount, setUnreadCount] = useState(0);
   const [qrModal, setQrModal] = useState(false);
+  const [myTicketIds, setMyTicketIds] = useState<string[]>([]);
   const [cancelModal, setCancelModal] = useState(false);
   const [cancelReason, setCancelReason] = useState('');
   const [cancelNote, setCancelNote] = useState('');
@@ -72,7 +76,10 @@ export default function EventDetailScreen() {
   }, []);
 
   const scrollY = useSharedValue(0);
-  const scrollHandler = useAnimatedScrollHandler(e => { scrollY.value = e.contentOffset.y; });
+
+  const scrollHandler = useAnimatedScrollHandler(e => {
+    scrollY.value = e.contentOffset.y;
+  });
 
   const parallaxStyle = useAnimatedStyle(() => ({
     transform: [{
@@ -87,7 +94,7 @@ export default function EventDetailScreen() {
   async function load() {
     const { data } = await supabase
       .from('events')
-      .select('*, club:clubs(id, name, cover_url, logo_url)')
+      .select('*, cover_urls, club:clubs(id, name, cover_url, logo_url)')
       .eq('id', id).single();
     setEvent(data as any);
 
@@ -99,11 +106,20 @@ export default function EventDetailScreen() {
       .from('event_attendees')
       .select('id, user_id, profile:profiles(name, avatar_url)')
       .eq('event_id', id).limit(10);
-    setAttendees((attData ?? []) as any);
+    // Deduplicate by user_id — one person can have multiple tickets
+    const seen = new Set<string>();
+    const unique = (attData ?? []).filter((a: any) => {
+      if (seen.has(a.user_id)) return false;
+      seen.add(a.user_id);
+      return true;
+    });
+    setAttendees(unique as any);
 
     if (user) {
-      const { data: att } = await supabase.from('event_attendees').select('id').eq('event_id', id).eq('user_id', user.id).single();
-      setIsAttending(!!att);
+      const { data: myAtts } = await supabase.from('event_attendees').select('id').eq('event_id', id).eq('user_id', user.id);
+      const ids = (myAtts ?? []).map((a: any) => a.id);
+      setIsAttending(ids.length > 0);
+      setMyTicketIds(ids);
 
       // Unread chat messages
       const lastRead = await AsyncStorage.getItem(`chat_read_${id}`);
@@ -122,21 +138,20 @@ export default function EventDetailScreen() {
 
   async function handleJoin() {
     if (!user) { router.push('/(auth)/login'); return; }
-    if (event?.is_free || event?.price === 0) {
+    if (event?.is_free || event?.price === 0 || (event as any)?.pay_at_door) {
       setLoading(true);
       await supabase.from('event_attendees').insert({ event_id: id, user_id: user.id, paid: true });
-      await supabase.from('events').update({ going_count: (event?.going_count ?? 0) + 1 }).eq('id', id);
       if (event?.creator_id && event.creator_id !== user.id) {
         await supabase.from('notifications').insert({
           user_id: event.creator_id, type: 'join',
           title: `New attendee for ${event.title}`,
-          body: `${profile?.name ?? 'Someone'} joined your event.`,
+          body: `${profile?.name?.split(' ')[0] ?? 'Someone'} joined your event.`,
           data: { event_id: id },
         });
         const d = new Date(event.date + 'T00:00:00');
         notify.joinedEvent({
           creatorId: event.creator_id,
-          attendeeName: profile?.name ?? 'Someone',
+          attendeeName: profile?.name?.split(' ')[0] ?? 'Someone',
           eventTitle: event.title,
           eventDate: d.toLocaleDateString('en-US', { weekday: 'short', day: 'numeric', month: 'short' }),
           eventTime: event.time ?? undefined,
@@ -190,7 +205,7 @@ export default function EventDetailScreen() {
         creatorName: profile?.name ?? 'Organiser',
         reason: cancelReason !== t.event.cancelReasons[4] ? cancelReason : cancelNote || undefined,
         attendeeTokens: tokens,
-        attendeeEmails: [], // emails require service role — handled server-side if needed
+        attendeeEmails: [], // emails require service role - handled server-side if needed
       });
 
       if (refundEligible && !event.is_free && hasPaidWithIntent) {
@@ -230,11 +245,21 @@ export default function EventDetailScreen() {
     } catch {}
   }
 
-  if (!event) return <View style={{ flex: 1, backgroundColor: Colors.white }} />;
+  function onScrollEndDrag(e: any) {
+    const { contentOffset, contentSize, layoutMeasurement } = e.nativeEvent;
+    const overBottom = contentOffset.y - (contentSize.height - layoutMeasurement.height);
+    if (overBottom > 55) {
+      router.push(`/feed?startAfterId=${rawId}` as any);
+    }
+  }
+
+  if (!event) return <View style={s.outerWrap} />;
 
   const isCreator = !!user && event.creator_id === user.id;
-  const isFree = event.is_free || event.price === 0;
-  const priceLabel = isFree ? t.event.freeLabel : `€${event.price}`;
+  const isPayAtDoor = !!(event as any).pay_at_door;
+  const isFree = !isPayAtDoor && (event.is_free || event.price === 0);
+  const isWoevaEvent = !!(event as any).source;
+  const priceLabel = isPayAtDoor ? `€${event.price}` : (isFree ? t.event.freeLabel : `€${event.price}`);
   const eventStart = new Date(`${event.date}T${event.time || '00:00'}`);
   const eventDurationH = event.duration ?? 3;
   const eventEnd = new Date(eventStart.getTime() + eventDurationH * 60 * 60 * 1000);
@@ -242,17 +267,32 @@ export default function EventDetailScreen() {
   const eventOver = eventEnd < new Date();
   const hostName = event.club?.name ?? creator?.name ?? '';
   const hostInitial = hostName.charAt(0).toUpperCase();
+  // Use DB going_count as source of truth (attendees may be deduplicated by user_id)
   const goingCount = Math.max(event.going_count ?? 0, attendees.length);
   const otherAtts = attendees.filter(a => a.user_id !== user?.id);
   const overflow = Math.max(0, goingCount - 4);
 
   const d = new Date(event.date + 'T00:00:00');
-  const dayName = d.toLocaleDateString(undefined, { weekday: 'short' }).toUpperCase();
+  const dayName = d.toLocaleDateString(locale, { weekday: 'short' }).toUpperCase();
   const dayNum = d.getDate();
-  const monthName = d.toLocaleDateString(undefined, { month: 'short' }).toUpperCase();
+  const monthName = d.toLocaleDateString(locale, { month: 'short' }).toUpperCase();
   const isToday = new Date().toDateString() === d.toDateString();
 
+  // Rotating cover: pick the correct photo for this occurrence
+  const activeCoverUrl = (() => {
+    const covers: string[] = (event as any).cover_urls?.length ? (event as any).cover_urls : (event.cover_url ? [event.cover_url] : []);
+    if (!covers.length) return null;
+    if (!event.is_recurring || covers.length === 1) return covers[0];
+    const occDate = occurrenceDate ?? event.date;
+    const start = new Date(event.date + 'T00:00:00');
+    const occ = new Date(occDate + 'T00:00:00');
+    const weekIndex = Math.max(0, Math.round((occ.getTime() - start.getTime()) / (7 * 24 * 60 * 60 * 1000)));
+    return covers[weekIndex % covers.length];
+  })();
+
   return (
+    <View style={s.outerWrap}>
+    <StatusBar style="light" />
     <View style={s.container}>
       <Toast visible={toast} title={t.event.joined} subtitle={t.event.eventCreatedSub} onHide={() => setToast(false)} />
 
@@ -262,9 +302,22 @@ export default function EventDetailScreen() {
           <View style={s.qrModalCard}>
             <Text style={s.qrModalTitle}>{event?.title}</Text>
             <Text style={s.qrModalSub}>{t.tickets.showAtDoor}</Text>
-            <View style={s.qrModalCode}>
-              <QRCode value={`woeva:event:${id}:${user?.id}`} size={220} color={Colors.black} backgroundColor={Colors.white} />
-            </View>
+            {myTicketIds.length > 1 ? (
+              <RNScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 16, paddingHorizontal: 4 }}>
+                {myTicketIds.map((tid, i) => (
+                  <View key={tid} style={{ alignItems: 'center', gap: 6 }}>
+                    <Text style={s.qrTicketNum}>#{i + 1}</Text>
+                    <View style={s.qrModalCode}>
+                      <QRCode value={`woeva:ticket:${tid}`} size={160} color={Colors.black} backgroundColor={Colors.white} />
+                    </View>
+                  </View>
+                ))}
+              </RNScrollView>
+            ) : (
+              <View style={s.qrModalCode}>
+                <QRCode value={`woeva:event:${id}:${user?.id}`} size={220} color={Colors.black} backgroundColor={Colors.white} />
+              </View>
+            )}
             <Text style={s.qrModalHint}>{t.tickets.tapToClose}</Text>
           </View>
         </TouchableOpacity>
@@ -342,7 +395,7 @@ export default function EventDetailScreen() {
         </View>
       </Modal>
 
-      {/* ── Sticky controls — always on top regardless of scroll ── */}
+      {/* ── Sticky controls - always on top regardless of scroll ── */}
       <View style={[s.topLeft, { top: insets.top + 10 }]} pointerEvents="box-none">
         <BackButton color={Colors.white} style={s.backBtn} />
       </View>
@@ -355,7 +408,25 @@ export default function EventDetailScreen() {
             </Svg>
             <Text style={s.ctrlPillText}>{t.common.edit}</Text>
           </TouchableOpacity>
-          <TouchableOpacity style={s.ctrlPill} onPress={() => { setCancelReason(''); setCancelNote(''); setCancelModal(true); }}>
+          <TouchableOpacity style={s.ctrlPill} onPress={() => {
+            if (event?.is_recurring && occurrenceDate) {
+              Alert.alert(
+                '⚠️ Recurring event',
+                'Do you want to cancel only this occurrence or all upcoming occurrences?',
+                [
+                  { text: 'Only this date', onPress: async () => {
+                    const existing: string[] = (event as any).cancelled_dates ?? [];
+                    await supabase.from('events').update({ cancelled_dates: [...existing, occurrenceDate] }).eq('id', id);
+                    router.back();
+                  }},
+                  { text: 'All occurrences', style: 'destructive', onPress: () => { setCancelReason(''); setCancelNote(''); setCancelModal(true); } },
+                  { text: 'Go back', style: 'cancel' },
+                ]
+              );
+            } else {
+              setCancelReason(''); setCancelNote(''); setCancelModal(true);
+            }
+          }}>
             <Svg width={13} height={13} viewBox="0 0 24 24" fill="none">
               <Path d="M18 6L6 18M6 6l12 12" stroke="#FF6B6B" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" />
             </Svg>
@@ -364,8 +435,10 @@ export default function EventDetailScreen() {
         </View>
       )}
 
+
       <Animated.ScrollView
         onScroll={scrollHandler}
+        onScrollEndDrag={onScrollEndDrag}
         scrollEventThrottle={16}
         contentContainerStyle={{ paddingBottom: insets.bottom + 110 }}
         showsVerticalScrollIndicator={false}
@@ -373,8 +446,8 @@ export default function EventDetailScreen() {
         {/* ── Cover with parallax ── */}
         <View style={[s.coverWrap, { height: COVER_HEIGHT }]}>
           <Animated.View style={[s.coverInner, parallaxStyle]}>
-            {event.cover_url
-              ? <Image source={{ uri: event.cover_url }} style={s.coverImg} resizeMode="cover" />
+            {activeCoverUrl
+              ? <Image source={{ uri: activeCoverUrl }} style={s.coverImg} resizeMode="cover" />
               : <View style={[s.coverImg, { backgroundColor: '#111' }]} />
             }
           </Animated.View>
@@ -420,7 +493,7 @@ export default function EventDetailScreen() {
               </Svg>
               <View style={{ flex: 1 }}>
                 <Text style={s.cancelledBannerTitle}>{t.event.eventCancelledLabel}</Text>
-                {event.cancellation_reason ? <Text style={s.cancelledBannerSub}>{event.cancellation_reason}{event.cancellation_note ? ` — ${event.cancellation_note}` : ''}</Text> : null}
+                {event.cancellation_reason ? <Text style={s.cancelledBannerSub}>{event.cancellation_reason}{event.cancellation_note ? ` - ${event.cancellation_note}` : ''}</Text> : null}
               </View>
             </View>
           )}
@@ -433,16 +506,17 @@ export default function EventDetailScreen() {
               <View style={s.goingAvatarRow}>
                   {/* Current user always on top */}
                   <View style={[s.goingAv, s.goingAvUser, { marginLeft: 0, zIndex: 10 }]}>
-                    <Text style={s.goingAvInitial}>{(profile?.name ?? user?.email ?? '?').charAt(0).toUpperCase()}</Text>
-                    {profile?.avatar_url ? <Image source={{ uri: profile.avatar_url }} style={[StyleSheet.absoluteFill, { borderRadius: 13 }]} /> : null}
+                    {profile?.avatar_url
+                      ? <Image source={{ uri: profile.avatar_url }} style={s.goingAvImg} resizeMode="cover" />
+                      : <Text style={s.goingAvInitial}>{(profile?.name ?? user?.email ?? '?').charAt(0).toUpperCase()}</Text>}
                   </View>
-                  {/* Other attendees — only real ones */}
+                  {/* Other attendees - only real ones */}
                   {otherAtts.slice(0, 3).map((att, i) => {
                     const avatarUrl = att?.profile?.avatar_url;
                     const initial = (att?.profile?.name ?? '?').charAt(0).toUpperCase();
                     return (
                       <View key={i} style={[s.goingAv, s.goingAvOther, { marginLeft: -6, zIndex: 9 - i }]}>
-                        {avatarUrl ? <Image source={{ uri: avatarUrl }} style={s.goingAvImg} /> : <Text style={s.goingAvInitial}>{initial}</Text>}
+                        {avatarUrl ? <Image source={{ uri: avatarUrl }} style={s.goingAvImg} resizeMode="cover" /> : <Text style={s.goingAvInitial}>{initial}</Text>}
                       </View>
                     );
                   })}
@@ -468,46 +542,75 @@ export default function EventDetailScreen() {
                   </View>
                   <View style={{ flex: 1 }}>
                     <Text style={s.infoText}>{isToday ? t.event.today : `${dayName}, ${dayNum} ${monthName}`}</Text>
-                    {event.time ? <Text style={s.infoSub}>{event.time}{event.duration ? `  ·  ${event.duration}h` : ''}</Text> : null}
+                    {event.time ? <Text style={s.infoSub}>{event.time.substring(0, 5)}{event.duration ? `  ·  ${event.duration}h` : ''}</Text> : null}
                   </View>
                 </View>
 
                 {/* Location row */}
                 {event.venue ? (
-                  <View style={s.infoRow}>
-                    <View style={s.infoIconBox}>
-                      <Svg width={15} height={15} viewBox="0 0 24 24" fill="none">
-                        <Path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7z" stroke={Colors.black} strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" />
-                        <Circle cx="12" cy="9" r="2.5" stroke={Colors.black} strokeWidth={2} />
-                      </Svg>
+                  <View style={[s.infoRow, { justifyContent: 'space-between' }]}>
+                    <View style={[s.infoRow, { flex: 1 }]}>
+                      <View style={s.infoIconBox}>
+                        <Svg width={15} height={15} viewBox="0 0 24 24" fill="none">
+                          <Path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7z" stroke={Colors.black} strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" />
+                          <Circle cx="12" cy="9" r="2.5" stroke={Colors.black} strokeWidth={2} />
+                        </Svg>
+                      </View>
+                      <View style={{ flex: 1 }}>
+                        <Text style={s.infoText}>{event.city ? event.venue.replace(new RegExp(`,?\\s*${event.city}`, 'i'), '').trim() : event.venue}</Text>
+                        {event.city ? <Text style={s.infoSub}>{event.city}</Text> : null}
+                      </View>
                     </View>
-                    <View style={{ flex: 1 }}>
-                      <Text style={s.infoText}>{event.city ? event.venue.replace(new RegExp(`,?\\s*${event.city}`, 'i'), '').trim() : event.venue}</Text>
-                      {event.city ? <Text style={s.infoSub}>{event.city}</Text> : null}
-                    </View>
+                    {!isAttending && (
+                      <TouchableOpacity onPress={handleInvite} activeOpacity={0.7} style={s.shareIconBtn} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
+                        <Svg width={13} height={13} viewBox="0 0 24 24" fill="none">
+                          <Path d="M4 12v8a2 2 0 002 2h12a2 2 0 002-2v-8M16 6l-4-4-4 4M12 2v13" stroke={Colors.black} strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" />
+                        </Svg>
+                      </TouchableOpacity>
+                    )}
                   </View>
                 ) : null}
               </View>
 
               {/* Inline QR */}
               {isAttending && user ? (
-                <TouchableOpacity style={s.inlinQR} onPress={() => setQrModal(true)} activeOpacity={0.8}>
-                  <QRCode value={`woeva:event:${id}:${user.id}`} size={48} color={Colors.black} backgroundColor={Colors.white} />
-                  <Text style={s.inlinQRHint}>{t.event.ticketLabel}</Text>
-                </TouchableOpacity>
+                <View style={{ alignItems: 'center', gap: 6 }}>
+                  <TouchableOpacity
+                    style={[s.inlinQR, (isFree || isWoevaEvent) && { opacity: 0.35 }]}
+                    onPress={() => {
+                      if (isFree) {
+                        Alert.alert(
+                          lang === 'sk' ? 'Zadarmo' : 'Free event',
+                          lang === 'sk' ? 'Tento event je zadarmo — QR kód nepotrebuješ.' : 'This event is free — no ticket needed at the door.',
+                        );
+                      } else if (!isWoevaEvent) {
+                        setQrModal(true);
+                      }
+                    }}
+                    activeOpacity={0.8}
+                  >
+                    <QRCode value={`woeva:event:${id}:${user.id}`} size={48} color={Colors.black} backgroundColor={Colors.white} />
+                    <Text style={s.inlinQRHint}>{t.event.ticketLabel}</Text>
+                  </TouchableOpacity>
+                  {!isFree && !isPayAtDoor && !isWoevaEvent && (
+                    <TouchableOpacity style={s.addTicketBtn} onPress={() => router.push(`/event/${id}/payment`)} activeOpacity={0.8}>
+                      <Text style={s.addTicketBtnText}>{t.event.addTicket}</Text>
+                    </TouchableOpacity>
+                  )}
+                </View>
               ) : null}
             </View>
 
-            {/* Going row — hidden when attending (shown in banner) */}
-            {!isAttending && (
+            {/* Going row */}
+            {!isAttending && (goingCount > 0 || attendees.some(a => a?.profile?.name || a?.profile?.avatar_url)) && (
               <View style={s.infoRow}>
                 <View style={s.avatarStack}>
-                  {attendees.slice(0, 3).map((att, i) => {
+                  {attendees.filter(a => a?.profile?.name || a?.profile?.avatar_url).slice(0, 3).map((att, i) => {
                     const avatarUrl = att?.profile?.avatar_url;
-                    const initial = (att?.profile?.name ?? '?').charAt(0).toUpperCase();
+                    const initial = (att?.profile?.name ?? '').charAt(0).toUpperCase();
                     return (
                       <View key={i} style={[s.av, { marginLeft: i === 0 ? 0 : -10, zIndex: 10 - i }, !avatarUrl && { backgroundColor: '#888', alignItems: 'center', justifyContent: 'center' }]}>
-                        {avatarUrl ? <Image source={{ uri: avatarUrl }} style={s.avImg} /> : <Text style={{ fontSize: 11, fontWeight: '700', color: Colors.white }}>{initial}</Text>}
+                        {avatarUrl ? <Image source={{ uri: avatarUrl }} style={s.avImg} resizeMode="cover" /> : <Text style={{ fontSize: 11, fontWeight: '700', color: Colors.white }}>{initial}</Text>}
                       </View>
                     );
                   })}
@@ -547,7 +650,7 @@ export default function EventDetailScreen() {
                 </View>
                 {isMember
                   ? <View style={s.memberPill}><Text style={s.memberPillText}>{t.event.memberLabel}</Text></View>
-                  : user && isAttending && event.club
+                  : event.club && user
                     ? <TouchableOpacity style={s.joinPill} onPress={async (e) => {
                         e.stopPropagation?.();
                         await supabase.from('club_members').insert({ club_id: event.club!.id, user_id: user.id, role: 'member', status: 'approved' });
@@ -604,7 +707,7 @@ export default function EventDetailScreen() {
           {user && isAttending && eventPast && !eventOver
             ? (
               <View style={s.attendingRow}>
-                <Button label="🔴 Práve prebieha" onPress={() => {}} variant="lime" disabled style={s.attendingBtn} textStyle={{ fontSize: 13 }} />
+                <Button label="Práve prebieha" onPress={() => {}} variant="lime" disabled style={s.attendingBtn} textStyle={{ fontSize: 13 }} />
               </View>
             )
             : user && isAttending && !eventOver
@@ -618,7 +721,7 @@ export default function EventDetailScreen() {
               </View>
             )
             : <Button
-                label={user ? (isFree ? t.event.joinFree : t.event.buyTicket(priceLabel)) : t.event.getWoeva}
+                label={user ? (isFree ? t.event.joinFree : isPayAtDoor ? `Pay €${event.price} at the venue` : t.event.buyTicket(priceLabel)) : t.event.getWoeva}
                 onPress={handleJoin}
                 loading={loading}
                 variant="lime"
@@ -626,11 +729,14 @@ export default function EventDetailScreen() {
           }
         </View>
       )}
+
+    </View>
     </View>
   );
 }
 
 const s = StyleSheet.create({
+  outerWrap: { flex: 1, backgroundColor: Colors.black },
   container: { flex: 1, backgroundColor: Colors.white },
 
   // Cover
@@ -661,7 +767,7 @@ const s = StyleSheet.create({
   // Body
   body: { backgroundColor: Colors.white, borderTopLeftRadius: 28, borderTopRightRadius: 28, marginTop: -28, paddingHorizontal: 16, paddingTop: 16, paddingBottom: 8 },
 
-  // Going banner — black card
+  // Going banner - black card
   goingBanner: { flexDirection: 'row', alignItems: 'center', gap: 10, backgroundColor: Colors.black, borderRadius: 18, paddingHorizontal: 16, paddingVertical: 14, marginBottom: 4 },
   livePill: { flexDirection: 'row', alignItems: 'center', gap: 5, backgroundColor: 'rgba(255,255,255,0.1)', borderRadius: 50, paddingHorizontal: 8, paddingVertical: 4 },
   liveDot: { width: 6, height: 6, borderRadius: 3, backgroundColor: Colors.lime },
@@ -681,12 +787,15 @@ const s = StyleSheet.create({
   infoSection: { paddingHorizontal: 6, paddingTop: 18, paddingBottom: 18, gap: 16 },
   infoDateBlock: { flexDirection: 'row', alignItems: 'center', gap: 14 },
   infoRow: { flexDirection: 'row', alignItems: 'center', gap: 14 },
+  shareIconBtn: { width: 28, height: 28, borderRadius: 7, backgroundColor: Colors.grayLight, alignItems: 'center', justifyContent: 'center', flexShrink: 0 },
   infoIconBox: { width: 36, height: 36, borderRadius: 10, backgroundColor: Colors.grayLight, alignItems: 'center', justifyContent: 'center', flexShrink: 0 },
   infoText: { fontSize: 15, fontWeight: '600', color: Colors.black, fontFamily: Fonts.semibold },
   infoSub: { fontSize: 13, color: Colors.gray, fontFamily: Fonts.regular, marginTop: 2 },
   infoGoingNum: { fontSize: 14, fontWeight: '700', color: Colors.black },
   inlinQR: { backgroundColor: Colors.white, borderRadius: 18, padding: 8, flexShrink: 0, overflow: 'hidden', alignItems: 'center', gap: 4 },
   inlinQRHint: { fontSize: 8, fontWeight: '700', color: Colors.black, letterSpacing: 1, textTransform: 'uppercase' },
+  addTicketBtn: { backgroundColor: Colors.lime, borderRadius: 50, paddingVertical: 5, alignSelf: 'center', paddingHorizontal: 5 },
+  addTicketBtnText: { fontSize: 6, fontWeight: '700', color: Colors.black, letterSpacing: 0.3 },
 
   // Hairline + sections
   hairline: { height: 1, backgroundColor: '#F0F0F0', marginHorizontal: 6 },
@@ -711,8 +820,8 @@ const s = StyleSheet.create({
   hostName: { fontSize: 15, fontWeight: '600', color: Colors.black, fontFamily: Fonts.semibold },
   memberPill: { backgroundColor: Colors.lime, borderRadius: 50, paddingHorizontal: 10, paddingVertical: 4 },
   memberPillText: { fontSize: 11, fontWeight: '700', color: Colors.black },
-  joinPill: { backgroundColor: Colors.black, borderRadius: 50, paddingHorizontal: 12, paddingVertical: 6 },
-  joinPillText: { fontSize: 12, fontWeight: '700', color: Colors.white },
+  joinPill: { borderWidth: 1, borderColor: Colors.grayBorder, borderRadius: 50, paddingHorizontal: 12, paddingVertical: 5 },
+  joinPillText: { fontSize: 12, fontWeight: '600', color: Colors.gray },
 
   // Chat
   chatRow: { flexDirection: 'row', alignItems: 'center', gap: 14, paddingHorizontal: 6, paddingVertical: 16 },
@@ -749,6 +858,81 @@ const s = StyleSheet.create({
   confirmWarningText: { fontSize: 14, color: '#CC3333', fontFamily: Fonts.regular, lineHeight: 22 },
   cancelActions: { flexDirection: 'row', gap: 10, marginTop: 4 },
 
+  // Swipe preview cards
+  previewCard: { borderTopLeftRadius: 28, borderTopRightRadius: 28, overflow: 'hidden' },
+  previewCardBottom: { borderBottomLeftRadius: 28, borderBottomRightRadius: 28, overflow: 'hidden' },
+  previewCardContent: { position: 'absolute', bottom: 100, left: 24, right: 24, gap: 8 },
+  previewCardLabel: { fontSize: 10, fontWeight: '800', color: Colors.lime, letterSpacing: 2 },
+  previewCardCat: { backgroundColor: Colors.lime, borderRadius: 50, paddingHorizontal: 10, paddingVertical: 3, alignSelf: 'flex-start' },
+  previewCardCatText: { fontSize: 9, fontWeight: '800', color: Colors.black, letterSpacing: 1 },
+  previewCardTitle: { fontSize: 28, fontWeight: '800', color: Colors.white, letterSpacing: -0.5, fontFamily: Fonts.extrabold, lineHeight: 34 },
+  previewCardDate: { fontSize: 14, color: 'rgba(255,255,255,0.65)', fontFamily: Fonts.regular },
+
+  // Peek card (swipe-past-bottom-to-next)
+  peekCard: {
+    position: 'absolute',
+    left: 16, right: 16,
+    zIndex: 20,
+    backgroundColor: 'rgba(10,10,10,0.92)',
+    borderRadius: 20,
+    flexDirection: 'row',
+    alignItems: 'center',
+    padding: 10,
+    gap: 12,
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.1)',
+    overflow: 'hidden',
+  },
+  peekThumb: { width: 48, height: 48, borderRadius: 12 },
+  peekInfo: { flex: 1, gap: 2 },
+  peekLabel: { fontSize: 9, fontWeight: '800', color: Colors.lime, letterSpacing: 1.5 },
+  peekTitle: { fontSize: 14, fontWeight: '700', color: Colors.white, fontFamily: Fonts.semibold },
+  peekDate: { fontSize: 11, color: 'rgba(255,255,255,0.5)', fontFamily: Fonts.regular },
+
+  // First-time hint overlay
+  hintOverlay: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: 'rgba(0,0,0,0.82)',
+    zIndex: 100,
+  },
+  hintInner: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: 32,
+    gap: 18,
+  },
+  hintCard: {
+    width: '100%',
+    height: 180,
+    borderRadius: 24,
+    overflow: 'hidden',
+  },
+  hintCardCover: { ...StyleSheet.absoluteFillObject, width: '100%', height: '100%' },
+  hintCardOverlay: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: 'rgba(0,0,0,0.45)',
+  },
+  hintCardText: {
+    position: 'absolute',
+    bottom: 0, left: 0, right: 0,
+    padding: 16, gap: 4,
+  },
+  hintNextPill: {
+    backgroundColor: Colors.lime,
+    borderRadius: 50,
+    paddingHorizontal: 10,
+    paddingVertical: 3,
+    alignSelf: 'flex-start',
+    marginBottom: 4,
+  },
+  hintNextPillText: { fontSize: 8, fontWeight: '800', color: Colors.black, letterSpacing: 1.5 },
+  hintCardTitle: { fontSize: 18, fontWeight: '800', color: Colors.white, fontFamily: Fonts.extrabold },
+  hintCardDate: { fontSize: 12, color: 'rgba(255,255,255,0.65)', fontFamily: Fonts.regular },
+  hintArrows: { gap: 2, alignItems: 'center' },
+  hintSwipeText: { fontSize: 17, fontWeight: '700', color: Colors.white, fontFamily: Fonts.semibold, textAlign: 'center', letterSpacing: -0.2 },
+  hintDismiss: { fontSize: 12, color: 'rgba(255,255,255,0.35)', fontFamily: Fonts.regular },
+
   // QR modal
   qrModalBg: { flex: 1, backgroundColor: 'rgba(0,0,0,0.75)', alignItems: 'center', justifyContent: 'center' },
   qrModalCard: { backgroundColor: Colors.white, borderRadius: 28, padding: 32, alignItems: 'center', gap: 8, marginHorizontal: 32 },
@@ -756,6 +940,7 @@ const s = StyleSheet.create({
   qrModalSub: { fontSize: 13, color: Colors.gray, fontFamily: Fonts.regular, marginBottom: 8 },
   qrModalCode: { padding: 12, backgroundColor: Colors.white, borderRadius: 16, borderWidth: 1, borderColor: Colors.grayBorder },
   qrModalHint: { fontSize: 11, color: Colors.gray, fontFamily: Fonts.regular, marginTop: 8 },
+  qrTicketNum: { fontSize: 12, fontWeight: '700', color: Colors.gray, fontFamily: Fonts.semibold },
 
   // CTA
   cta: { position: 'absolute', bottom: 0, left: 0, right: 0, paddingHorizontal: 20, paddingTop: 14, backgroundColor: Colors.white, borderTopWidth: 1, borderColor: Colors.grayBorder, gap: 10 },

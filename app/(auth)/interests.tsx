@@ -9,11 +9,12 @@ import { Colors } from '@/constants/colors';
 import { supabase } from '@/lib/supabase';
 import { useCategories } from '@/hooks/useCategories';
 import { useTranslations } from '@/context/LanguageContext';
+import { CATEGORY_SK, CATEGORY_EN } from '@/types';
 
 export default function InterestsScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
-  const { t } = useTranslations();
+  const { t, lang } = useTranslations();
   const { categories } = useCategories();
   const [selected, setSelected] = useState<string[]>([]);
   const [loading, setLoading] = useState(false);
@@ -36,7 +37,7 @@ export default function InterestsScreen() {
 
   return (
     <View style={[styles.container, { paddingTop: insets.top + 20, paddingBottom: insets.bottom + 24 }]}>
-      <BackButton />
+      <View style={{ paddingHorizontal: 24 }}><BackButton /></View>
       <ScrollView contentContainerStyle={styles.scroll} showsVerticalScrollIndicator={false}>
         <View style={styles.header}>
           <Text style={styles.title}>{t.auth.whatsYourThing}</Text>
@@ -47,7 +48,7 @@ export default function InterestsScreen() {
           {categories.map((cat, i) => (
             <Tag
               key={cat}
-              label={cat}
+              label={lang === 'sk' ? (CATEGORY_SK[cat] ?? cat) : (CATEGORY_EN[cat] ?? cat)}
               selected={selected.includes(cat)}
               onPress={() => toggle(cat)}
               floatDelay={i * 317 + (i % 4) * 213 + (i % 7) * 89}

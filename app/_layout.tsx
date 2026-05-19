@@ -38,7 +38,7 @@ export default function RootLayout() {
           <Stack screenOptions={{ headerShown: false, animation: 'fade_from_bottom' }}>
             <Stack.Screen name="(auth)" options={{ animation: 'none' }} />
             <Stack.Screen name="(tabs)" options={{ animation: 'none' }} />
-            <Stack.Screen name="event/[id]" options={{ animation: 'slide_from_right' }} />
+            <Stack.Screen name="event/[id]" options={{ animation: 'none', gestureEnabled: false, contentStyle: { backgroundColor: '#0A0A0A' } }} />
             <Stack.Screen name="event/[id]/edit" options={{ animation: 'slide_from_right' }} />
             <Stack.Screen name="event/create/step1" options={{ animation: 'slide_from_bottom', presentation: 'modal' }} />
             <Stack.Screen name="event/create/step2" options={{ animation: 'slide_from_right' }} />

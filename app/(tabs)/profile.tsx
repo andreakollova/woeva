@@ -112,24 +112,16 @@ export default function ProfileScreen() {
           </View>
         </View>
 
-        {/* Bio */}
-        {(profile?.bio || true) && (
-          <View style={styles.section}>
-            <Text style={styles.sectionTitle}>{t.settings.bio}</Text>
-            {profile?.bio ? (
-              <Text style={styles.bioText}>{profile.bio}</Text>
-            ) : (
-              <TouchableOpacity onPress={() => router.push('/settings/profile')}>
-                <Text style={styles.bioEmpty}>{t.settings.addBio}</Text>
-              </TouchableOpacity>
-            )}
-          </View>
-        )}
-
-        {/* Favorites / Interests */}
-        {(profile?.interests?.length ?? 0) > 0 && (
-          <View style={styles.section}>
-            <Text style={styles.sectionTitle}>{t.settings.favorites}</Text>
+        {/* Bio + Interests inline block */}
+        <View style={styles.infoBlock}>
+          {profile?.bio ? (
+            <Text style={styles.bioText}>{profile.bio}</Text>
+          ) : (
+            <TouchableOpacity onPress={() => router.push('/settings/profile')} activeOpacity={0.7}>
+              <Text style={styles.bioEmpty}>{t.settings.addBio}</Text>
+            </TouchableOpacity>
+          )}
+          {(profile?.interests?.length ?? 0) > 0 && (
             <View style={styles.tags}>
               {profile!.interests.map(tag => (
                 <View key={tag} style={styles.tag}>
@@ -137,90 +129,84 @@ export default function ProfileScreen() {
                 </View>
               ))}
             </View>
-          </View>
-        )}
+          )}
+        </View>
 
         {/* My clubs */}
         {clubs.length > 0 && (
-          <View style={styles.section}>
-            <Text style={styles.sectionTitle}>{t.settings.myClubs}</Text>
-            <View style={styles.clubsList}>
-              {(showAllClubs ? clubs : clubs.slice(0, 4)).map((club, idx, arr) => (
-                <TouchableOpacity
-                  key={club.id}
-                  style={[styles.clubRow, idx === arr.length - 1 && styles.clubRowLast]}
-                  onPress={() => router.push(`/club/${club.id}` as any)}
-                  onLongPress={async () => {
-                    const { count } = await supabase.from('club_members').select('id', { count: 'exact', head: true }).eq('club_id', club.id).eq('role', 'admin').eq('status', 'approved');
-                    if ((count ?? 0) <= 1) {
-                      Alert.alert('Cannot leave', 'You are the only admin. Assign another admin first.');
-                      return;
-                    }
-                    Alert.alert(t.settings.leaveClub, t.settings.leaveClubConfirm(club.name), [
-                      { text: t.common.cancel, style: 'cancel' },
-                      { text: t.event.leave, style: 'destructive', onPress: async () => {
-                        await supabase.from('club_members').delete().eq('club_id', club.id).eq('user_id', user!.id);
-                        setClubs(prev => prev.filter(c => c.id !== club.id));
-                        setClubsCount(prev => Math.max(prev - 1, 0));
-                      }},
-                    ]);
-                  }}
-                  activeOpacity={0.7}
-                >
-                  {club.logo_url || club.cover_url
-                    ? <Image source={{ uri: (club.logo_url ?? club.cover_url)! }} style={styles.clubAvatar} />
-                    : <View style={[styles.clubAvatar, styles.clubAvatarFallback]}>
-                        <Text style={styles.clubAvatarInitial}>{club.name.charAt(0).toUpperCase()}</Text>
-                      </View>
-                  }
-                  <View style={{ flex: 1 }}>
-                    <Text style={styles.clubName} numberOfLines={1}>{club.name}</Text>
-                    {club.category ? <Text style={styles.clubCategory}>{club.category}</Text> : null}
-                  </View>
-                  <Text style={styles.clubLeaveHint}>{t.settings.holdToLeave}</Text>
-                </TouchableOpacity>
-              ))}
-            </View>
+          <View style={styles.listBlock}>
+            <Text style={styles.listBlockTitle}>{t.settings.myClubs}</Text>
+            {(showAllClubs ? clubs : clubs.slice(0, 4)).map((club, idx, arr) => (
+              <TouchableOpacity
+                key={club.id}
+                style={[styles.listRow, idx === arr.length - 1 && styles.listRowLast]}
+                onPress={() => router.push(`/club/${club.id}` as any)}
+                onLongPress={async () => {
+                  const { count } = await supabase.from('club_members').select('id', { count: 'exact', head: true }).eq('club_id', club.id).eq('role', 'admin').eq('status', 'approved');
+                  if ((count ?? 0) <= 1) { Alert.alert('Cannot leave', 'You are the only admin. Assign another admin first.'); return; }
+                  Alert.alert(t.settings.leaveClub, t.settings.leaveClubConfirm(club.name), [
+                    { text: t.common.cancel, style: 'cancel' },
+                    { text: t.event.leave, style: 'destructive', onPress: async () => {
+                      await supabase.from('club_members').delete().eq('club_id', club.id).eq('user_id', user!.id);
+                      setClubs(prev => prev.filter(c => c.id !== club.id));
+                      setClubsCount(prev => Math.max(prev - 1, 0));
+                    }},
+                  ]);
+                }}
+                activeOpacity={0.7}
+              >
+                {club.logo_url || club.cover_url
+                  ? <Image source={{ uri: (club.logo_url ?? club.cover_url)! }} style={styles.rowAvatar} />
+                  : <View style={[styles.rowAvatar, styles.rowAvatarFallback]}>
+                      <Text style={styles.rowAvatarInitial}>{club.name.charAt(0).toUpperCase()}</Text>
+                    </View>
+                }
+                <View style={{ flex: 1 }}>
+                  <Text style={styles.rowTitle} numberOfLines={1}>{club.name}</Text>
+                  {club.category ? <Text style={styles.rowSub}>{club.category}</Text> : null}
+                </View>
+                <Text style={styles.rowChevron}>›</Text>
+              </TouchableOpacity>
+            ))}
             {clubs.length > 4 && !showAllClubs && (
-              <TouchableOpacity style={styles.viewAllBtn} onPress={() => setShowAllClubs(true)} activeOpacity={0.7}>
-                <Text style={styles.viewAllText}>View all ({clubs.length})</Text>
+              <TouchableOpacity style={styles.showMoreBtn} onPress={() => setShowAllClubs(true)} activeOpacity={0.7}>
+                <Text style={styles.showMoreText}>+ {clubs.length - 4} more</Text>
               </TouchableOpacity>
             )}
           </View>
         )}
 
-        {/* Latest events (attended) */}
+        {/* Latest events */}
         {latestEvents.length > 0 && (
-          <View style={styles.section}>
-            <Text style={styles.sectionTitle}>{t.settings.latestEvents}</Text>
-            <View style={styles.clubsList}>
-              {(showAllEvents ? latestEvents : latestEvents.slice(0, 4)).map((event, idx, arr) => {
-                const d = new Date(event.date + 'T00:00:00');
-                const dateStr = d.toLocaleDateString('sk-SK', { weekday: 'short', month: 'short', day: 'numeric' });
-                return (
-                  <TouchableOpacity
-                    key={event.id}
-                    style={[styles.clubRow, idx === arr.length - 1 && styles.clubRowLast]}
-                    onPress={() => router.push(`/event/${event.id}` as any)}
-                    activeOpacity={0.7}
-                  >
-                    {event.cover_url
-                      ? <Image source={{ uri: event.cover_url }} style={styles.clubAvatar} />
-                      : <View style={[styles.clubAvatar, styles.clubAvatarFallback]}>
-                          <Text style={styles.clubAvatarInitial}>{event.title.charAt(0).toUpperCase()}</Text>
-                        </View>
-                    }
-                    <View style={{ flex: 1 }}>
-                      <Text style={styles.clubName}>{event.title}</Text>
-                      <Text style={styles.clubCategory}>{dateStr}</Text>
-                    </View>
-                  </TouchableOpacity>
-                );
-              })}
-            </View>
+          <View style={styles.listBlock}>
+            <Text style={styles.listBlockTitle}>{t.settings.latestEvents}</Text>
+            {(showAllEvents ? latestEvents : latestEvents.slice(0, 4)).map((event, idx, arr) => {
+              const d = new Date(event.date + 'T00:00:00');
+              const dateStr = d.toLocaleDateString('sk-SK', { weekday: 'short', day: 'numeric', month: 'short' });
+              return (
+                <TouchableOpacity
+                  key={event.id}
+                  style={[styles.listRow, idx === arr.length - 1 && styles.listRowLast]}
+                  onPress={() => router.push(`/event/${event.id}` as any)}
+                  activeOpacity={0.7}
+                >
+                  {event.cover_url
+                    ? <Image source={{ uri: event.cover_url }} style={styles.rowAvatar} />
+                    : <View style={[styles.rowAvatar, styles.rowAvatarFallback]}>
+                        <Text style={styles.rowAvatarInitial}>{event.title.charAt(0).toUpperCase()}</Text>
+                      </View>
+                  }
+                  <View style={{ flex: 1 }}>
+                    <Text style={styles.rowTitle} numberOfLines={1}>{event.title}</Text>
+                    <Text style={styles.rowSub}>{dateStr}</Text>
+                  </View>
+                  <Text style={styles.rowChevron}>›</Text>
+                </TouchableOpacity>
+              );
+            })}
             {latestEvents.length > 4 && !showAllEvents && (
-              <TouchableOpacity style={styles.viewAllBtn} onPress={() => setShowAllEvents(true)} activeOpacity={0.7}>
-                <Text style={styles.viewAllText}>View all ({latestEvents.length})</Text>
+              <TouchableOpacity style={styles.showMoreBtn} onPress={() => setShowAllEvents(true)} activeOpacity={0.7}>
+                <Text style={styles.showMoreText}>+ {latestEvents.length - 4} more</Text>
               </TouchableOpacity>
             )}
           </View>
@@ -251,28 +237,28 @@ const styles = StyleSheet.create({
   avatarEditBadge: { position: 'absolute', bottom: 0, right: 0, width: 26, height: 26, borderRadius: 13, backgroundColor: Colors.black, alignItems: 'center', justifyContent: 'center', borderWidth: 2, borderColor: Colors.white },
   avatarEditIcon: { fontSize: 12, color: Colors.white },
   name: { fontSize: 26, fontWeight: '700', fontFamily: Fonts.bold, color: Colors.black, marginBottom: 4 },
-  subtitle: { fontSize: 12, color: Colors.gray, fontFamily: Fonts.regular, marginBottom: 24 },
-  stats: { flexDirection: 'row', gap: 10, marginBottom: 36 },
+  subtitle: { fontSize: 12, color: Colors.gray, fontFamily: Fonts.regular, marginBottom: 20 },
+  stats: { flexDirection: 'row', gap: 10, marginBottom: 24 },
   statCard: { flex: 1, backgroundColor: Colors.grayLight, borderRadius: 16, padding: 16, alignItems: 'center', gap: 2 },
   statCardLime: { backgroundColor: Colors.lime },
   statNum: { fontSize: 22, fontWeight: '700', fontFamily: Fonts.bold, color: Colors.black },
   statLabel: { fontSize: 12, color: Colors.gray, fontFamily: Fonts.regular },
-  section: { marginBottom: 32, paddingTop: 24, borderTopWidth: 1, borderTopColor: Colors.grayBorder },
-  sectionTitle: { fontSize: 13, fontWeight: '700', fontFamily: Fonts.semibold, color: Colors.gray, letterSpacing: 0.8, textTransform: 'uppercase', marginBottom: 14 },
   bioText: { fontSize: 15, color: Colors.black, fontFamily: Fonts.regular, lineHeight: 23 },
   bioEmpty: { fontSize: 15, color: Colors.gray, fontFamily: Fonts.regular },
-  clubsList: { borderRadius: 16, overflow: 'hidden', borderWidth: 1, borderColor: Colors.grayBorder },
-  clubRow: { flexDirection: 'row', alignItems: 'center', gap: 12, paddingVertical: 10, paddingHorizontal: 12, borderBottomWidth: 1, borderBottomColor: Colors.grayBorder, backgroundColor: Colors.white },
-  clubRowLast: { borderBottomWidth: 0 },
-  viewAllBtn: { paddingTop: 10, paddingBottom: 2, alignItems: 'center' },
-  viewAllText: { fontSize: 13, fontWeight: '600', color: Colors.gray, fontFamily: Fonts.semibold },
-  clubAvatar: { width: 36, height: 36, borderRadius: 10 },
-  clubAvatarFallback: { backgroundColor: Colors.grayLight, alignItems: 'center', justifyContent: 'center' },
-  clubAvatarInitial: { fontSize: 14, fontWeight: '700', color: Colors.black, fontFamily: Fonts.bold },
-  clubName: { fontSize: 14, fontWeight: '600', color: Colors.black, fontFamily: Fonts.semibold },
-  clubCategory: { fontSize: 12, color: Colors.gray, fontFamily: Fonts.regular, marginTop: 1 },
-  clubLeaveHint: { fontSize: 11, color: Colors.grayBorder, fontFamily: Fonts.regular },
-  adminBtn: { marginTop: 32, backgroundColor: Colors.black, borderRadius: 16, padding: 16, alignItems: 'center' },
+  infoBlock: { marginBottom: 24, gap: 12 },
+  listBlock: { marginBottom: 24 },
+  listBlockTitle: { fontSize: 11, fontWeight: '700', fontFamily: Fonts.semibold, color: Colors.gray, letterSpacing: 0.9, textTransform: 'uppercase', marginBottom: 6 },
+  listRow: { flexDirection: 'row', alignItems: 'center', gap: 12, paddingVertical: 10, borderBottomWidth: 1, borderBottomColor: '#F2F2F2' },
+  listRowLast: { borderBottomWidth: 0 },
+  rowAvatar: { width: 40, height: 40, borderRadius: 10 },
+  rowAvatarFallback: { backgroundColor: Colors.grayLight, alignItems: 'center', justifyContent: 'center' },
+  rowAvatarInitial: { fontSize: 16, fontWeight: '700', fontFamily: Fonts.bold, color: Colors.black },
+  rowTitle: { fontSize: 14, fontWeight: '600', fontFamily: Fonts.semibold, color: Colors.black },
+  rowSub: { fontSize: 12, color: Colors.gray, fontFamily: Fonts.regular, marginTop: 1 },
+  rowChevron: { fontSize: 20, color: Colors.grayBorder, fontWeight: '300' },
+  showMoreBtn: { paddingVertical: 10, alignItems: 'center' },
+  showMoreText: { fontSize: 13, color: Colors.gray, fontFamily: Fonts.semibold, fontWeight: '600' },
+  adminBtn: { marginTop: 24, backgroundColor: Colors.black, borderRadius: 16, padding: 16, alignItems: 'center' },
   adminBtnText: { color: Colors.lime, fontSize: 15, fontWeight: '700', fontFamily: Fonts.bold },
   tags: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
   tag: { paddingHorizontal: 14, paddingVertical: 7, borderRadius: 50, backgroundColor: Colors.grayLight },

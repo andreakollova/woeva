@@ -6,6 +6,7 @@ import { Colors } from '@/constants/colors';
 import { Fonts } from '@/constants/fonts';
 import { Event } from '@/types';
 import { useAuth } from '@/context/AuthContext';
+import { useTranslations } from '@/context/LanguageContext';
 
 interface EventCardProps {
   event: Event;
@@ -16,15 +17,19 @@ interface EventCardProps {
 export function EventCard({ event, featured, attending }: EventCardProps) {
   const router = useRouter();
   const { profile, user } = useAuth();
+  const { lang } = useTranslations();
+  const locale = lang === 'sk' ? 'sk-SK' : 'en-US';
 
   const d = getEventDate(event.date, event.is_recurring);
-  const dayName = d.toLocaleDateString('en-US', { weekday: 'short' }).toUpperCase();
+  const coverUrl = getRotatingCover(event);
+  const dayName = d.toLocaleDateString(locale, { weekday: 'short' }).toUpperCase();
   const dayNum = d.getDate();
-  const monthShort = d.toLocaleDateString('en-US', { month: 'short' }).toUpperCase();
+  const monthShort = d.toLocaleDateString(locale, { month: 'short' }).toUpperCase();
   const isToday = new Date().toDateString() === d.toDateString();
 
-  const priceLabel = event.is_free || event.price === 0 ? 'Free' : `€${event.price}`;
-  const isFree = event.is_free || event.price === 0;
+  const isPayAtDoor = !!(event as any).pay_at_door;
+  const isFree = !isPayAtDoor && (event.is_free || event.price === 0);
+  const priceLabel = isPayAtDoor ? `€${event.price} at door` : (isFree ? 'Free' : `€${event.price}`);
   const clubName = event.club?.name ?? (event as any).creator?.name ?? null;
   // Use attendees length as fallback if going_count is stale/0
   const goingCount = Math.max(event.going_count ?? 0, event.attendees?.length ?? 0, attending ? 1 : 0);
@@ -36,9 +41,9 @@ export function EventCard({ event, featured, attending }: EventCardProps) {
         onPress={() => router.push(`/event/${event.id}`)}
         activeOpacity={0.93}
       >
-        {event.cover_url ? (
+        {coverUrl ? (
           <ImageBackground
-            source={{ uri: event.cover_url }}
+            source={{ uri: coverUrl }}
             style={styles.featuredBg}
             imageStyle={styles.featuredImage}
           >
@@ -93,13 +98,18 @@ export function EventCard({ event, featured, attending }: EventCardProps) {
       activeOpacity={0.8}
     >
       {/* Date block */}
-      <View style={[styles.dateBlock, isToday && styles.dateBlockToday, attending && styles.dateBlockGoing]}>
-        <Text style={[styles.dateBlockDay, isToday && styles.dateBlockTextToday]}>
-          {isToday ? 'NOW' : dayName}
-        </Text>
-        <Text style={[styles.dateBlockNum, isToday && styles.dateBlockTextToday]}>{dayNum}</Text>
-        <Text style={[styles.dateBlockMonth, isToday && styles.dateBlockTextToday]}>{monthShort}</Text>
-      </View>
+      {(() => {
+        const isGoing = attending || event.creator_id === user?.id;
+        return (
+          <View style={[styles.dateBlock, isToday && styles.dateBlockToday, isGoing && styles.dateBlockGoing]}>
+            <Text style={[styles.dateBlockDay, isToday && styles.dateBlockTextToday, isGoing && styles.dateBlockTextGoing]}>
+              {isToday ? 'NOW' : dayName}
+            </Text>
+            <Text style={[styles.dateBlockNum, isToday && styles.dateBlockTextToday, isGoing && styles.dateBlockTextGoing]}>{dayNum}</Text>
+            <Text style={[styles.dateBlockMonth, isToday && styles.dateBlockTextToday, isGoing && styles.dateBlockTextGoing]}>{monthShort}</Text>
+          </View>
+        );
+      })()}
 
       {/* Info */}
       <View style={styles.rowInfo}>
@@ -129,8 +139,12 @@ export function EventCard({ event, featured, attending }: EventCardProps) {
 
       {/* Thumb */}
       <View style={styles.rowThumbWrap}>
-        {event.cover_url ? (
-          <Image source={{ uri: event.cover_url }} style={styles.rowThumb} />
+        {coverUrl ? (
+          <Image
+            source={{ uri: coverUrl }}
+            style={event.venue?.toLowerCase().includes('freshmarket') ? styles.rowThumbRight : styles.rowThumb}
+            resizeMode="cover"
+          />
         ) : (
           <View style={[styles.rowThumb, { backgroundColor: Colors.grayLight }]} />
         )}
@@ -249,7 +263,19 @@ function FeaturedContent({ event, isToday, dayName, dayNum, monthShort, priceLab
 
 function formatTime(time?: string | null): string {
   if (!time || time === '00:00' || time === '0:00') return 'Celý deň';
-  return time;
+  return time.slice(0, 5);
+}
+
+function getRotatingCover(event: { cover_url: string | null; cover_urls?: string[] | null; date: string; is_recurring?: boolean }): string | null {
+  const covers = event.cover_urls?.length ? event.cover_urls : (event.cover_url ? [event.cover_url] : []);
+  if (!covers.length) return null;
+  if (!event.is_recurring || covers.length === 1) return covers[0];
+  // Use _recurringStartDate (set during expansion) to compute occurrence index
+  const originalDate = (event as any)._recurringStartDate ?? event.date;
+  const start = new Date(originalDate + 'T00:00:00');
+  const occDate = new Date(event.date + 'T00:00:00');
+  const weekIndex = Math.max(0, Math.round((occDate.getTime() - start.getTime()) / (7 * 24 * 60 * 60 * 1000)));
+  return covers[weekIndex % covers.length];
 }
 
 function getEventDate(date: string, isRecurring?: boolean): Date {
@@ -308,12 +334,13 @@ const styles = StyleSheet.create({
     paddingVertical: 8,
     gap: 0,
   },
-  dateBlockToday: { backgroundColor: Colors.black },
+  dateBlockToday: {},
   dateBlockGoing: { backgroundColor: Colors.lime },
   dateBlockDay: { fontSize: 9, fontWeight: '700', color: Colors.gray, letterSpacing: 0.5 },
   dateBlockNum: { fontSize: 22, fontWeight: '800', color: Colors.black, lineHeight: 26, fontFamily: Fonts.extrabold },
   dateBlockMonth: { fontSize: 9, fontWeight: '600', color: Colors.gray, letterSpacing: 0.3 },
-  dateBlockTextToday: { color: Colors.white },
+  dateBlockTextToday: {},
+  dateBlockTextGoing: { color: Colors.black },
 
   rowInfo: { flex: 1, gap: 3 },
   rowTitle: { fontSize: 15, fontWeight: '700', color: Colors.black, fontFamily: Fonts.semibold, letterSpacing: -0.2 },
@@ -334,4 +361,5 @@ const styles = StyleSheet.create({
 
   rowThumbWrap: { width: 64, height: 64, borderRadius: 12, overflow: 'hidden' },
   rowThumb: { width: 64, height: 64 },
+  rowThumbRight: { position: 'absolute', right: 0, height: 64, width: 180 },
 });

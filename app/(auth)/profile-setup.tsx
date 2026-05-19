@@ -5,6 +5,7 @@ import {
 } from 'react-native';
 import { useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { useTranslations } from '@/context/LanguageContext';
 import * as ImagePicker from 'expo-image-picker';
 import { Colors } from '@/constants/colors';
 import { Fonts } from '@/constants/fonts';
@@ -15,8 +16,17 @@ import { uploadImage } from '@/lib/uploadImage';
 export default function ProfileSetupScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
+  const { t } = useTranslations();
   const [avatar, setAvatar] = useState<string | null>(null);
+  const [googleAvatar, setGoogleAvatar] = useState<string | null>(null);
   const [bio, setBio] = useState('');
+
+  React.useEffect(() => {
+    supabase.auth.getUser().then(({ data: { user } }) => {
+      const pic = user?.user_metadata?.avatar_url ?? user?.user_metadata?.picture ?? null;
+      if (pic) setGoogleAvatar(pic);
+    });
+  }, []);
   const [loading, setLoading] = useState(false);
 
   async function pickAvatar() {
@@ -46,8 +56,9 @@ export default function ProfileSetupScreen() {
         }
         const patch: Record<string, unknown> = { id: user.id };
         if (avatar_url) patch.avatar_url = `${avatar_url}?t=${Date.now()}`;
+        else if (googleAvatar) patch.avatar_url = googleAvatar;
         if (bio.trim()) patch.bio = bio.trim();
-        if (avatar_url || bio.trim()) {
+        if (avatar_url || googleAvatar || bio.trim()) {
           await supabase.from('profiles').upsert(patch);
         }
       }
@@ -57,7 +68,8 @@ export default function ProfileSetupScreen() {
     router.push('/(auth)/interests');
   }
 
-  const hasPhoto = !!avatar;
+  const hasPhoto = !!avatar || !!googleAvatar;
+  const displayAvatar = avatar ?? googleAvatar;
 
   return (
     <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
@@ -67,27 +79,19 @@ export default function ProfileSetupScreen() {
         keyboardShouldPersistTaps="handled"
         showsVerticalScrollIndicator={false}
       >
-        {/* Skip button top-right */}
-        <TouchableOpacity style={styles.skipTop} onPress={() => handleContinue(true)} activeOpacity={0.7}>
-          <Text style={styles.skipText}>Preskočiť</Text>
-        </TouchableOpacity>
-
         {/* Heading */}
         <View style={styles.header}>
-          <Text style={styles.title}>Ako vyzeráš?</Text>
-          <Text style={styles.subtitle}>
-            Profilovka zvyšuje dôveru — ľudia ťa radšej pozvú na event.
-          </Text>
+          <Text style={styles.title}>{t.auth.profileSetupTitle}</Text>
+          <Text style={styles.subtitle}>{t.auth.profileSetupSubtitle}</Text>
         </View>
 
         {/* Avatar picker */}
         <TouchableOpacity style={styles.avatarWrap} onPress={pickAvatar} activeOpacity={0.85}>
-          {avatar ? (
-            <Image source={{ uri: avatar }} style={styles.avatar} />
+          {displayAvatar ? (
+            <Image source={{ uri: displayAvatar }} style={styles.avatar} />
           ) : (
             <View style={styles.avatarEmpty}>
-              <Text style={styles.avatarIcon}>📷</Text>
-              <Text style={styles.avatarHint}>Pridaj fotku</Text>
+              <Text style={styles.avatarIcon}>+</Text>
             </View>
           )}
           <View style={styles.avatarBadge}>
@@ -97,7 +101,7 @@ export default function ProfileSetupScreen() {
 
         {hasPhoto && (
           <TouchableOpacity onPress={pickAvatar} activeOpacity={0.7} style={styles.changePhotoBtn}>
-            <Text style={styles.changePhotoText}>Zmeniť fotku</Text>
+            <Text style={styles.changePhotoText}>{t.auth.changePhoto}</Text>
           </TouchableOpacity>
         )}
 
@@ -105,18 +109,17 @@ export default function ProfileSetupScreen() {
         {!hasPhoto && (
           <View style={styles.nudge}>
             <Text style={styles.nudgeText}>
-              👥  Udalosti s profilovkou dostávajú{' '}
-              <Text style={styles.nudgeBold}>3× viac záujmu</Text>
+              👥{'  '}<Text style={styles.nudgeBold}>{t.auth.photoNudge}</Text>
             </Text>
           </View>
         )}
 
         {/* Bio */}
         <View style={styles.bioWrap}>
-          <Text style={styles.label}>Krátke bio <Text style={styles.optional}>(nepovinné)</Text></Text>
+          <Text style={styles.label}>{t.auth.shortBio} <Text style={styles.optional}>{t.auth.bioOptional}</Text></Text>
           <TextInput
             style={styles.bioInput}
-            placeholder="Pár slov o sebe..."
+            placeholder={t.auth.bioPlaceholder}
             placeholderTextColor={Colors.gray}
             value={bio}
             onChangeText={setBio}
@@ -129,11 +132,14 @@ export default function ProfileSetupScreen() {
         {/* Continue */}
         <View style={styles.footer}>
           <Button
-            label={hasPhoto || bio.trim() ? 'Pokračovať →' : 'Pokračovať bez fotky'}
+            label={hasPhoto || bio.trim() ? t.auth.continueBtn : t.auth.continueWithoutPhoto}
             onPress={() => handleContinue(false)}
             loading={loading}
             variant={hasPhoto ? 'lime' : 'black'}
           />
+          <TouchableOpacity style={styles.skipBottom} onPress={() => handleContinue(true)} activeOpacity={0.7}>
+            <Text style={styles.skipText}>{t.auth.skip}</Text>
+          </TouchableOpacity>
         </View>
       </ScrollView>
     </KeyboardAvoidingView>
@@ -144,14 +150,14 @@ const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: Colors.white },
   scroll: { paddingHorizontal: 24 },
 
-  skipTop: { alignSelf: 'flex-end', paddingVertical: 4, paddingHorizontal: 2, marginBottom: 8 },
-  skipText: { fontSize: 14, color: Colors.gray, fontFamily: Fonts.regular },
+  skipBottom: { alignSelf: 'center', marginTop: 16, paddingVertical: 4 },
+  skipText: { fontSize: 14, color: Colors.gray, fontFamily: Fonts.regular, textDecorationLine: 'underline' },
 
-  header: { marginBottom: 36, gap: 8 },
-  title: { fontSize: 30, fontWeight: '700', fontFamily: Fonts.bold, color: Colors.black, letterSpacing: -0.5 },
+  header: { marginBottom: 40, gap: 6 },
+  title: { fontSize: 32, fontWeight: '800', fontFamily: Fonts.extrabold, color: Colors.black, letterSpacing: -0.8 },
   subtitle: { fontSize: 15, color: Colors.gray, fontFamily: Fonts.regular, lineHeight: 22 },
 
-  avatarWrap: { alignSelf: 'center', marginBottom: 12, position: 'relative' },
+  avatarWrap: { alignSelf: 'center', marginBottom: 14, position: 'relative' },
   avatar: { width: 120, height: 120, borderRadius: 60 },
   avatarEmpty: {
     width: 120, height: 120, borderRadius: 60,
@@ -159,8 +165,7 @@ const styles = StyleSheet.create({
     alignItems: 'center', justifyContent: 'center', gap: 6,
     borderWidth: 2, borderColor: Colors.grayBorder, borderStyle: 'dashed',
   },
-  avatarIcon: { fontSize: 32 },
-  avatarHint: { fontSize: 12, color: Colors.gray, fontFamily: Fonts.regular },
+  avatarIcon: { fontSize: 40, color: Colors.gray, fontWeight: '300', lineHeight: 44 },
   avatarBadge: {
     position: 'absolute', bottom: 4, right: 4,
     width: 28, height: 28, borderRadius: 14,

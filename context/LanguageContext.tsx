@@ -9,8 +9,8 @@ interface LanguageContextType {
 }
 
 const LanguageContext = createContext<LanguageContextType>({
-  lang: 'en',
-  t: translations.en,
+  lang: 'sk',
+  t: translations.sk as unknown as Translations,
   setLang: () => {},
 });
 
@@ -18,7 +18,9 @@ export function LanguageProvider({ children }: { children: React.ReactNode }) {
   const [lang, setLangState] = useState<Lang>('en');
 
   useEffect(() => {
-    loadSavedLang().then(setLangState);
+    loadSavedLang().then(saved => {
+      if (saved) setLangState(saved);
+    });
   }, []);
 
   function setLang(l: Lang) {

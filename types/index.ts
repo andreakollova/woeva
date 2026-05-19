@@ -73,6 +73,7 @@ export interface Event {
   category: string;
   tags: string[];
   cover_url: string | null;
+  cover_urls?: string[] | null;
   date: string;
   time: string;
   duration: number;
@@ -85,19 +86,22 @@ export interface Event {
   is_recurring: boolean;
   city: string;
   created_at: string;
+  source?: string | null;
+  pay_at_door?: boolean | null;
+  cancelled_dates?: string[] | null;
   status: 'active' | 'cancelled';
   cancelled_at: string | null;
   cancellation_reason: string | null;
   cancellation_note: string | null;
   creator?: Profile;
-  club?: { id: string; name: string; cover_url: string | null } | null;
+  club?: { id: string; name: string; cover_url: string | null; logo_url?: string | null } | null;
   attendees?: Array<{ profile?: { id: string; name: string; avatar_url: string | null } | null }>;
 }
 
 export interface Notification {
   id: string;
   user_id: string;
-  type: 'event_cancelled' | 'new_event' | 'event_chat' | 'club_event' | 'admin_invite';
+  type: 'event_cancelled' | 'new_event' | 'event_chat' | 'club_event' | 'admin_invite' | 'join';
   title: string;
   body: string | null;
   data: Record<string, any> | null;
@@ -118,6 +122,9 @@ export interface Club {
   member_count: number;
   rating: number;
   city: string;
+  address: string | null;
+  lat: number | null;
+  lng: number | null;
   created_at: string;
 }
 
@@ -171,8 +178,38 @@ export interface Report {
 
 export const CATEGORIES = [
   'Sport', 'Coffee', 'Sober party', 'Party', 'Music', 'Art',
-  'Marathon', 'Film', 'Yoga', 'Tech', 'Gardening', 'Gaming',
-  'Running', 'Hockey', 'Dance', 'Food', 'Networking',
+  'Film', 'Yoga', 'Tech', 'Gardening', 'Gaming',
+  'Running', 'Hockey', 'Dance', 'Food', 'Networking', 'Matches', 'Gastro',
 ] as const;
+
+export const CATEGORY_SK: Record<string, string> = {
+  'Sport': 'Šport',
+  'Coffee': 'Káva',
+  'Sober party': 'Sober party',
+  'Party': 'Párty',
+  'Music': 'Hudba',
+  'Art': 'Umenie',
+  'Film': 'Film',
+  'Yoga': 'Jóga',
+  'Tech': 'Tech',
+  'Gardening': 'Záhradníctvo',
+  'Gaming': 'Gaming',
+  'Running': 'Beh',
+  'Hockey': 'Hokej',
+  'Dance': 'Tanec',
+  'Food': 'Jedlo',
+  'Networking': 'Networking',
+  'Free': 'Zadarmo',
+  'Matches': 'Zápasy',
+  'matches': 'Zápasy',
+  'Gastro': 'Gastro',
+  'trhy': 'Trhy',
+  'Trhy': 'Trhy',
+};
+
+// EN display overrides (for categories whose DB key differs from desired EN label)
+export const CATEGORY_EN: Record<string, string> = {
+  'Gastro': 'Food',
+};
 
 export type CategoryName = typeof CATEGORIES[number];

@@ -8,6 +8,7 @@ import { useRouter, usePathname } from 'expo-router';
 import { useEffect, useState } from 'react';
 import { supabase } from '@/lib/supabase';
 import { useAuth } from '@/context/AuthContext';
+import { useTranslations } from '@/context/LanguageContext';
 
 function HomeIcon({ color }: { color: string }) {
   return (
@@ -64,19 +65,26 @@ const TAB_ICONS: Record<string, (color: string) => React.ReactNode> = {
   dashboard: (c) => <DashboardIcon color={c} />,
 };
 
-const TAB_LABELS: Record<string, string> = {
-  index: 'Home',
-  search: 'Search',
-  booked: 'Booked',
-  profile: 'Profile',
-  dashboard: 'Dashboard',
-};
-
 function TabBar({ state, descriptors, navigation }: any) {
   const insets = useSafeAreaInsets();
   const router = useRouter();
   const pathname = usePathname();
   const { user, loading } = useAuth();
+  const { t, lang } = useTranslations();
+
+  const TAB_LABELS: Record<string, string> = lang === 'sk' ? {
+    index: 'Domov',
+    search: 'Hľadať',
+    booked: 'Lístky',
+    profile: 'Profil',
+    dashboard: 'Dashboard',
+  } : {
+    index: 'Home',
+    search: 'Search',
+    booked: 'Tickets',
+    profile: 'Profile',
+    dashboard: 'Dashboard',
+  };
   const [myClubs, setMyClubs] = useState<{ id: string; name: string }[]>([]);
   const [showMenu, setShowMenu] = useState(false);
 
@@ -98,7 +106,7 @@ function TabBar({ state, descriptors, navigation }: any) {
       <Modal visible={showMenu} transparent animationType="fade" onRequestClose={() => setShowMenu(false)}>
         <Pressable style={styles.modalOverlay} onPress={() => setShowMenu(false)}>
           <View style={[styles.menuSheet, { paddingBottom: insets.bottom + 4 }]}>
-            {/* New Event — dominant */}
+            {/* New Event - dominant */}
             <TouchableOpacity
               style={styles.menuItemHero}
               onPress={() => { setShowMenu(false); router.push('/event/create/step2'); }}
@@ -106,15 +114,14 @@ function TabBar({ state, descriptors, navigation }: any) {
             >
               <Text style={styles.menuItemHeroEmoji}>🎉</Text>
               <View>
-                <Text style={styles.menuItemHeroTitle}>New event</Text>
-                <Text style={styles.menuItemHeroSub}>Party, run, brunch...</Text>
+                <Text style={styles.menuItemHeroTitle}>{t.event.newEvent}</Text>
+                <Text style={styles.menuItemHeroSub}>{t.event.newEventSub}</Text>
               </View>
             </TouchableOpacity>
 
             {/* Secondary row */}
             <View style={styles.menuSecondaryRow}>
-              {/* Club(s) or New club */}
-              {myClubs.length === 0 ? (
+              {myClubs.length === 0 && (
                 <TouchableOpacity style={styles.menuSecondaryItem} onPress={() => { setShowMenu(false); router.push('/club/create'); }} activeOpacity={0.7}>
                   <Svg width={16} height={16} viewBox="0 0 24 24" fill="none">
                     <Path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2" stroke={Colors.gray} strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round" />
@@ -122,9 +129,10 @@ function TabBar({ state, descriptors, navigation }: any) {
                     <Path d="M23 21v-2a4 4 0 0 0-3-3.87" stroke={Colors.gray} strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round" />
                     <Path d="M16 3.13a4 4 0 0 1 0 7.75" stroke={Colors.gray} strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round" />
                   </Svg>
-                  <Text style={styles.menuSecondaryTitle}>New club</Text>
+                  <Text style={styles.menuSecondaryTitle}>{t.club.createClub}</Text>
                 </TouchableOpacity>
-              ) : myClubs.length === 1 ? (
+              )}
+              {myClubs.length === 1 && (
                 <TouchableOpacity style={styles.menuSecondaryItem} onPress={() => { setShowMenu(false); router.push(`/club/${myClubs[0].id}` as any); }} activeOpacity={0.7}>
                   <Svg width={16} height={16} viewBox="0 0 24 24" fill="none">
                     <Path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2" stroke={Colors.gray} strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round" />
@@ -132,9 +140,10 @@ function TabBar({ state, descriptors, navigation }: any) {
                     <Path d="M23 21v-2a4 4 0 0 0-3-3.87" stroke={Colors.gray} strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round" />
                     <Path d="M16 3.13a4 4 0 0 1 0 7.75" stroke={Colors.gray} strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round" />
                   </Svg>
-                  <Text style={styles.menuSecondaryTitle}>My club</Text>
+                  <Text style={styles.menuSecondaryTitle}>{t.club.myClub}</Text>
                 </TouchableOpacity>
-              ) : (
+              )}
+              {myClubs.length >= 2 && (
                 <TouchableOpacity style={styles.menuSecondaryItem} onPress={() => { setShowMenu(false); router.push('/dashboard'); }} activeOpacity={0.7}>
                   <Svg width={16} height={16} viewBox="0 0 24 24" fill="none">
                     <Path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2" stroke={Colors.gray} strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round" />
@@ -144,7 +153,7 @@ function TabBar({ state, descriptors, navigation }: any) {
                 </TouchableOpacity>
               )}
 
-              {/* Dashboard — always visible */}
+              {/* Dashboard - always visible */}
               <View style={styles.menuSecondaryDivider} />
               <TouchableOpacity
                 style={styles.menuSecondaryItem}
@@ -230,9 +239,13 @@ export default function TabsLayout() {
 
 const styles = StyleSheet.create({
   container: {
+    position: 'absolute',
+    bottom: 0,
+    left: 0,
+    right: 0,
     paddingHorizontal: 16,
     paddingTop: 8,
-    backgroundColor: Colors.white,
+    backgroundColor: 'transparent',
   },
   bar: {
     backgroundColor: Colors.black,
@@ -286,7 +299,7 @@ const styles = StyleSheet.create({
     gap: 10,
   },
 
-  // Hero item — New event
+  // Hero item - New event
   menuItemHero: {
     flexDirection: 'row',
     alignItems: 'center',

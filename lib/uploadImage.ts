@@ -45,7 +45,8 @@ export async function uploadImage(
       ?? process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY
       ?? '';
 
-    const uploadUrl = `${SUPABASE_URL}/storage/v1/object/${bucket}/${fileName.replace(/\.[^.]+$/, '.jpg')}`;
+    const normalizedFileName = fileName.replace(/\.[^.]+$/, '.jpg');
+    const uploadUrl = `${SUPABASE_URL}/storage/v1/object/${bucket}/${normalizedFileName}`;
 
     const result = await FileSystem.uploadAsync(uploadUrl, uri, {
       httpMethod: 'POST',
@@ -63,7 +64,7 @@ export async function uploadImage(
       return null;
     }
 
-    const { data } = supabase.storage.from(bucket).getPublicUrl(fileName);
+    const { data } = supabase.storage.from(bucket).getPublicUrl(normalizedFileName);
     return data.publicUrl;
   } catch (e) {
     console.warn('uploadImage error:', e);

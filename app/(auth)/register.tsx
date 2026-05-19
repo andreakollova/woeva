@@ -30,7 +30,17 @@ export default function RegisterScreen() {
     const fn = provider === 'google' ? signInWithGoogle : signInWithApple;
     const { error } = await fn();
     setSocialLoading(null);
-    if (!error) router.replace('/(auth)/profile-setup');
+    if (error) return;
+    // Check if profile already exists — if yes, go straight into the app
+    const { data: { user: u } } = await supabase.auth.getUser();
+    if (u) {
+      const { data: existingProfile } = await supabase.from('profiles').select('name').eq('id', u.id).single();
+      if (existingProfile?.name) {
+        router.replace('/(tabs)');
+        return;
+      }
+    }
+    router.replace('/(auth)/profile-setup');
   }
 
   function validate() {
@@ -66,7 +76,7 @@ export default function RegisterScreen() {
     }
 
     if (!data.session) {
-      // Email confirmation required — user must confirm before they can log in
+      // Email confirmation required - user must confirm before they can log in
       Alert.alert(
         t.auth.checkEmail,
         t.auth.checkEmailMsg(email),
@@ -75,7 +85,7 @@ export default function RegisterScreen() {
       return;
     }
 
-    // Session created — save profile with name immediately
+    // Session created - save profile with name immediately
     if (data.user) {
       await supabase.from('profiles').upsert({ id: data.user.id, name: name.trim(), email: email.trim().toLowerCase() });
       notify.welcome({ email: email.trim().toLowerCase(), name: name.trim() });

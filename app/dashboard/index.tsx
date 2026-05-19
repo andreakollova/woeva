@@ -1,9 +1,9 @@
-import React, { useState, useCallback } from 'react';
+import React, { useState, useCallback, useMemo, useRef } from 'react';
 import {
   View, Text, StyleSheet, ScrollView, TouchableOpacity,
-  Image, Alert, ActivityIndicator, Modal, TextInput, Platform, FlatList,
+  Image, Alert, ActivityIndicator, Modal, TextInput, Platform, FlatList, KeyboardAvoidingView, RefreshControl,
 } from 'react-native';
-// expo-camera requires a native build — safe lazy import
+// expo-camera requires a native build - safe lazy import
 let _expoCamera: any = null;
 try { _expoCamera = require('expo-camera'); } catch {}
 const SafeCameraView: any = _expoCamera?.CameraView ?? null;
@@ -14,10 +14,10 @@ function useSafeCameraPermissions(): [{ granted: boolean } | null, () => Promise
   }
   return [null, async () => {}];
 }
-import { useFocusEffect, useRouter } from 'expo-router';
+import { useFocusEffect, useRouter, useLocalSearchParams } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import * as WebBrowser from 'expo-web-browser';
-import Svg, { Path, Circle, Defs, LinearGradient as SvgGrad, Stop, Rect, Polyline, Polygon } from 'react-native-svg';
+import Svg, { Path, Circle, Defs, LinearGradient as SvgGrad, Stop, Rect, Polyline, Polygon, Text as SvgText, G } from 'react-native-svg';
 import { useWindowDimensions } from 'react-native';
 import { Colors } from '@/constants/colors';
 import { Fonts } from '@/constants/fonts';
@@ -31,10 +31,68 @@ import { notify } from '@/lib/notify';
 import { useTranslations } from '@/context/LanguageContext';
 
 // ─── Constants ────────────────────────────────────────────────────────────────
-const WOEVA_FEE = 0.05;
-const STRIPE_PCT = 0.029;
-const STRIPE_FIXED = 0.30;
-const PLATFORM_FEE_PCT = 5;
+const WOEVA_FEE = 0.035;         // 3.5% Woeva platform fee
+const STRIPE_PCT = 0.015;        // 1.5% Stripe EU fee
+const STRIPE_FIXED = 0.25;       // €0.25 Stripe fixed fee
+const PLATFORM_FEE_PCT = 5;      // ~5% total displayed to organizers
+
+// ─── Payment method icons ──────────────────────────────────────────────────────
+function PayMethodIcon({ method }: { method: 'visa' | 'mc' | 'amex' | 'apple' | 'gpay' }) {
+  if (method === 'visa') return (
+    <Svg width={52} height={34} viewBox="0 0 52 34">
+      <Rect width={52} height={34} rx={6} fill="white" stroke="#E2E8F0" strokeWidth={1.5} />
+      {/* VISA wordmark paths */}
+      <Path d="M19.5 22.5l2.1-12h3.3l-2.1 12h-3.3z" fill="#1A1F71" />
+      <Path d="M32.2 10.8c-.65-.24-1.67-.5-2.95-.5-3.25 0-5.54 1.63-5.56 3.97-.03 1.73 1.63 2.7 2.88 3.27 1.28.59 1.71.97 1.7 1.49-.01.81-.02 1.17-1.48 1.17-1.38 0-2.15-.21-3.3-.7l-.45-.2-.49 2.87c.82.36 2.33.67 3.9.68 3.67 0 6.05-1.71 6.08-4.35.01-1.45-.91-2.55-2.9-3.46-1.21-.59-1.95-.98-1.94-1.57 0-.53.63-1.09 1.98-1.09 1.13-.02 1.95.23 2.59.48l.31.14.47-2.76z" fill="#1A1F71" />
+      <Path d="M36.5 18.5c.27-.69 1.31-3.36 1.31-3.36-.02.03.27-.7.44-1.15l.22 1.04s.63 2.88.76 3.47H36.5zm3.84-7.97h-2.54c-.79 0-1.38.21-1.73.99l-4.9 11.01h3.67l.73-1.9h4.48l.41 1.9h3.24l-3.36-12z" fill="#1A1F71" />
+      <Path d="M16.8 10.5l-3.22 8.18-.34-1.65c-.6-1.92-2.46-4.01-4.54-5.05l2.94 10.52h3.69l5.49-12h-4.02z" fill="#1A1F71" />
+      <Path d="M10.5 10.5H4.93l-.06.28c4.34 1.05 7.21 3.57 8.4 6.6l-1.21-5.84c-.21-.82-.79-1.01-1.56-1.04z" fill="#F9A533" />
+    </Svg>
+  );
+  if (method === 'mc') return (
+    <Svg width={52} height={34} viewBox="0 0 52 34">
+      <Rect width={52} height={34} rx={6} fill="white" stroke="#E2E8F0" strokeWidth={1.5} />
+      <Circle cx={20} cy={17} r={10} fill="#EB001B" />
+      <Circle cx={32} cy={17} r={10} fill="#F79E1B" />
+      {/* Overlap blend area */}
+      <Path d="M26 9.3a10 10 0 0 1 0 15.4A10 10 0 0 1 26 9.3z" fill="#FF5F00" />
+    </Svg>
+  );
+  if (method === 'amex') return (
+    <Svg width={52} height={34} viewBox="0 0 52 34">
+      <Rect width={52} height={34} rx={6} fill="#016FD0" />
+      <SvgText x="26" y="22" textAnchor="middle" fontSize="10.5" fontWeight="bold" fill="white" fontFamily="Arial, Helvetica, sans-serif" letterSpacing={2}>AMEX</SvgText>
+    </Svg>
+  );
+  if (method === 'apple') return (
+    <Svg width={64} height={34} viewBox="0 0 64 34">
+      <Rect width={64} height={34} rx={6} fill="black" />
+      {/* Apple logo — official path scaled to fit */}
+      <G transform="translate(8, 7.5) scale(0.73)">
+        <Path d="M18.71 19.5c-.83 1.24-1.71 2.45-3.05 2.47-1.34.03-1.77-.79-3.29-.79-1.53 0-2 .77-3.27.82-1.31.05-2.3-1.32-3.14-2.53C4.25 17 2.94 12.45 4.7 9.39c.87-1.52 2.43-2.48 4.12-2.51 1.28-.02 2.5.87 3.29.87.78 0 2.26-1.07 3.8-.91.65.03 2.47.26 3.64 1.98-.09.06-2.17 1.28-2.15 3.81.03 3.02 2.65 4.03 2.68 4.04-.03.07-.42 1.44-1.38 2.83M13 3.5c.73-.83 1.94-1.46 2.94-1.5.13 1.17-.34 2.35-1.04 3.19-.69.85-1.83 1.51-2.95 1.42-.15-1.15.41-2.35 1.05-3.11z" fill="white" />
+      </G>
+      <SvgText x="40" y="22" textAnchor="middle" fontSize="12" fill="white" fontFamily="Arial, sans-serif" fontWeight="300">Pay</SvgText>
+    </Svg>
+  );
+  // gpay — 3-colour ring G (opening at top-right) + blue bar
+  const cx = 16, cy = 17, ro = 8, ri = 4.5;
+  return (
+    <Svg width={64} height={34} viewBox="0 0 64 34">
+      <Rect width={64} height={34} rx={6} fill="white" stroke="#E2E8F0" strokeWidth={1.5} />
+      {/* Red arc: right→bottom (0°→90°) */}
+      <Path d={`M${cx+ro} ${cy} A${ro} ${ro} 0 0 1 ${cx} ${cy+ro} L${cx} ${cy+ri} A${ri} ${ri} 0 0 0 ${cx+ri} ${cy} Z`} fill="#EA4335" />
+      {/* Yellow arc: bottom→left (90°→180°) */}
+      <Path d={`M${cx} ${cy+ro} A${ro} ${ro} 0 0 1 ${cx-ro} ${cy} L${cx-ri} ${cy} A${ri} ${ri} 0 0 0 ${cx} ${cy+ri} Z`} fill="#FBBC05" />
+      {/* Green arc: left→top (180°→270°) */}
+      <Path d={`M${cx-ro} ${cy} A${ro} ${ro} 0 0 1 ${cx} ${cy-ro} L${cx} ${cy-ri} A${ri} ${ri} 0 0 0 ${cx-ri} ${cy} Z`} fill="#34A853" />
+      {/* Blue cap: top→top-right (~270°→315°) */}
+      <Path d={`M${cx} ${cy-ro} A${ro} ${ro} 0 0 1 ${cx+5.7} ${cy-5.7} L${cx+3.2} ${cy-3.2} A${ri} ${ri} 0 0 0 ${cx} ${cy-ri} Z`} fill="#4285F4" />
+      {/* Blue horizontal bar */}
+      <Rect x={cx} y={cy - 2.2} width={ro + 0.5} height={4.4} fill="#4285F4" />
+      <SvgText x="43" y="22" textAnchor="middle" fontSize="12" fill="#5F6368" fontFamily="Arial, sans-serif" fontWeight="500">Pay</SvgText>
+    </Svg>
+  );
+}
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 type DashTab = 'home' | 'events' | 'payouts' | 'stats' | 'scan';
@@ -46,9 +104,13 @@ type Member = {
 
 type EventRow = {
   id: string; title: string; date: string; time: string;
-  going_count: number; cover_url: string | null; club_id: string | null;
+  going_count: number; cover_url: string | null; cover_urls?: string[] | null; club_id: string | null;
+  creator_id: string;
   price: number; is_free: boolean; status: string;
-  paid_count: number; gross: number; stripe_fee: number; woeva_fee: number; net: number;
+  is_recurring?: boolean; recurring_end_date?: string | null;
+  paid_count: number; online_count: number; door_count: number; scan_count: number;
+  gross: number; stripe_fee: number; woeva_fee: number; net: number;
+  _startDate?: string;
 };
 
 type Club = { id: string; name: string; cover_url: string | null; logo_url: string | null; creator_id: string };
@@ -71,15 +133,63 @@ type PayoutRecord = {
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 function fmt(n: number) { return `€${n.toFixed(2)}`; }
 
-function calcRevenue(price: number, count: number) {
-  const gross = price * count;
-  const stripe_fee = count > 0 ? gross * STRIPE_PCT + count * STRIPE_FIXED : 0;
-  const woeva_fee = gross * WOEVA_FEE;
+// Strip invisible/zero-width unicode chars that sneak in from web copy-paste
+function sanitize(s: string) {
+  return s.replace(/[\u200B-\u200D\uFEFF\u00AD\u2060\u180E\u00A0]/g, ' ').replace(/\s+/g, ' ').trimStart();
+}
+
+// Real attendee count — excludes the creator's auto-join
+function realGoing(e: { going_count: number; creator_id: string }, userId: string) {
+  return Math.max(0, e.going_count - (e.creator_id === userId ? 1 : 0));
+}
+
+function calcRevenue(price: number, onlineCount: number, doorCount: number) {
+  const gross = price * (onlineCount + doorCount);
+  const onlineGross = price * onlineCount;
+  // Stripe fee and Woeva fee only apply to online (Stripe-processed) tickets
+  const stripe_fee = onlineCount > 0 ? onlineGross * STRIPE_PCT + onlineCount * STRIPE_FIXED : 0;
+  const woeva_fee = onlineGross * WOEVA_FEE;
   const net = Math.max(0, gross - stripe_fee - woeva_fee);
   return { gross, stripe_fee, woeva_fee, net };
 }
 
-function isUpcoming(e: EventRow) { return new Date(`${e.date}T${e.time ?? '00:00'}`) >= new Date(); }
+function isUpcoming(e: EventRow) {
+  if (e.is_recurring && e.recurring_end_date) {
+    return new Date(e.recurring_end_date + 'T23:59:59') >= new Date();
+  }
+  return new Date(`${e.date}T${e.time ?? '00:00'}`) >= new Date();
+}
+
+function expandDashboardRows(rows: EventRow[]): EventRow[] {
+  const result: EventRow[] = [];
+  const today = new Date(); today.setHours(0, 0, 0, 0);
+  const maxDate = new Date(); maxDate.setMonth(maxDate.getMonth() + 3);
+  for (const row of rows) {
+    if (!row.is_recurring) { result.push(row); continue; }
+    const startDate = new Date(row.date + 'T00:00:00');
+    const endDate = row.recurring_end_date ? new Date(row.recurring_end_date + 'T00:00:00') : maxDate;
+    const cap = endDate < maxDate ? endDate : maxDate;
+    let current = new Date(startDate);
+    while (current < today) current.setDate(current.getDate() + 7);
+    while (current <= cap) {
+      const dateStr = `${current.getFullYear()}-${String(current.getMonth() + 1).padStart(2, '0')}-${String(current.getDate()).padStart(2, '0')}`;
+      result.push({ ...row, id: `${row.id}_${dateStr}`, date: dateStr, _startDate: row.date });
+      current = new Date(current);
+      current.setDate(current.getDate() + 7);
+    }
+  }
+  return result.sort((a, b) => a.date.localeCompare(b.date));
+}
+
+function getRotatingCover(e: EventRow): string | null {
+  const covers = e.cover_urls?.length ? e.cover_urls : (e.cover_url ? [e.cover_url] : []);
+  if (!covers.length) return null;
+  if (!e.is_recurring || covers.length === 1) return covers[0];
+  const start = new Date((e._startDate ?? e.date) + 'T00:00:00');
+  const occ = new Date(e.date + 'T00:00:00');
+  const weekIndex = Math.max(0, Math.round((occ.getTime() - start.getTime()) / (7 * 24 * 60 * 60 * 1000)));
+  return covers[weekIndex % covers.length];
+}
 
 function EventChart({ events, range, width, getValue, color, gradId }: {
   events: EventRow[]; range: 'week' | 'month' | 'all'; width: number;
@@ -163,11 +273,12 @@ export default function DashboardScreen() {
   const insets = useSafeAreaInsets();
   const router = useRouter();
   const { user, profile } = useAuth();
-  const { t } = useTranslations();
+  const { t, lang } = useTranslations();
   const { width: screenWidth } = useWindowDimensions();
   const chartWidth = screenWidth - 40;
+  const { tab: tabParam } = useLocalSearchParams<{ tab?: string }>();
 
-  const [activeTab, setActiveTab] = useState<DashTab>('home');
+  const [activeTab, setActiveTab] = useState<DashTab>((tabParam as DashTab) || 'home');
   const [unreadNotifs, setUnreadNotifs] = useState(0);
   const [loading, setLoading] = useState(true);
   const [clubs, setClubs] = useState<Club[]>([]);
@@ -179,6 +290,10 @@ export default function DashboardScreen() {
   const [payouts, setPayouts] = useState<PayoutRecord[]>([]);
   const [connectingStripe, setConnectingStripe] = useState(false);
   const [checkingStatus, setCheckingStatus] = useState(false);
+  const [showInvoicesSheet, setShowInvoicesSheet] = useState(false);
+  const [showFeeInfo, setShowFeeInfo] = useState(false);
+  const [payoutFilter, setPayoutFilter] = useState<'all' | 'month'>('all');
+  const [payoutPage, setPayoutPage] = useState(0);
 
   // Billing form
   const [showBillingModal, setShowBillingModal] = useState(false);
@@ -201,8 +316,8 @@ export default function DashboardScreen() {
   const [attendees, setAttendees] = useState<{ id: string; name: string; avatar_url: string | null }[]>([]);
   const [loadingAttendees, setLoadingAttendees] = useState(false);
 
-  // Payouts intro gate
-  const [showPayoutsSetup, setShowPayoutsSetup] = useState(false);
+  // Payouts intro gate — auto-open setup if arrived via tab=payouts param
+  const [showPayoutsSetup, setShowPayoutsSetup] = useState(tabParam === 'payouts');
 
   // Club settings sheet
   const [showClubSettings, setShowClubSettings] = useState(false);
@@ -222,10 +337,17 @@ export default function DashboardScreen() {
 
   function markCheckedIn(eventId: string, userId: string) {
     setCheckedIn(prev => {
+      if (prev[eventId]?.has(userId)) return prev; // already checked in
       const s = new Set(prev[eventId] ?? []);
       s.add(userId);
       return { ...prev, [eventId]: s };
     });
+    // Update scan_count in local events list
+    setEvents(prev => prev.map(e =>
+      e.id === eventId && !(checkedIn[eventId]?.has(userId))
+        ? { ...e, scan_count: (e.scan_count ?? 0) + 1 }
+        : e
+    ));
     supabase.from('check_ins').upsert({ event_id: eventId, user_id: userId }).then(() => {});
   }
 
@@ -270,9 +392,14 @@ export default function DashboardScreen() {
   async function searchInvite(q: string) {
     setInviteQuery(q);
     if (q.trim().length < 2) { setInviteResults([]); return; }
+    const term = q.trim();
     const { data } = await supabase.from('profiles').select('id, name, avatar_url, email')
-      .ilike('email', `%${q.trim()}%`).limit(6);
-    setInviteResults((data ?? []) as any[]);
+      .or(`email.ilike.%${term}%,name.ilike.%${term}%`)
+      .neq('id', user!.id)
+      .limit(8);
+    // exclude already-admins
+    const existingIds = new Set(clubAdmins.map(a => a.user_id));
+    setInviteResults(((data ?? []) as any[]).filter(r => !existingIds.has(r.id)));
   }
 
   async function inviteAdmin(profileId: string, profileName: string) {
@@ -288,7 +415,7 @@ export default function DashboardScreen() {
           text: t.club.sendInvite,
           onPress: async () => {
             setInvitingAdmin(true);
-            // Insert as pending — they must accept
+            // Insert as pending - they must accept
             await supabase.from('club_members').upsert({
               club_id: targetClub.id, user_id: profileId, role: 'admin', status: 'pending',
             }, { onConflict: 'club_id,user_id' });
@@ -330,6 +457,15 @@ export default function DashboardScreen() {
     }
   }, [user]));
 
+  // When arriving via tab=payouts with no billing, auto-open billing sheet after data loads
+  // Also skip intro if billing is already set up
+  React.useEffect(() => {
+    if (!loading) {
+      if (billing) setShowPayoutsSetup(true);
+      else if (tabParam === 'payouts') setTimeout(() => setShowBillingModal(true), 500);
+    }
+  }, [loading]);
+
   async function loadMembers(clubId: string) {
     const { data: membersData } = await supabase
       .from('club_members')
@@ -345,7 +481,7 @@ export default function DashboardScreen() {
 
     // Fetch clubs user owns
     const { data: ownedClubs } = await supabase
-      .from('clubs').select('id, name, cover_url, logo_url, creator_id')
+      .from('clubs').select('id, name, cover_url, logo_url, creator_id, member_count')
       .eq('creator_id', user.id);
 
     // Fetch clubs user is admin of (but didn't create)
@@ -372,11 +508,11 @@ export default function DashboardScreen() {
     ] = await Promise.all([
       clubIds.length > 0
         ? supabase.from('events')
-            .select('id, title, date, time, going_count, cover_url, club_id, price, is_free, status')
+            .select('id, title, date, time, going_count, cover_url, cover_urls, club_id, creator_id, price, is_free, status, is_recurring, recurring_end_date')
             .or(`creator_id.eq.${user.id},club_id.in.(${clubIds.join(',')})`)
             .order('date', { ascending: false })
         : supabase.from('events')
-            .select('id, title, date, time, going_count, cover_url, club_id, price, is_free, status')
+            .select('id, title, date, time, going_count, cover_url, cover_urls, club_id, creator_id, price, is_free, status, is_recurring, recurring_end_date')
             .eq('creator_id', user.id).order('date', { ascending: false }),
       supabase.from('creator_billing').select('*').eq('user_id', user.id).maybeSingle(),
       supabase.from('stripe_accounts')
@@ -400,15 +536,44 @@ export default function DashboardScreen() {
 
     if (eventsData && eventsData.length > 0) {
       const { data: paidAtts } = await supabase
-        .from('event_attendees').select('event_id')
-        .in('event_id', eventsData.map(e => e.id)).eq('paid', true);
+        .from('event_attendees').select('event_id, user_id, payment_intent_id')
+        .in('event_id', eventsData.map(e => e.id))
+        .eq('paid', true);
 
-      const paidCounts: Record<string, number> = {};
-      (paidAtts ?? []).forEach((a: any) => { paidCounts[a.event_id] = (paidCounts[a.event_id] ?? 0) + 1; });
+      // Build a map of creator_id per event for fast lookup
+      const creatorMap: Record<string, string> = {};
+      eventsData.forEach(e => { creatorMap[e.id] = e.creator_id; });
+
+      const onlineCounts: Record<string, number> = {};
+      const doorCounts: Record<string, number> = {};
+      (paidAtts ?? []).forEach((a: any) => {
+        // Exclude creator auto-join: creator row with no payment = free/manual join
+        if (a.user_id === creatorMap[a.event_id] && !a.payment_intent_id) return;
+        if (a.payment_intent_id) {
+          onlineCounts[a.event_id] = (onlineCounts[a.event_id] ?? 0) + 1;
+        } else {
+          doorCounts[a.event_id] = (doorCounts[a.event_id] ?? 0) + 1;
+        }
+      });
+
+      const { data: checkInsData } = await supabase
+        .from('check_ins').select('event_id, user_id')
+        .in('event_id', eventsData.map(e => e.id));
+      const scanCounts: Record<string, number> = {};
+      (checkInsData ?? []).forEach((ci: any) => {
+        scanCounts[ci.event_id] = (scanCounts[ci.event_id] ?? 0) + 1;
+      });
+      const initCheckedIn: Record<string, Set<string>> = {};
+      (checkInsData ?? []).forEach((ci: any) => {
+        if (!initCheckedIn[ci.event_id]) initCheckedIn[ci.event_id] = new Set();
+        initCheckedIn[ci.event_id].add(ci.user_id);
+      });
+      setCheckedIn(initCheckedIn);
 
       setEvents(eventsData.map(e => {
-        const pc = e.is_free ? 0 : (paidCounts[e.id] ?? 0);
-        return { ...e, paid_count: pc, ...calcRevenue(e.price ?? 0, pc) };
+        const oc = e.is_free ? 0 : (onlineCounts[e.id] ?? 0);
+        const dc = e.is_free ? 0 : (doorCounts[e.id] ?? 0);
+        return { ...e, paid_count: oc + dc, online_count: oc, door_count: dc, scan_count: scanCounts[e.id] ?? 0, ...calcRevenue(e.price ?? 0, oc, dc) };
       }) as EventRow[]);
     } else {
       setEvents([]);
@@ -438,23 +603,40 @@ export default function DashboardScreen() {
   async function connectStripe() {
     setConnectingStripe(true);
     try {
-      const { data: sessionData } = await supabase.auth.getSession();
-      const token = sessionData.session?.access_token;
       const res = await supabase.functions.invoke('create-connect-account', {
-        body: { return_url: 'woeva://dashboard' },
+        body: { return_url: 'woeva://dashboard?tab=payouts' },
       });
+
+      if (res.error) {
+        // Try to extract actual error body from the response context
+        const ctx = (res.error as any)?.context;
+        const detail = ctx?.error ?? ctx?.message ?? res.error.message ?? t.dashboard.stripeError;
+        Alert.alert(t.common.error, detail);
+        setConnectingStripe(false);
+        return;
+      }
+
       if (res.data?.already_connected) {
         setStripeAccount(s => s ? { ...s, onboarding_complete: true } : s);
         Alert.alert(t.dashboard.alreadyConnected, t.dashboard.alreadyConnectedMsg);
         setConnectingStripe(false);
         return;
       }
-      if (res.data?.url) {
-        await WebBrowser.openAuthSessionAsync(res.data.url, 'woeva://dashboard');
-        await checkStripeStatus();
+
+      if (res.data?.error) {
+        Alert.alert(t.common.error, res.data.error);
+        setConnectingStripe(false);
+        return;
       }
-    } catch (e) {
-      Alert.alert(t.common.error, t.dashboard.stripeError);
+
+      if (res.data?.url) {
+        await WebBrowser.openBrowserAsync(res.data.url);
+        await checkStripeStatus();
+      } else {
+        Alert.alert(t.common.error, t.dashboard.stripeError);
+      }
+    } catch (e: any) {
+      Alert.alert(t.common.error, e?.message ?? t.dashboard.stripeError);
     }
     setConnectingStripe(false);
   }
@@ -463,7 +645,11 @@ export default function DashboardScreen() {
     setCheckingStatus(true);
     const res = await supabase.functions.invoke('check-connect-status', {});
     if (res.data?.connected) {
-      setStripeAccount(s => s ? { ...s, onboarding_complete: true, payouts_enabled: res.data.payouts_enabled } : s);
+      // Reload from DB so state reflects what the edge function just wrote
+      const { data } = await supabase.from('stripe_accounts')
+        .select('stripe_account_id, onboarding_complete, payouts_enabled')
+        .eq('user_id', user!.id).maybeSingle();
+      if (data) setStripeAccount(data);
       if (res.data.payouts) setPayouts(res.data.payouts);
     }
     setCheckingStatus(false);
@@ -526,13 +712,11 @@ export default function DashboardScreen() {
     }
   }
 
-  async function downloadInvoice() {
+  async function downloadInvoiceForMonth(monthKey: string, monthLabel: string, monthEvents: EventRow[]) {
     if (!billing) return;
-    const month = new Date().toLocaleDateString('en-US', { month: 'long', year: 'numeric' });
-    const invoiceNum = `W-${new Date().getFullYear()}-${String(new Date().getMonth() + 1).padStart(2, '0')}`;
-    const paidEvents = events.filter(e => !e.is_free && e.paid_count > 0);
-    const html = generateCreatorInvoice(billing, paidEvents, month, invoiceNum);
-
+    const [year, month] = monthKey.split('-').map(Number);
+    const invoiceNum = `W-${year}-${String(month).padStart(2, '0')}`;
+    const html = generateCreatorInvoice(billing, monthEvents, monthLabel, invoiceNum);
     try {
       const Print = require('expo-print');
       const Sharing = require('expo-sharing');
@@ -541,6 +725,18 @@ export default function DashboardScreen() {
     } catch {
       Alert.alert(t.dashboard.pdfUnavailable, 'Install expo-print and expo-sharing to download invoices:\nnpx expo install expo-print expo-sharing');
     }
+  }
+
+  function canDownloadMonth(monthKey: string) {
+    const [year, month] = monthKey.split('-').map(Number);
+    const now = new Date();
+    const cy = now.getFullYear(), cm = now.getMonth() + 1;
+    if (year < cy || (year === cy && month < cm)) return true;
+    if (year === cy && month === cm) {
+      const lastDay = new Date(cy, cm, 0).getDate();
+      return now.getDate() >= lastDay;
+    }
+    return false;
   }
 
   // ── Derived data ─────────────────────────────────────────────────────────────
@@ -553,7 +749,11 @@ export default function DashboardScreen() {
   const new1y = members.filter(m => new Date(m.created_at) >= d365).length;
 
   const selectedClub = clubs.find(c => c.id === selectedClubId) ?? null;
-  const viewEvents = selectedClubId ? events.filter(e => e.club_id === selectedClubId) : events;
+  const viewEvents = selectedClubId === '__individual__'
+    ? events.filter(e => !e.club_id)
+    : selectedClubId
+      ? events.filter(e => e.club_id === selectedClubId)
+      : events;
 
   const totalGross = viewEvents.reduce((s, e) => s + e.gross, 0);
   const totalNet = viewEvents.reduce((s, e) => s + e.net, 0);
@@ -562,7 +762,21 @@ export default function DashboardScreen() {
   const weekNet = viewEvents.filter(e => new Date(e.date) >= d7).reduce((s, e) => s + e.net, 0);
   const monthNet = viewEvents.filter(e => new Date(e.date) >= d30).reduce((s, e) => s + e.net, 0);
 
-  const upcomingEvents = viewEvents.filter(e => isUpcoming(e) && e.status !== 'cancelled');
+  const monthlyEarnings = useMemo(() => {
+    const map: Record<string, { key: string; label: string; gross: number; net: number; events: EventRow[] }> = {};
+    viewEvents.filter(e => !e.is_free && e.paid_count > 0).forEach(e => {
+      const d = new Date(e.date + 'T00:00:00');
+      const key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
+      if (!map[key]) map[key] = { key, label: d.toLocaleDateString('en-US', { month: 'long', year: 'numeric' }), gross: 0, net: 0, events: [] };
+      map[key].gross += e.gross;
+      map[key].net += e.net;
+      map[key].events.push(e);
+    });
+    return Object.values(map).sort((a, b) => b.key.localeCompare(a.key));
+  }, [viewEvents]);
+
+  const rawUpcoming = viewEvents.filter(e => isUpcoming(e) && e.status !== 'cancelled');
+  const upcomingEvents = expandDashboardRows(rawUpcoming);
   const pastEvents = viewEvents.filter(e => !isUpcoming(e) && e.status !== 'cancelled');
   const cancelledEvents = viewEvents.filter(e => e.status === 'cancelled');
   const displayedEvents = eventsFilter === 'upcoming' ? upcomingEvents : eventsFilter === 'past' ? pastEvents : cancelledEvents;
@@ -580,34 +794,36 @@ export default function DashboardScreen() {
     <View style={[s.container, { paddingTop: insets.top }]}>
       {/* ── Billing Form Modal ──────────────────────────────────────────────── */}
       <Modal visible={showBillingModal} animationType="slide" transparent onRequestClose={() => setShowBillingModal(false)}>
-        <View style={s.modalOverlay}>
-          <ScrollView style={s.billingSheet} keyboardShouldPersistTaps="handled" contentContainerStyle={{ paddingBottom: 40 }}>
-            <View style={s.billingSheetHandle} />
-            <Text style={s.billingSheetTitle}>{t.dashboard.billingDetails}</Text>
-            <Text style={s.billingSheetSub}>{t.dashboard.billingDetailsSub}</Text>
+        <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : 'height'}>
+          <View style={s.modalOverlay}>
+            <ScrollView style={s.billingSheet} keyboardShouldPersistTaps="handled" contentContainerStyle={{ paddingBottom: insets.bottom + 16 }}>
+              <View style={s.billingSheetHandle} />
+              <Text style={s.billingSheetTitle}>{t.dashboard.billingDetails}</Text>
+              <Text style={s.billingSheetSub}>{t.dashboard.billingDetailsSub}</Text>
 
-            <View style={s.billingForm}>
-              <Input label={t.dashboard.companyName} value={bCompany} onChangeText={setBCompany} placeholder="My Company Ltd." />
-              <Input label={t.dashboard.companyId} value={bIco} onChangeText={setBIco} placeholder="12345678" />
-              <Input label={t.dashboard.taxId} value={bDic} onChangeText={setBDic} placeholder="SK2012345678" />
-              <Input label={t.dashboard.streetAddress} value={bAddress} onChangeText={setBAddress} placeholder="123 Main Street" />
-              <View style={s.billingRow}>
-                <View style={{ flex: 1 }}>
-                  <Input label={t.dashboard.cityLabel} value={bCity} onChangeText={setBCity} placeholder="Bratislava" />
-                </View>
-                <View style={{ flex: 1 }}>
-                  <Input label={t.dashboard.country} value={bCountry} onChangeText={setBCountry} placeholder="Slovakia" />
+              <View style={s.billingForm}>
+                <Input label={t.dashboard.companyName} value={bCompany} onChangeText={v => setBCompany(sanitize(v))} placeholder="My Company Ltd." />
+                <Input label={t.dashboard.companyId} value={bIco} onChangeText={v => setBIco(sanitize(v))} placeholder="12345678" />
+                <Input label={t.dashboard.taxId} value={bDic} onChangeText={v => setBDic(sanitize(v))} placeholder="SK2012345678" />
+                <Input label={t.dashboard.streetAddress} value={bAddress} onChangeText={v => setBAddress(sanitize(v))} placeholder="123 Main Street" />
+                <View style={s.billingRow}>
+                  <View style={{ flex: 1 }}>
+                    <Input label={t.dashboard.cityLabel} value={bCity} onChangeText={v => setBCity(sanitize(v))} placeholder="Bratislava" />
+                  </View>
+                  <View style={{ flex: 1 }}>
+                    <Input label={t.dashboard.country} value={bCountry} onChangeText={v => setBCountry(sanitize(v))} placeholder="Slovakia" />
+                  </View>
                 </View>
               </View>
-            </View>
 
-            <View style={{ gap: 10, marginTop: 8 }}>
-              <Button label={t.dashboard.save} onPress={saveBilling} loading={savingBilling}
-                disabled={!bCompany.trim() || !bIco.trim() || !bAddress.trim() || !bCity.trim()} variant="black" />
-              <Button label={t.dashboard.cancelLabel} onPress={() => setShowBillingModal(false)} variant="ghost" />
-            </View>
-          </ScrollView>
-        </View>
+              <View style={{ gap: 10, marginTop: 8 }}>
+                <Button label={t.dashboard.save} onPress={saveBilling} loading={savingBilling}
+                  disabled={!bCompany.trim() || !bIco.trim() || !bAddress.trim() || !bCity.trim()} variant="black" />
+                <Button label={t.dashboard.cancelLabel} onPress={() => setShowBillingModal(false)} variant="ghost" />
+              </View>
+            </ScrollView>
+          </View>
+        </KeyboardAvoidingView>
       </Modal>
 
       {/* ── Tab Content ─────────────────────────────────────────────────────── */}
@@ -615,6 +831,7 @@ export default function DashboardScreen() {
         key={activeTab}
         contentContainerStyle={[s.scroll, { paddingBottom: insets.bottom + 100 }]}
         showsVerticalScrollIndicator={false}
+        refreshControl={<RefreshControl refreshing={loading} onRefresh={load} tintColor={Colors.black} />}
       >
         {/* Top bar */}
         <View style={s.topBar}>
@@ -626,7 +843,7 @@ export default function DashboardScreen() {
               </TouchableOpacity>
             : <BackButton />
           }
-          <Text style={s.pageTitle}>{activeTab === 'scan' ? t.dashboard.scanQR : t.dashboard.dashboard}</Text>
+          <Text style={s.pageTitle} pointerEvents="none">{activeTab === 'scan' ? t.dashboard.scanQR : t.dashboard.dashboard}</Text>
           <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
             {clubs.some(c => c.creator_id === user?.id) && activeTab !== 'scan' && (
               <TouchableOpacity style={s.bellBtn} onPress={openClubSettings}>
@@ -645,9 +862,16 @@ export default function DashboardScreen() {
           </View>
         </View>
 
-        {/* Club switcher — only on relevant tabs, only if user has clubs */}
+        {/* Club switcher - only on relevant tabs, only if user has clubs */}
         {(activeTab === 'home' || activeTab === 'events' || activeTab === 'stats') && clubs.length > 0 && (
-          <View style={s.viewFilter}>
+          <ScrollView
+            horizontal
+            showsHorizontalScrollIndicator={false}
+            contentContainerStyle={s.viewFilter}
+            style={{ marginHorizontal: -20, marginBottom: 20 }}
+            contentInset={{ left: 20, right: 20 }}
+            contentOffset={{ x: -20, y: 0 }}
+          >
             <TouchableOpacity
               style={[s.viewFilterChip, !selectedClubId && s.viewFilterChipActive]}
               onPress={() => setSelectedClubId(null)} activeOpacity={0.7}>
@@ -660,7 +884,18 @@ export default function DashboardScreen() {
                 <Text style={[s.viewFilterText, selectedClubId === c.id && s.viewFilterTextActive]} numberOfLines={1}>{c.name}</Text>
               </TouchableOpacity>
             ))}
-          </View>
+            <TouchableOpacity
+              style={[s.viewFilterChip, selectedClubId === '__individual__' && s.viewFilterChipActive]}
+              onPress={() => setSelectedClubId('__individual__')} activeOpacity={0.7}>
+              <Text style={[s.viewFilterText, selectedClubId === '__individual__' && s.viewFilterTextActive]}>Individual</Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={s.viewFilterAdd}
+              onPress={() => router.push('/club/create')}
+              activeOpacity={0.7}>
+              <Text style={s.viewFilterAddText}>+</Text>
+            </TouchableOpacity>
+          </ScrollView>
         )}
 
         {/* ── HOME ──────────────────────────────────────────────────────────── */}
@@ -669,53 +904,108 @@ export default function DashboardScreen() {
             {/* Quick overview strip */}
             <View style={s.overviewStrip}>
               {[
-                { label: t.dashboard.events, val: viewEvents.length },
-                { label: t.dashboard.attendees, val: viewEvents.reduce((sum, e) => sum + e.going_count, 0) },
-                { label: t.dashboard.members, val: members.length },
-                { label: t.dashboard.revenue, val: fmt(totalGross) },
+                { label: t.dashboard.events, val: String(viewEvents.length) },
+                { label: t.dashboard.attendees, val: String(viewEvents.reduce((sum, e) => sum + (e.is_free ? realGoing(e, user!.id) : e.paid_count), 0)) },
+                { label: t.dashboard.members, val: String(clubs.reduce((sum, c) => sum + ((c as any).member_count ?? 0), 0)) },
               ].map(item => (
                 <View key={item.label} style={s.overviewItem}>
-                  <Text style={s.overviewVal}>{item.val}</Text>
+                  <Text style={s.overviewVal} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.5}>{item.val}</Text>
                   <Text style={s.overviewLabel}>{item.label}</Text>
                 </View>
               ))}
             </View>
 
-            {/* Club card */}
-            {(() => {
-              const displayClub = selectedClub ?? clubs[0] ?? null;
-              if (!displayClub) return null;
-              const isOwner = displayClub.creator_id === user?.id;
+            {/* Club cards carousel */}
+            {clubs.length > 0 && (() => {
+              const CARD_WIDTH = screenWidth - 72;
+              const CARD_GAP = 12;
+              const allItems = [
+                { type: 'all' as const },
+                ...clubs.map(c => ({ type: 'club' as const, data: c })),
+                { type: 'individual' as const },
+              ];
               return (
-                <View style={s.clubCard}>
-                  {displayClub.cover_url
-                    ? <Image source={{ uri: displayClub.cover_url }} style={StyleSheet.absoluteFill as any} resizeMode="cover" />
-                    : displayClub.logo_url
-                      ? <View style={[StyleSheet.absoluteFill as any, { backgroundColor: '#000' }]}>
-                          <Image source={{ uri: displayClub.logo_url }} style={[StyleSheet.absoluteFill as any, { opacity: 0.35 }]} resizeMode="cover" />
-                        </View>
-                      : <View style={[StyleSheet.absoluteFill as any, { backgroundColor: '#000' }]} />
-                  }
-                  <Svg style={StyleSheet.absoluteFill as any} preserveAspectRatio="none">
-                    <Defs><SvgGrad id="g1" x1="0" y1="0" x2="0" y2="1">
-                      <Stop offset="0" stopColor="#000" stopOpacity="0.05" />
-                      <Stop offset="1" stopColor="#000" stopOpacity="0.82" />
-                    </SvgGrad></Defs>
-                    <Rect x="0" y="0" width="100%" height="100%" fill="url(#g1)" />
-                  </Svg>
-                  <View style={s.clubCardContent}>
-                    <Text style={s.clubCardLabel}>{isOwner ? t.club.myClub : t.club.adminClub}</Text>
-                    <Text style={s.clubCardName}>{displayClub.name}</Text>
-                    <View style={s.clubCardActions}>
-                      <TouchableOpacity style={s.clubCardActionBtn} onPress={() => router.push(`/club/${displayClub.id}` as any)} activeOpacity={0.8}>
-                        <Text style={s.clubCardActionText}>{t.club.viewClub}</Text>
-                      </TouchableOpacity>
-                      <TouchableOpacity style={[s.clubCardActionBtn, s.clubCardActionBtnEdit]} onPress={() => router.push(`/club/${displayClub.id}/edit` as any)} activeOpacity={0.8}>
-                        <Text style={[s.clubCardActionText, s.clubCardActionTextEdit]}>{t.common.edit}</Text>
-                      </TouchableOpacity>
-                    </View>
+                <ScrollView
+                  horizontal
+                  showsHorizontalScrollIndicator={false}
+                  snapToInterval={CARD_WIDTH + CARD_GAP}
+                  decelerationRate="fast"
+                  contentContainerStyle={{ paddingHorizontal: 20, gap: CARD_GAP }}
+                  style={{ marginHorizontal: -20, marginBottom: 24 }}
+                  scrollEventThrottle={16}
+                  onScroll={(e) => {
+                    const idx = Math.round(e.nativeEvent.contentOffset.x / (CARD_WIDTH + CARD_GAP));
+                    const item = allItems[idx];
+                    if (!item) return;
+                    if (item.type === 'all') setSelectedClubId(null);
+                    else if (item.type === 'individual') setSelectedClubId('__individual__');
+                    else setSelectedClubId(item.data.id);
+                  }}
+                >
+                  {/* Overview card */}
+                  <View style={[s.clubCard, { width: CARD_WIDTH, backgroundColor: Colors.black, justifyContent: 'center', paddingHorizontal: 20 }]}>
+                    <Text style={{ fontSize: 11, fontWeight: '700', color: 'rgba(255,255,255,0.4)', letterSpacing: 0.5, marginBottom: 6 }}>OVERVIEW</Text>
+                    <Text style={{ fontSize: 28, fontWeight: '800', color: Colors.lime, fontFamily: Fonts.extrabold, letterSpacing: -0.5 }}>My clubs</Text>
+                    <Text style={{ fontSize: 13, color: 'rgba(255,255,255,0.55)', marginTop: 4 }}>{clubs.length} {clubs.length === 1 ? 'club' : 'clubs'} · all stats</Text>
                   </View>
-                </View>
+
+                  {/* Individual club cards */}
+                  {clubs.map(c => {
+                    const isOwner = c.creator_id === user?.id;
+                    return (
+                      <View key={c.id} style={[s.clubCard, { width: CARD_WIDTH }]}>
+                        {c.cover_url
+                          ? <Image source={{ uri: c.cover_url }} style={StyleSheet.absoluteFill as any} resizeMode="cover" />
+                          : c.logo_url
+                            ? <View style={[StyleSheet.absoluteFill as any, { backgroundColor: '#000' }]}>
+                                <Image source={{ uri: c.logo_url }} style={[StyleSheet.absoluteFill as any, { opacity: 0.35 }]} resizeMode="cover" />
+                              </View>
+                            : <View style={[StyleSheet.absoluteFill as any, { backgroundColor: '#000' }]} />
+                        }
+                        <Svg style={StyleSheet.absoluteFill as any} preserveAspectRatio="none">
+                          <Defs><SvgGrad id={`g_${c.id}`} x1="0" y1="0" x2="0" y2="1">
+                            <Stop offset="0" stopColor="#000" stopOpacity="0.05" />
+                            <Stop offset="1" stopColor="#000" stopOpacity="0.82" />
+                          </SvgGrad></Defs>
+                          <Rect x="0" y="0" width="100%" height="100%" fill={`url(#g_${c.id})`} />
+                        </Svg>
+                        <View style={s.clubCardContent}>
+                          <Text style={s.clubCardLabel}>{isOwner ? t.club.myClub : t.club.adminClub}</Text>
+                          <Text style={s.clubCardName}>{c.name}</Text>
+                          <View style={s.clubCardActions}>
+                            <TouchableOpacity style={s.clubCardActionBtn} onPress={() => router.push(`/club/${c.id}` as any)} activeOpacity={0.8}>
+                              <Text style={s.clubCardActionText}>{t.club.viewClub}</Text>
+                            </TouchableOpacity>
+                            <TouchableOpacity style={[s.clubCardActionBtn, s.clubCardActionBtnEdit]} onPress={() => router.push(`/club/${c.id}/edit` as any)} activeOpacity={0.8}>
+                              <Text style={[s.clubCardActionText, s.clubCardActionTextEdit]}>{t.common.edit}</Text>
+                            </TouchableOpacity>
+                          </View>
+                        </View>
+                      </View>
+                    );
+                  })}
+
+                  {/* Individual events card */}
+                  {(() => {
+                    const initials = (profile?.name ?? 'Me').split(' ').map((w: string) => w[0]).join('').slice(0, 2).toUpperCase();
+                    const individualCount = events.filter(e => !e.club_id).length;
+                    return (
+                      <View style={[s.clubCard, { width: CARD_WIDTH, backgroundColor: '#111', justifyContent: 'center', paddingHorizontal: 20, flexDirection: 'row', alignItems: 'center', gap: 16 }]}>
+                        {profile?.avatar_url
+                          ? <Image source={{ uri: profile.avatar_url }} style={{ width: 56, height: 56, borderRadius: 28, borderWidth: 2, borderColor: Colors.white }} />
+                          : <View style={{ width: 56, height: 56, borderRadius: 28, backgroundColor: Colors.lime, alignItems: 'center', justifyContent: 'center' }}>
+                              <Text style={{ fontSize: 20, fontWeight: '800', color: Colors.black }}>{initials}</Text>
+                            </View>
+                        }
+                        <View style={{ flex: 1 }}>
+                          <Text style={{ fontSize: 11, fontWeight: '700', color: 'rgba(255,255,255,0.45)', letterSpacing: 0.5, marginBottom: 4 }}>INDIVIDUAL</Text>
+                          <Text style={{ fontSize: 20, fontWeight: '800', color: Colors.white, fontFamily: Fonts.extrabold, letterSpacing: -0.3 }} numberOfLines={1}>{profile?.name ?? 'Me'}</Text>
+                          <Text style={{ fontSize: 12, color: 'rgba(255,255,255,0.45)', marginTop: 3 }}>{individualCount} {individualCount === 1 ? 'event' : 'events'}</Text>
+                        </View>
+                      </View>
+                    );
+                  })()}
+                </ScrollView>
               );
             })()}
 
@@ -740,21 +1030,6 @@ export default function DashboardScreen() {
               </>
             )}
 
-            {/* Earnings overview */}
-            {totalGross > 0 && (
-              <>
-                <Text style={[s.sectionTitle, { marginTop: 24 }]}>{t.dashboard.earnings}</Text>
-                <View style={s.earningsRow}>
-                  {[[t.dashboard.thisWeek, weekGross, weekNet], [t.dashboard.thisMonth, monthGross, monthNet], [t.dashboard.allTime, totalGross, totalNet]].map(([label, gross, net]) => (
-                    <View key={label as string} style={s.earningsCard}>
-                      <Text style={s.earningsLabel}>{label}</Text>
-                      <Text style={s.earningsGross}>{fmt(gross as number)}</Text>
-                      <Text style={s.earningsNet}>{t.dashboard.net(fmt(net as number))}</Text>
-                    </View>
-                  ))}
-                </View>
-              </>
-            )}
 
             {/* Empty state */}
             {viewEvents.length === 0 && (
@@ -763,6 +1038,13 @@ export default function DashboardScreen() {
                 <Text style={s.emptySub}>
                   {selectedClubId ? t.dashboard.noEventsForClub(selectedClub?.name ?? '') : t.dashboard.createFirst}
                 </Text>
+                <TouchableOpacity
+                  style={{ marginTop: 16, backgroundColor: Colors.lime, borderRadius: 50, paddingHorizontal: 24, paddingVertical: 12 }}
+                  onPress={() => router.push('/event/create/step2')}
+                  activeOpacity={0.85}
+                >
+                  <Text style={{ fontSize: 14, fontWeight: '700', color: Colors.black }}>+ Create Event</Text>
+                </TouchableOpacity>
               </View>
             )}
 
@@ -774,8 +1056,8 @@ export default function DashboardScreen() {
                   {upcomingEvents.slice(0, 5).map(e => (
                     <TouchableOpacity key={e.id} style={s.upcomingCard}
                       onPress={() => router.push(`/event/${e.id}` as any)} activeOpacity={0.85}>
-                      {e.cover_url
-                        ? <Image source={{ uri: e.cover_url }} style={s.upcomingCover} />
+                      {getRotatingCover(e)
+                        ? <Image source={{ uri: getRotatingCover(e)! }} style={s.upcomingCover} />
                         : <View style={[s.upcomingCover, s.upcomingCoverFallback]}>
                             <Text style={s.upcomingCoverInitial}>{e.title.charAt(0).toUpperCase()}</Text>
                           </View>
@@ -788,7 +1070,7 @@ export default function DashboardScreen() {
                         </Text>
                         <View style={s.upcomingMeta}>
                           <View style={s.upcomingAttendees}>
-                            <Text style={s.upcomingAttendeesNum}>{e.going_count}</Text>
+                            <Text style={s.upcomingAttendeesNum}>{e.is_free ? realGoing(e, user!.id) : e.paid_count}</Text>
                             <Text style={s.upcomingAttendeesLabel}> {t.dashboard.going}</Text>
                           </View>
                           {!e.is_free && e.gross > 0 && <Text style={s.upcomingRevenue}>{fmt(e.gross)}</Text>}
@@ -796,7 +1078,7 @@ export default function DashboardScreen() {
                       </View>
                       <View style={s.upcomingActions}>
                         <TouchableOpacity style={s.upcomingActionBtn}
-                          onPress={ev => { ev.stopPropagation(); router.push(`/event/${e.id}/edit` as any); }}
+                          onPress={ev => { ev.stopPropagation(); router.push(`/event/${e.id.split('_')[0]}/edit` as any); }}
                           hitSlop={{ top: 4, bottom: 4, left: 4, right: 4 }}>
                           <Text style={s.upcomingActionEdit}>{t.dashboard.editBtn}</Text>
                         </TouchableOpacity>
@@ -845,25 +1127,20 @@ export default function DashboardScreen() {
                   return (
                     <TouchableOpacity key={e.id} style={[s.listRow, i < displayedEvents.length - 1 && s.listRowBorder]}
                       onPress={() => openAttendees(e)} activeOpacity={0.7}>
-                      {e.cover_url
-                        ? <Image source={{ uri: e.cover_url }} style={s.listAvatar} />
+                      {getRotatingCover(e)
+                        ? <Image source={{ uri: getRotatingCover(e)! }} style={s.listAvatar} />
                         : <View style={[s.listAvatar, s.listAvatarFallback]}><Text style={s.listAvatarInitial}>{e.title.charAt(0).toUpperCase()}</Text></View>
                       }
                       <View style={{ flex: 1 }}>
                         <Text style={s.listName} numberOfLines={1}>{e.title}</Text>
                         <Text style={s.listSub}>{dateStr}</Text>
-                        {!e.is_free && <Text style={s.listRevenue}>{t.dashboard.ticketsGross(e.paid_count, fmt(e.gross))}</Text>}
+                        {(e.price ?? 0) > 0 && e.paid_count > 0 && <Text style={s.listRevenue}>Scanned {e.scan_count}/{e.paid_count} · {fmt(e.gross)}</Text>}
+                        {(e.price ?? 0) > 0 && e.paid_count === 0 && <Text style={s.listRevenue}>{fmt(e.gross)} gross</Text>}
                       </View>
                       {e.status === 'cancelled' && <View style={s.cancelledBadge}><Text style={s.cancelledBadgeText}>{t.dashboard.cancelled}</Text></View>}
-                      {!e.is_free && e.gross > 0 && e.status !== 'cancelled' && (
+                      {e.status !== 'cancelled' && (
                         <View style={s.goingBadge}>
-                          <Text style={s.goingNum}>{e.going_count}</Text>
-                          <Text style={s.goingLabel}>{t.dashboard.going}</Text>
-                        </View>
-                      )}
-                      {(e.is_free || e.gross === 0) && e.status !== 'cancelled' && (
-                        <View style={s.goingBadge}>
-                          <Text style={s.goingNum}>{e.going_count}</Text>
+                          <Text style={s.goingNum}>{e.is_free ? realGoing(e, user!.id) : e.paid_count}</Text>
                           <Text style={s.goingLabel}>{t.dashboard.going}</Text>
                         </View>
                       )}
@@ -904,7 +1181,10 @@ export default function DashboardScreen() {
                 </View>
               </View>
             </View>
-            <TouchableOpacity style={s.payoutsIntroBtn} onPress={() => setShowPayoutsSetup(true)} activeOpacity={0.85}>
+            <TouchableOpacity style={s.payoutsIntroBtn} onPress={() => {
+              setShowPayoutsSetup(true);
+              if (!billing) setTimeout(() => setShowBillingModal(true), 400);
+            }} activeOpacity={0.85}>
               <Text style={s.payoutsIntroBtnText}>{t.dashboard.continueSetup}</Text>
             </TouchableOpacity>
           </View>
@@ -946,11 +1226,56 @@ export default function DashboardScreen() {
                   <View style={s.connectedPill}><Text style={s.connectedPillText}>{t.dashboard.connected}</Text></View>
                 )}
               </View>
+
               {!stripeAccount?.onboarding_complete && (
-                <View style={{ gap: 10, marginTop: 12 }}>
-                  <Text style={s.stripeInfo}>
-                    {t.dashboard.stripeInfo(PLATFORM_FEE_PCT)}
+                <View style={{ gap: 12, marginTop: 14 }}>
+                  {/* Why connect */}
+                  <Text style={s.stripeIntro}>
+                    {lang === 'sk'
+                      ? 'Umožni účastníkom platiť za eventy priamo v appke.'
+                      : 'Let attendees pay for your events directly in the app.'}
                   </Text>
+
+                  {/* Payment method icons */}
+                  <View style={s.payMethodRow}>
+                    <PayMethodIcon method="visa" />
+                    <PayMethodIcon method="mc" />
+                    <PayMethodIcon method="amex" />
+                    <PayMethodIcon method="apple" />
+                    <PayMethodIcon method="gpay" />
+                  </View>
+
+                  {/* Fee dropdown */}
+                  <TouchableOpacity style={s.feeToggle} onPress={() => setShowFeeInfo(v => !v)} activeOpacity={0.7}>
+                    <Text style={s.feeToggleText}>
+                      {lang === 'sk' ? `O poplatkoch (~${PLATFORM_FEE_PCT}% z online lístkov)` : `About fees (~${PLATFORM_FEE_PCT}% on online tickets)`}
+                    </Text>
+                    <Text style={s.feeToggleArrow}>{showFeeInfo ? '▲' : '▼'}</Text>
+                  </TouchableOpacity>
+                  {showFeeInfo && (
+                    <View style={s.feeBox}>
+                      {(lang === 'sk' ? [
+                        ['Stripe (1,5 % + 0,25 €)', 'Poplatok za spracovanie platby kartou, Apple Pay, Google Pay.'],
+                        ['Woeva (3,5 %)', 'Pokrýva prevádzku serverov, aplikácie a podpory.'],
+                        ['Výplaty', 'Automaticky každý pondelok na tvoj bankový účet.'],
+                      ] : [
+                        ['Stripe (1.5% + €0.25)', 'Card processing fee — Visa, Mastercard, Apple Pay, Google Pay.'],
+                        ['Woeva (3.5%)', 'Covers servers, the app, and support so we can keep running.'],
+                        ['Payouts', 'Automatically every Monday to your bank account.'],
+                      ]).map(([label, val]) => (
+                        <View key={label} style={s.feeRow}>
+                          <Text style={s.feeLabel}>{label}</Text>
+                          <Text style={s.feeVal}>{val}</Text>
+                        </View>
+                      ))}
+                      <Text style={s.feeExampleText}>
+                        {lang === 'sk'
+                          ? 'Príklad: event za 5 € → poplatok 0,25 €'
+                          : 'Example: €5 event → €0.25 fee'}
+                      </Text>
+                    </View>
+                  )}
+
                   <Button
                     label={connectingStripe ? t.dashboard.opening : t.dashboard.connectStripe}
                     onPress={connectStripe}
@@ -964,9 +1289,9 @@ export default function DashboardScreen() {
                   )}
                 </View>
               )}
+
               {stripeAccount?.onboarding_complete && (
                 <View style={s.stripeStatusRow}>
-                  <View style={[s.stripeStatusDot, { backgroundColor: stripeAccount.payouts_enabled ? Colors.lime : '#FF9500' }]} />
                   <Text style={s.stripeStatusText}>
                     {stripeAccount.payouts_enabled ? t.dashboard.payoutsActive : t.dashboard.payoutsPending}
                   </Text>
@@ -974,37 +1299,153 @@ export default function DashboardScreen() {
               )}
             </View>
 
-            {/* Earnings summary */}
+            {/* Weekly payouts list — FIRST */}
+            {stripeAccount?.onboarding_complete && (() => {
+              const now = new Date();
+              const todayDay = now.getDay();
+              const daysToMon = todayDay === 0 ? 6 : todayDay - 1;
+              const currentMonday = new Date(now); currentMonday.setDate(now.getDate() - daysToMon); currentMonday.setHours(0,0,0,0);
+              const monthStart = new Date(now.getFullYear(), now.getMonth(), 1);
+
+              const weekMap: Record<string, { net: number; isCurrent: boolean; monDate: Date; sunDate: Date }> = {};
+              viewEvents.filter(e => !e.is_free && e.net > 0).forEach(e => {
+                const d = new Date(e.date + 'T00:00:00');
+                const day = d.getDay();
+                const offset = day === 0 ? 6 : day - 1;
+                const mon = new Date(d); mon.setDate(d.getDate() - offset); mon.setHours(0,0,0,0);
+                const sun = new Date(mon); sun.setDate(mon.getDate() + 6);
+                const key = mon.toISOString().slice(0, 10);
+                if (!weekMap[key]) weekMap[key] = {
+                  net: 0, isCurrent: mon.getTime() === currentMonday.getTime(), monDate: mon, sunDate: sun,
+                };
+                weekMap[key].net += e.net;
+              });
+
+              let allWeeks = Object.entries(weekMap).sort(([a],[b]) => b.localeCompare(a));
+              if (payoutFilter === 'month') allWeeks = allWeeks.filter(([,w]) => w.monDate >= monthStart);
+              if (allWeeks.length === 0) return null;
+
+              const PAGE = 5;
+              const totalPages = Math.ceil(allWeeks.length / PAGE);
+              const page = Math.min(payoutPage, totalPages - 1);
+              const pageWeeks = allWeeks.slice(page * PAGE, page * PAGE + PAGE);
+              const fmtDay = (d: Date) => d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+
+              return (
+                <>
+                  <View style={s.payoutHeader}>
+                    <Text style={s.sectionTitle}>PAYOUTS</Text>
+                    <View style={s.payoutFilterRow}>
+                      {(['all', 'month'] as const).map(f => (
+                        <TouchableOpacity key={f}
+                          style={[s.payoutFilterChip, payoutFilter === f && s.payoutFilterChipActive]}
+                          onPress={() => { setPayoutFilter(f); setPayoutPage(0); }} activeOpacity={0.7}>
+                          <Text style={[s.payoutFilterText, payoutFilter === f && s.payoutFilterTextActive]}>
+                            {f === 'all' ? 'All time' : 'This month'}
+                          </Text>
+                        </TouchableOpacity>
+                      ))}
+                    </View>
+                  </View>
+                  <View>
+                    {pageWeeks.map(([key, w], idx) => (
+                      <View key={key} style={[s.payoutRow, idx > 0 && s.payoutRowBorder]}>
+                        <View style={[s.payoutDot, w.isCurrent ? s.payoutDotPending : s.payoutDotDone]} />
+                        <Text style={s.payoutRowDate} numberOfLines={1}>{fmtDay(w.monDate)} – {fmtDay(w.sunDate)}</Text>
+                        <Text style={[s.payoutRowStatus, w.isCurrent ? s.payoutRowStatusPending : s.payoutRowStatusDone]}>
+                          {w.isCurrent ? 'Pending' : 'Processed'}
+                        </Text>
+                        <Text style={s.payoutRowAmount}>{fmt(w.net)}</Text>
+                      </View>
+                    ))}
+                  </View>
+                  {totalPages > 1 && (
+                    <View style={s.payoutPagination}>
+                      <TouchableOpacity onPress={() => setPayoutPage(p => Math.max(0, p - 1))} disabled={page === 0} style={[s.payoutPageBtn, page === 0 && { opacity: 0.3 }]}>
+                        <Text style={s.payoutPageBtnText}>← Prev</Text>
+                      </TouchableOpacity>
+                      <Text style={s.payoutPageInfo}>{page + 1} / {totalPages}</Text>
+                      <TouchableOpacity onPress={() => setPayoutPage(p => Math.min(totalPages - 1, p + 1))} disabled={page === totalPages - 1} style={[s.payoutPageBtn, page === totalPages - 1 && { opacity: 0.3 }]}>
+                        <Text style={s.payoutPageBtnText}>Next →</Text>
+                      </TouchableOpacity>
+                    </View>
+                  )}
+                  <Text style={s.payoutNote}>Payouts are sent every Monday. Allow 2–5 business days to arrive in your bank account.</Text>
+                </>
+              );
+            })()}
+
+            {/* Earnings summary — SECOND */}
             {stripeAccount?.onboarding_complete && (
               <>
-                <Text style={s.sectionTitle}>{t.dashboard.earnings}</Text>
-                <View style={s.earningsGrid}>
-                  {[
-                    { label: t.dashboard.thisWeek, gross: weekGross, net: weekNet },
-                    { label: t.dashboard.thisMonth, gross: monthGross, net: monthNet },
-                    { label: t.dashboard.allTime, gross: totalGross, net: totalNet },
-                  ].map(item => (
-                    <View key={item.label} style={s.earningsGridCard}>
-                      <Text style={s.earningsGridLabel}>{item.label}</Text>
-                      <Text style={s.earningsGridGross}>{fmt(item.gross)}</Text>
-                      <Text style={s.earningsGridSub}>{t.dashboard.gross}</Text>
-                      <View style={s.earningsDivider} />
-                      <Text style={s.earningsGridNet}>{fmt(item.net)}</Text>
-                      <Text style={s.earningsGridSub}>{t.dashboard.netto}</Text>
+                <Text style={[s.sectionTitle, { marginTop: 24 }]}>{t.dashboard.earnings}</Text>
+
+                {/* Big earnings card */}
+                <View style={s.earningsCard}>
+                  <View style={s.earningsCardTop}>
+                    <View>
+                      <Text style={s.earningsCardLabel}>Net earnings</Text>
+                      <Text style={s.earningsCardAmount}>{fmt(totalNet)}</Text>
                     </View>
-                  ))}
+                    <View style={s.earningsCardRight}>
+                      <Text style={s.earningsCardGrossLabel}>Gross</Text>
+                      <Text style={s.earningsCardGross}>{fmt(totalGross)}</Text>
+                    </View>
+                  </View>
+                  {monthGross > 0 && (
+                    <View style={s.earningsCardMonth}>
+                      <View style={s.earningsCardMonthDot} />
+                      <Text style={s.earningsCardMonthText}>This month: {fmt(monthNet)} net</Text>
+                    </View>
+                  )}
                 </View>
 
+                {/* Invoices row */}
+                <TouchableOpacity
+                  style={s.invoicesRow}
+                  onPress={() => setShowInvoicesSheet(true)}
+                  activeOpacity={0.8}
+                >
+                  <View style={s.invoicesRowIcon}>
+                    <Svg width={16} height={16} viewBox="0 0 24 24" fill="none">
+                      <Path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z" stroke={Colors.black} strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" />
+                      <Path d="M14 2v6h6M16 13H8M16 17H8M10 9H8" stroke={Colors.black} strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" />
+                    </Svg>
+                  </View>
+                  <Text style={s.invoicesRowLabel}>Invoices</Text>
+                  {monthlyEarnings.length > 0 && (
+                    <View style={s.invoicesRowBadge}>
+                      <Text style={s.invoicesRowBadgeText}>{monthlyEarnings.length}</Text>
+                    </View>
+                  )}
+                  <Svg width={16} height={16} viewBox="0 0 24 24" fill="none" style={{ marginLeft: 'auto' }}>
+                    <Path d="M9 18l6-6-6-6" stroke={Colors.gray} strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" />
+                  </Svg>
+                </TouchableOpacity>
+
                 {/* Per-event breakdown */}
-                {events.filter(e => !e.is_free && e.paid_count > 0).length > 0 && (
+                {viewEvents.filter(e => (e.price ?? 0) > 0 && e.paid_count > 0).length > 0 && (
                   <>
                     <Text style={[s.sectionTitle, { marginTop: 24 }]}>{t.dashboard.perEvent}</Text>
                     <View style={s.listCard}>
-                      {events.filter(e => !e.is_free && e.paid_count > 0).map((e, i, arr) => (
+                      {viewEvents.filter(e => (e.price ?? 0) > 0 && e.paid_count > 0).map((e, i, arr) => (
                         <View key={e.id} style={[s.eventBreakdownRow, i < arr.length - 1 && s.listRowBorder]}>
+                          {(e.cover_url || (e as any).cover_urls?.[0]) ? (
+                            <Image
+                              source={{ uri: e.cover_url || (e as any).cover_urls?.[0] }}
+                              style={s.breakdownThumb}
+                            />
+                          ) : (
+                            <View style={[s.breakdownThumb, { backgroundColor: Colors.grayLight }]} />
+                          )}
                           <View style={{ flex: 1 }}>
                             <Text style={s.listName} numberOfLines={1}>{e.title}</Text>
-                            <Text style={s.listSub}>{e.paid_count} tickets · Stripe {fmt(e.stripe_fee)} · Woeva {fmt(e.woeva_fee)}</Text>
+                            <Text style={s.listSub}>
+                              {e.online_count > 0 ? `Online: ${e.online_count}` : ''}
+                              {e.online_count > 0 && e.door_count > 0 ? ' · ' : ''}
+                              {e.door_count > 0 ? `At door: ${e.door_count}` : ''}
+                              {e.online_count > 0 ? ` · Stripe ${fmt(e.stripe_fee)} · Woeva ${fmt(e.woeva_fee)}` : ''}
+                            </Text>
                           </View>
                           <View style={{ alignItems: 'flex-end' }}>
                             <Text style={s.breakdownGross}>{fmt(e.gross)}</Text>
@@ -1015,6 +1456,80 @@ export default function DashboardScreen() {
                     </View>
                   </>
                 )}
+
+                {/* Invoices bottom sheet */}
+                <Modal visible={showInvoicesSheet} transparent animationType="slide" onRequestClose={() => setShowInvoicesSheet(false)}>
+                  <TouchableOpacity style={s.modalOverlay} activeOpacity={1} onPress={() => setShowInvoicesSheet(false)}>
+                    <View style={[s.invoicesSheet, { paddingBottom: insets.bottom + 16 }]}>
+                      <View style={s.billingSheetHandle} />
+                      {/* Header */}
+                      <View style={s.invoicesSheetHeader}>
+                        <View style={{ flex: 1 }}>
+                          <Text style={s.invoicesSheetTitle}>Invoices</Text>
+                          <Text style={s.invoicesSheetSub}>{monthlyEarnings.length} {monthlyEarnings.length === 1 ? 'month' : 'months'}</Text>
+                        </View>
+                        <TouchableOpacity onPress={() => setShowInvoicesSheet(false)} style={s.invoicesCloseBtn} hitSlop={8}>
+                          <Text style={s.invoicesCloseBtnText}>✕</Text>
+                        </TouchableOpacity>
+                      </View>
+                      <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingHorizontal: 20, paddingTop: 8, paddingBottom: 16, gap: 14 }}>
+                        {monthlyEarnings.length === 0 ? (
+                          <Text style={[s.listSub, { textAlign: 'center', paddingVertical: 40 }]}>No invoices yet</Text>
+                        ) : (
+                          monthlyEarnings.map(m => {
+                            const available = canDownloadMonth(m.key);
+                            return (
+                              <View key={m.key} style={s.invoiceCard}>
+                                {/* Top row: month + badge */}
+                                <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 14 }}>
+                                  <Text style={s.invoiceCardMonth}>{m.label}</Text>
+                                  {available ? (
+                                    <View style={s.invoiceAvailBadge}><Text style={s.invoiceAvailBadgeText}>Ready</Text></View>
+                                  ) : (
+                                    <View style={s.invoicePendingBadge}><Text style={s.invoicePendingText}>Pending</Text></View>
+                                  )}
+                                </View>
+                                {/* Stats row */}
+                                <View style={s.invoiceStatsRow}>
+                                  <View style={s.invoiceStatBlock}>
+                                    <Text style={s.invoiceStatLabel}>Events</Text>
+                                    <Text style={s.invoiceStatVal}>{m.events.length}</Text>
+                                  </View>
+                                  <View style={s.invoiceStatDivider} />
+                                  <View style={s.invoiceStatBlock}>
+                                    <Text style={s.invoiceStatLabel}>Gross</Text>
+                                    <Text style={s.invoiceStatVal}>{fmt(m.gross)}</Text>
+                                  </View>
+                                  <View style={s.invoiceStatDivider} />
+                                  <View style={s.invoiceStatBlock}>
+                                    <Text style={s.invoiceStatLabel}>Net</Text>
+                                    <Text style={[s.invoiceStatVal, { color: Colors.lime }]}>{fmt(m.net)}</Text>
+                                  </View>
+                                </View>
+                                {/* Download button */}
+                                {available && (
+                                  <TouchableOpacity
+                                    style={s.invoiceDownloadBtn}
+                                    onPress={() => downloadInvoiceForMonth(m.key, m.label, m.events)}
+                                    activeOpacity={0.75}
+                                  >
+                                    <Svg width={15} height={15} viewBox="0 0 24 24" fill="none">
+                                      <Path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4M7 10l5 5 5-5M12 15V3" stroke={Colors.white} strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" />
+                                    </Svg>
+                                    <Text style={s.invoiceDownloadText}>Download PDF</Text>
+                                  </TouchableOpacity>
+                                )}
+                                {!available && (
+                                  <Text style={s.invoicePendingNote}>Available at the end of the month</Text>
+                                )}
+                              </View>
+                            );
+                          })
+                        )}
+                      </ScrollView>
+                    </View>
+                  </TouchableOpacity>
+                </Modal>
 
                 {/* Payout history */}
                 {payouts.length > 0 && (
@@ -1038,13 +1553,6 @@ export default function DashboardScreen() {
                   </>
                 )}
 
-                {/* Download invoice */}
-                <TouchableOpacity style={s.invoiceBtn} onPress={downloadInvoice}>
-                  <Svg width={16} height={16} viewBox="0 0 24 24" fill="none">
-                    <Path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4M7 10l5 5 5-5M12 15V3" stroke={Colors.black} strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" />
-                  </Svg>
-                  <Text style={s.invoiceBtnText}>{t.dashboard.downloadInvoice}</Text>
-                </TouchableOpacity>
               </>
             )}
           </>
@@ -1071,13 +1579,13 @@ export default function DashboardScreen() {
                 ))}
               </View>
 
-              {/* Attendance chart — primary */}
+              {/* Attendance chart - primary */}
               <View style={s.chartCard}>
                 <Text style={s.chartTitle}>{t.dashboard.attendance}</Text>
-                <EventChart events={viewEvents} range={statsRange} width={chartWidth - 32} getValue={e => e.going_count} color={Colors.black} gradId="attGrad" />
+                <EventChart events={viewEvents} range={statsRange} width={chartWidth - 32} getValue={e => e.is_free ? realGoing(e, user!.id) : e.paid_count} color={Colors.black} gradId="attGrad" />
               </View>
 
-              {/* Revenue chart — secondary, only if there's paid revenue */}
+              {/* Revenue chart - secondary, only if there's paid revenue */}
               {viewEvents.some(e => e.gross > 0) && (
                 <View style={[s.chartCard, { marginTop: 12 }]}>
                   <Text style={s.chartTitle}>{t.dashboard.revenue}</Text>
@@ -1089,9 +1597,11 @@ export default function DashboardScreen() {
                 {[
                   { label: t.dashboard.events, val: filtered.length },
                   { label: t.dashboard.ticketsSold, val: filtered.reduce((sum, e) => sum + e.paid_count, 0) },
+                  { label: 'Online tickets', val: filtered.reduce((sum, e) => sum + e.online_count, 0) },
+                  { label: 'At door', val: filtered.reduce((sum, e) => sum + e.door_count, 0) },
                   { label: t.dashboard.freeEvents, val: filtered.filter(e => e.is_free).length },
                   { label: t.dashboard.paidEvents, val: filtered.filter(e => !e.is_free).length },
-                  { label: t.dashboard.attendees, val: filtered.reduce((sum, e) => sum + e.going_count, 0) },
+                  { label: t.dashboard.attendees, val: filtered.reduce((sum, e) => sum + realGoing(e, user!.id), 0) },
                   { label: t.dashboard.clubMembers, val: members.length },
                 ].map(item => (
                   <View key={item.label} style={s.statsOverviewCard}>
@@ -1105,43 +1615,72 @@ export default function DashboardScreen() {
                 <>
                   <Text style={[s.sectionTitle, { marginTop: 24 }]}>{t.dashboard.revenue}</Text>
                   <View style={s.revenueCard}>
-                    <View style={s.revenueRow}>
-                      <Text style={s.revenueLabel}>{t.dashboard.grossRevenue}</Text>
-                      <Text style={s.revenueVal}>{fmt(fGross)}</Text>
-                    </View>
-                    <View style={s.revenueRow}>
-                      <Text style={s.revenueLabel}>{t.dashboard.stripeFees}</Text>
-                      <Text style={[s.revenueVal, { color: Colors.gray }]}>- {fmt(fStripe)}</Text>
-                    </View>
-                    <View style={s.revenueRow}>
-                      <Text style={s.revenueLabel}>{t.dashboard.woevaFee}</Text>
-                      <Text style={[s.revenueVal, { color: Colors.gray }]}>- {fmt(fWoeva)}</Text>
-                    </View>
-                    <View style={[s.revenueRow, { borderTopWidth: 1.5, borderTopColor: Colors.black, marginTop: 8, paddingTop: 12 }]}>
-                      <Text style={[s.revenueLabel, { fontWeight: '800', fontFamily: Fonts.extrabold }]}>{t.dashboard.netToYou}</Text>
-                      <Text style={[s.revenueVal, { fontWeight: '800', fontFamily: Fonts.extrabold }]}>{fmt(fNet)}</Text>
-                    </View>
+                    {(() => {
+                      const fOnline = filtered.reduce((sum, e) => sum + e.price * e.online_count, 0);
+                      const fDoor = filtered.reduce((sum, e) => sum + e.price * e.door_count, 0);
+                      return (
+                        <>
+                          {fOnline > 0 && (
+                            <View style={s.revenueRow}>
+                              <Text style={s.revenueLabel}>Online tickets</Text>
+                              <Text style={s.revenueVal}>{fmt(fOnline)}</Text>
+                            </View>
+                          )}
+                          {fDoor > 0 && (
+                            <View style={s.revenueRow}>
+                              <Text style={s.revenueLabel}>At door</Text>
+                              <Text style={s.revenueVal}>{fmt(fDoor)}</Text>
+                            </View>
+                          )}
+                          <View style={s.revenueRow}>
+                            <Text style={s.revenueLabel}>{t.dashboard.grossRevenue}</Text>
+                            <Text style={s.revenueVal}>{fmt(fGross)}</Text>
+                          </View>
+                          {fStripe > 0 && (
+                            <View style={s.revenueRow}>
+                              <Text style={s.revenueLabel}>{t.dashboard.stripeFees}</Text>
+                              <Text style={[s.revenueVal, { color: Colors.gray }]}>- {fmt(fStripe)}</Text>
+                            </View>
+                          )}
+                          <View style={s.revenueRow}>
+                            <Text style={s.revenueLabel}>{t.dashboard.woevaFee} (5% online)</Text>
+                            <Text style={[s.revenueVal, { color: Colors.gray }]}>- {fmt(fWoeva)}</Text>
+                          </View>
+                          <View style={[s.revenueRow, { borderTopWidth: 1.5, borderTopColor: Colors.black, marginTop: 8, paddingTop: 12 }]}>
+                            <Text style={[s.revenueLabel, { fontWeight: '800', fontFamily: Fonts.extrabold }]}>{t.dashboard.netToYou}</Text>
+                            <Text style={[s.revenueVal, { fontWeight: '800', fontFamily: Fonts.extrabold }]}>{fmt(fNet)}</Text>
+                          </View>
+                        </>
+                      );
+                    })()}
                   </View>
                 </>
               )}
 
-              {filtered.length > 0 && (
-                <>
-                  <Text style={[s.sectionTitle, { marginTop: 24 }]}>{t.dashboard.topByAttendance}</Text>
-                  <View style={s.listCard}>
-                    {[...filtered].sort((a, b) => b.going_count - a.going_count).slice(0, 5).map((e, i, arr) => (
-                      <View key={e.id} style={[s.listRow, i < arr.length - 1 && s.listRowBorder]}>
-                        <Text style={s.rankNum}>{i + 1}</Text>
-                        <View style={{ flex: 1 }}>
-                          <Text style={s.listName} numberOfLines={1}>{e.title}</Text>
-                          <Text style={s.listSub}>{t.dashboard.attendeesCount(e.going_count)}</Text>
+              {(() => {
+                const realCount = (e: EventRow) => e.is_free ? realGoing(e, user!.id) : e.paid_count;
+                const topEvents = [...viewEvents]
+                  .filter(e => e.status !== 'cancelled')
+                  .sort((a, b) => realCount(b) - realCount(a))
+                  .slice(0, 5);
+                return topEvents.length > 0 ? (
+                  <>
+                    <Text style={[s.sectionTitle, { marginTop: 24 }]}>{t.dashboard.topByAttendance}</Text>
+                    <View style={s.listCard}>
+                      {topEvents.map((e, i, arr) => (
+                        <View key={e.id} style={[s.listRow, i < arr.length - 1 && s.listRowBorder]}>
+                          <Text style={s.rankNum}>{i + 1}</Text>
+                          <View style={{ flex: 1 }}>
+                            <Text style={s.listName} numberOfLines={1}>{e.title}</Text>
+                            <Text style={s.listSub}>{t.dashboard.attendeesCount(realCount(e))}</Text>
+                          </View>
+                          {e.gross > 0 && <Text style={s.eventRevenue}>{fmt(e.gross)}</Text>}
                         </View>
-                        {!e.is_free && <Text style={s.eventRevenue}>{fmt(e.gross)}</Text>}
-                      </View>
-                    ))}
-                  </View>
-                </>
-              )}
+                      ))}
+                    </View>
+                  </>
+                ) : null;
+              })()}
 
               {filtered.length === 0 && (
                 <View style={s.emptyBox}>
@@ -1225,19 +1764,6 @@ export default function DashboardScreen() {
           <View style={[s.attendeesSheet, { paddingBottom: insets.bottom + 24 }]}>
             <View style={s.billingSheetHandle} />
             <Text style={s.billingSheetTitle}>{t.dashboard.clubSettings}</Text>
-
-            {/* Edit club */}
-            <View style={s.settingsSection}>
-              <Text style={s.settingsSectionTitle}>{t.dashboard.clubSection}</Text>
-              <TouchableOpacity style={s.settingsRow} onPress={() => {
-                setShowClubSettings(false);
-                const c = selectedClub ?? clubs[0];
-                if (c) router.push(`/club/${c.id}/edit` as any);
-              }} activeOpacity={0.7}>
-                <Text style={s.settingsRowLabel}>{t.dashboard.editClubDetails}</Text>
-                <Text style={s.settingsRowArrow}>›</Text>
-              </TouchableOpacity>
-            </View>
 
             {/* Admins */}
             <View style={s.settingsSection}>
@@ -1335,26 +1861,33 @@ export default function DashboardScreen() {
           <View style={[s.attendeesSheet, { paddingBottom: insets.bottom + 16 }]}>
             <View style={s.billingSheetHandle} />
             <Text style={s.billingSheetTitle}>{attendeesEvent?.title}</Text>
-            <Text style={[s.listSub, { marginBottom: 12 }]}>{attendeesEvent?.going_count} {t.dashboard.going}</Text>
+            <Text style={[s.listSub, { marginBottom: 12 }]}>
+              {attendeesEvent
+                ? (attendeesEvent.is_free ? realGoing(attendeesEvent, user!.id) : attendeesEvent.paid_count)
+                : 0} {t.dashboard.going}
+            </Text>
             {loadingAttendees
               ? <ActivityIndicator color={Colors.black} />
               : <FlatList
-                  data={attendees}
+                  data={[...attendees].sort((a, b) => (b.id === user?.id ? 1 : 0) - (a.id === user?.id ? 1 : 0))}
                   keyExtractor={i => i.id}
                   renderItem={({ item }) => {
                     const isIn = checkedIn[attendeesEvent?.id ?? '']?.has(item.id);
+                    const isMe = item.id === user?.id;
                     return (
                       <View style={s.attendeeRow}>
                         <View style={s.attendeeAvatar}>
                           {item.avatar_url ? <Image source={{ uri: item.avatar_url }} style={StyleSheet.absoluteFill as any} /> : null}
                           {!item.avatar_url && <Text style={s.attendeeInitial}>{item.name.charAt(0).toUpperCase()}</Text>}
                         </View>
-                        <Text style={s.attendeeName}>{item.name.split(' ')[0]}</Text>
-                        {isIn
-                          ? <View style={s.checkedInBadge}><Text style={s.checkedInBadgeText}>{t.dashboard.checkedIn}</Text></View>
-                          : <TouchableOpacity style={s.checkInBtn} onPress={() => markCheckedIn(attendeesEvent!.id, item.id)} activeOpacity={0.7}>
-                              <Text style={s.checkInBtnText}>{t.dashboard.checkIn}</Text>
-                            </TouchableOpacity>
+                        <Text style={s.attendeeName}>{item.name.split(' ')[0]}{isMe ? '' : ''}</Text>
+                        {isMe
+                          ? <View style={s.meBadge}><Text style={s.meBadgeText}>me</Text></View>
+                          : isIn
+                            ? <View style={s.checkedInBadge}><Text style={s.checkedInBadgeText}>{t.dashboard.checkedIn}</Text></View>
+                            : <TouchableOpacity style={s.checkInBtn} onPress={() => markCheckedIn(attendeesEvent!.id, item.id)} activeOpacity={0.7}>
+                                <Text style={s.checkInBtnText}>{t.dashboard.checkIn}</Text>
+                              </TouchableOpacity>
                         }
                       </View>
                     );
@@ -1414,12 +1947,12 @@ const s = StyleSheet.create({
   container: { flex: 1, backgroundColor: Colors.white },
   scroll: { paddingHorizontal: 20 },
   topBar: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingVertical: 10, marginBottom: 16 },
-  pageTitle: { fontSize: 17, fontWeight: '700', fontFamily: Fonts.bold, color: Colors.black },
+  pageTitle: { fontSize: 17, fontWeight: '700', fontFamily: Fonts.bold, color: Colors.black, position: 'absolute', left: 0, right: 0, textAlign: 'center' },
 
   sectionTitle: { fontSize: 11, fontWeight: '700', color: Colors.gray, letterSpacing: 0.8, textTransform: 'uppercase', marginBottom: 10 },
 
   // Club card
-  clubCard: { height: 150, borderRadius: 20, overflow: 'hidden', marginBottom: 24, backgroundColor: '#000' },
+  clubCard: { height: 150, borderRadius: 20, overflow: 'hidden', backgroundColor: '#000' },
   clubCardContent: { position: 'absolute', bottom: 14, left: 16, right: 16 },
   clubCardLabel: { fontSize: 10, fontWeight: '600', color: 'rgba(255,255,255,0.6)', textTransform: 'uppercase', letterSpacing: 0.6, marginBottom: 2 },
   clubCardName: { fontSize: 19, fontWeight: '700', fontFamily: Fonts.bold, color: Colors.white, marginBottom: 10 },
@@ -1432,7 +1965,7 @@ const s = StyleSheet.create({
   // Overview strip
   overviewStrip: { flexDirection: 'row', backgroundColor: Colors.grayLight, borderRadius: 18, paddingVertical: 14, paddingHorizontal: 6, marginBottom: 20, justifyContent: 'space-around' },
   overviewItem: { alignItems: 'center', flex: 1 },
-  overviewVal: { fontSize: 20, fontWeight: '800', fontFamily: Fonts.extrabold, color: Colors.black },
+  overviewVal: { fontSize: 16, fontWeight: '800', fontFamily: Fonts.extrabold, color: Colors.black },
   overviewLabel: { fontSize: 10, color: Colors.gray, fontFamily: Fonts.regular, marginTop: 2 },
 
   // Stats grid
@@ -1445,12 +1978,19 @@ const s = StyleSheet.create({
   statNumSmall: { fontSize: 17, fontWeight: '700', fontFamily: Fonts.bold, color: Colors.black },
   statLabel: { fontSize: 11, color: Colors.gray, fontFamily: Fonts.regular },
 
-  // Earnings row (home)
-  earningsRow: { flexDirection: 'row', gap: 10 },
-  earningsCard: { flex: 1, backgroundColor: Colors.grayLight, borderRadius: 14, padding: 12, gap: 2 },
-  earningsLabel: { fontSize: 10, fontWeight: '600', color: Colors.gray, letterSpacing: 0.5, textTransform: 'uppercase' },
-  earningsGross: { fontSize: 16, fontWeight: '800', fontFamily: Fonts.extrabold, color: Colors.black, marginTop: 4 },
-  earningsNet: { fontSize: 11, color: Colors.gray, fontFamily: Fonts.regular },
+  // Earnings home card
+  earningsHomeCard: { backgroundColor: Colors.grayLight, borderRadius: 20, padding: 18, marginBottom: 4 },
+  earningsHomeTotalRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
+  earningsHomeLabel: { fontSize: 11, fontWeight: '600', color: Colors.gray, letterSpacing: 0.5, textTransform: 'uppercase', marginBottom: 4 },
+  earningsHomeBig: { fontSize: 30, fontWeight: '800', color: Colors.black, fontFamily: Fonts.bold, letterSpacing: -0.5 },
+  earningsHomePill: { backgroundColor: Colors.black, borderRadius: 50, paddingHorizontal: 10, paddingVertical: 4 },
+  earningsHomePillText: { fontSize: 11, fontWeight: '700', color: Colors.white, fontFamily: Fonts.bold },
+  earningsHomeDivider: { height: 1, backgroundColor: Colors.grayBorder, marginVertical: 14 },
+  earningsHomeRow: { flexDirection: 'row', alignItems: 'center' },
+  earningsHomeCell: { flex: 1, alignItems: 'center', gap: 3 },
+  earningsHomeCellDivider: { width: 1, height: 28, backgroundColor: Colors.grayBorder },
+  earningsHomeCellLabel: { fontSize: 11, color: Colors.gray, fontFamily: Fonts.regular },
+  earningsHomeCellVal: { fontSize: 15, fontWeight: '700', color: Colors.black, fontFamily: Fonts.bold },
 
   // List card
   listCard: { backgroundColor: Colors.grayLight, borderRadius: 18, paddingHorizontal: 14 },
@@ -1512,9 +2052,22 @@ const s = StyleSheet.create({
   billingPreviewMain: { fontSize: 14, fontWeight: '600', color: Colors.black, fontFamily: Fonts.semibold },
   billingPreviewSub: { fontSize: 12, color: Colors.gray, fontFamily: Fonts.regular },
   stripeInfo: { fontSize: 13, color: Colors.gray, fontFamily: Fonts.regular, lineHeight: 19 },
-  stripeStatusRow: { flexDirection: 'row', alignItems: 'center', gap: 8, marginTop: 12, paddingTop: 12, borderTopWidth: 1, borderTopColor: Colors.grayBorder },
+  stripeIntro: { fontSize: 14, color: Colors.black, fontFamily: Fonts.regular, lineHeight: 20 },
+  payMethodRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 6 },
+  payMethodBadge: { paddingHorizontal: 10, paddingVertical: 5, borderRadius: 8, borderWidth: 1.5, borderColor: Colors.grayBorder, backgroundColor: Colors.white },
+  payMethodText: { fontSize: 11, fontWeight: '700', color: Colors.black, fontFamily: Fonts.bold, letterSpacing: 0.2 },
+  feeToggle: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingVertical: 8, borderTopWidth: 1, borderTopColor: Colors.grayBorder },
+  feeToggleText: { fontSize: 12, fontWeight: '600', color: Colors.gray, fontFamily: Fonts.semibold },
+  feeToggleArrow: { fontSize: 10, color: Colors.gray },
+  feeBox: { backgroundColor: Colors.white, borderRadius: 12, padding: 12, gap: 10 },
+  feeExample: {},
+  feeExampleText: { fontSize: 11, color: Colors.gray, fontFamily: Fonts.regular, marginTop: 2 },
+  feeRow: { gap: 2 },
+  feeLabel: { fontSize: 12, fontWeight: '700', color: Colors.black, fontFamily: Fonts.bold },
+  feeVal: { fontSize: 12, color: Colors.gray, fontFamily: Fonts.regular, lineHeight: 17 },
+  stripeStatusRow: { marginTop: 12, paddingTop: 12, borderTopWidth: 1, borderTopColor: Colors.grayBorder },
   stripeStatusDot: { width: 8, height: 8, borderRadius: 4 },
-  stripeStatusText: { fontSize: 13, color: Colors.black, fontFamily: Fonts.regular },
+  stripeStatusText: { fontSize: 13, color: Colors.gray, fontFamily: Fonts.regular },
   connectedPill: { backgroundColor: Colors.lime, borderRadius: 50, paddingHorizontal: 10, paddingVertical: 3 },
   connectedPillText: { fontSize: 11, fontWeight: '700', color: Colors.black },
   payoutStatusDot: { width: 10, height: 10, borderRadius: 5, flexShrink: 0 },
@@ -1526,10 +2079,84 @@ const s = StyleSheet.create({
   earningsGridSub: { fontSize: 10, color: Colors.gray },
   earningsDivider: { height: 1, backgroundColor: Colors.grayBorder, width: '100%', marginVertical: 6 },
   eventBreakdownRow: { flexDirection: 'row', alignItems: 'center', gap: 12, paddingVertical: 12 },
+  breakdownThumb: { width: 40, height: 40, borderRadius: 8, overflow: 'hidden', flexShrink: 0 },
   breakdownGross: { fontSize: 13, fontWeight: '700', color: Colors.black, fontFamily: Fonts.bold },
   breakdownNet: { fontSize: 11, color: Colors.gray, fontFamily: Fonts.regular, textAlign: 'right' },
+
+  // Payout section
+  payoutHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginTop: 16, marginBottom: 12 },
+  payoutFilterRow: { flexDirection: 'row', gap: 6 },
+  payoutFilterChip: { paddingHorizontal: 12, paddingVertical: 6, borderRadius: 50, backgroundColor: Colors.grayLight },
+  payoutFilterChipActive: { backgroundColor: Colors.black },
+  payoutFilterText: { fontSize: 12, fontWeight: '600', color: Colors.gray, fontFamily: Fonts.semibold },
+  payoutFilterTextActive: { color: Colors.white },
+  // Payout card rows
+  payoutRow: { flexDirection: 'row', alignItems: 'center', gap: 8, paddingVertical: 11 },
+  payoutRowBorder: { borderTopWidth: 1, borderTopColor: Colors.grayBorder },
+  payoutDot: { width: 8, height: 8, borderRadius: 4, flexShrink: 0 },
+  payoutDotPending: { backgroundColor: '#F59E0B' },
+  payoutDotDone: { backgroundColor: '#4CAF50' },
+  payoutRowDate: { flex: 1, fontSize: 14, fontWeight: '600', color: Colors.black, fontFamily: Fonts.semibold },
+  payoutRowStatus: { fontSize: 12, fontWeight: '500', fontFamily: Fonts.regular },
+  payoutRowStatusPending: { color: '#F59E0B' },
+  payoutRowStatusDone: { color: '#4CAF50' },
+  payoutRowAmount: { fontSize: 15, fontWeight: '700', color: Colors.black, fontFamily: Fonts.bold, marginLeft: 8 },
+  payoutPagination: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginTop: 12 },
+  payoutPageBtn: { paddingVertical: 8, paddingHorizontal: 4 },
+  payoutPageBtnText: { fontSize: 13, fontWeight: '600', color: Colors.black, fontFamily: Fonts.semibold },
+  payoutPageInfo: { fontSize: 12, color: Colors.gray, fontFamily: Fonts.regular },
+  payoutNote: { fontSize: 12, color: Colors.gray, fontFamily: Fonts.regular, lineHeight: 18, marginTop: 12 },
   invoiceBtn: { flexDirection: 'row', alignItems: 'center', gap: 10, justifyContent: 'center', marginTop: 20, paddingVertical: 14, backgroundColor: Colors.grayLight, borderRadius: 14 },
   invoiceBtnText: { fontSize: 14, fontWeight: '600', color: Colors.black, fontFamily: Fonts.semibold },
+  monthRow: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 16, paddingVertical: 14 },
+  monthLabel: { fontSize: 15, fontWeight: '700', color: Colors.black, fontFamily: Fonts.semibold },
+  monthSub: { fontSize: 12, color: Colors.gray, fontFamily: Fonts.regular, marginTop: 2 },
+
+  // Earnings card
+  earningsCard: { backgroundColor: Colors.black, borderRadius: 20, padding: 20, marginBottom: 12 },
+  earningsCardTop: { flexDirection: 'row', alignItems: 'flex-end', justifyContent: 'space-between' },
+  earningsCardLabel: { fontSize: 12, color: 'rgba(255,255,255,0.5)', fontFamily: Fonts.regular, marginBottom: 4, letterSpacing: 0.5 },
+  earningsCardAmount: { fontSize: 36, fontWeight: '800', color: Colors.white, fontFamily: Fonts.bold, letterSpacing: -1 },
+  earningsCardRight: { alignItems: 'flex-end', paddingBottom: 4 },
+  earningsCardGrossLabel: { fontSize: 11, color: 'rgba(255,255,255,0.4)', fontFamily: Fonts.regular },
+  earningsCardGross: { fontSize: 16, fontWeight: '600', color: 'rgba(255,255,255,0.6)', fontFamily: Fonts.semibold },
+  earningsCardMonth: { flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: 16, paddingTop: 14, borderTopWidth: 1, borderTopColor: 'rgba(255,255,255,0.1)' },
+  earningsCardMonthDot: { width: 7, height: 7, borderRadius: 4, backgroundColor: Colors.lime },
+  earningsCardMonthText: { fontSize: 13, color: 'rgba(255,255,255,0.65)', fontFamily: Fonts.regular },
+
+  // Invoices row
+  invoicesRow: { flexDirection: 'row', alignItems: 'center', gap: 12, backgroundColor: Colors.grayLight, borderRadius: 16, paddingHorizontal: 16, paddingVertical: 14, marginBottom: 8 },
+  invoicesRowIcon: { width: 36, height: 36, borderRadius: 10, backgroundColor: Colors.white, alignItems: 'center', justifyContent: 'center' },
+  invoicesRowLabel: { fontSize: 15, fontWeight: '600', color: Colors.black, fontFamily: Fonts.semibold },
+  invoicesRowBadge: { backgroundColor: Colors.black, borderRadius: 50, paddingHorizontal: 8, paddingVertical: 3 },
+  invoicesRowBadgeText: { fontSize: 11, fontWeight: '700', color: Colors.white, fontFamily: Fonts.bold },
+
+  // Invoices sheet
+  invoicesSheet: { backgroundColor: '#F7F7F7', borderTopLeftRadius: 28, borderTopRightRadius: 28, maxHeight: '85%' },
+  invoicesSheetHeader: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 20, paddingTop: 6, paddingBottom: 20, borderBottomWidth: 1, borderBottomColor: Colors.grayBorder },
+  invoicesSheetTitle: { fontSize: 22, fontWeight: '800', color: Colors.black, fontFamily: Fonts.bold },
+  invoicesSheetSub: { fontSize: 13, color: Colors.gray, fontFamily: Fonts.regular, marginTop: 2 },
+  invoicesCloseBtn: { width: 32, height: 32, borderRadius: 16, backgroundColor: Colors.grayLight, alignItems: 'center', justifyContent: 'center' },
+  invoicesCloseBtnText: { fontSize: 14, color: Colors.gray, fontFamily: Fonts.semibold },
+
+  // Invoice card
+  invoiceCard: { backgroundColor: Colors.white, borderRadius: 20, padding: 20, gap: 0 },
+  invoiceCardMonth: { fontSize: 18, fontWeight: '800', color: Colors.black, fontFamily: Fonts.bold },
+  invoiceAvailBadge: { backgroundColor: '#E8F5E9', borderRadius: 50, paddingHorizontal: 10, paddingVertical: 4 },
+  invoiceAvailBadgeText: { fontSize: 11, fontWeight: '700', color: '#2E7D32', fontFamily: Fonts.bold },
+  invoicePendingBadge: { backgroundColor: '#F5F5F5', borderRadius: 50, paddingHorizontal: 10, paddingVertical: 4 },
+  invoicePendingText: { fontSize: 11, fontWeight: '500', color: Colors.gray, fontFamily: Fonts.medium },
+  invoiceStatsRow: { flexDirection: 'row', alignItems: 'center', backgroundColor: '#F7F7F7', borderRadius: 14, padding: 16, marginTop: 0 },
+  invoiceStatBlock: { flex: 1, alignItems: 'center', gap: 3 },
+  invoiceStatDivider: { width: 1, height: 28, backgroundColor: Colors.grayBorder },
+  invoiceStatLabel: { fontSize: 11, color: Colors.gray, fontFamily: Fonts.regular },
+  invoiceStatVal: { fontSize: 15, fontWeight: '700', color: Colors.black, fontFamily: Fonts.bold },
+  invoiceDownloadBtn: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, backgroundColor: Colors.black, borderRadius: 14, paddingVertical: 13, marginTop: 12 },
+  invoiceDownloadText: { fontSize: 14, fontWeight: '700', color: Colors.white, fontFamily: Fonts.bold },
+  invoicePendingNote: { fontSize: 12, color: Colors.gray, fontFamily: Fonts.regular, textAlign: 'center', marginTop: 14 },
+  monthDownloadBtn: { flexDirection: 'row', alignItems: 'center', gap: 6, backgroundColor: Colors.grayLight, borderRadius: 50, paddingHorizontal: 12, paddingVertical: 7 },
+  monthDownloadBtnDisabled: { opacity: 0.5 },
+  monthDownloadText: { fontSize: 12, fontWeight: '600', color: Colors.black, fontFamily: Fonts.semibold },
 
   // Chart
   chartCard: { backgroundColor: Colors.grayLight, borderRadius: 18, padding: 16, marginBottom: 16 },
@@ -1564,12 +2191,14 @@ const s = StyleSheet.create({
   bottomNavLabelActive: { color: Colors.black, fontWeight: '600', fontFamily: Fonts.semibold },
 
   // View filter (All / Club / Individual)
-  viewFilter: { flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 20 },
+  viewFilter: { flexDirection: 'row', alignItems: 'center', gap: 8, paddingHorizontal: 20 },
   viewFilterLabel: { fontSize: 12, color: Colors.gray, fontFamily: Fonts.medium, marginRight: 2 },
   viewFilterChip: { paddingHorizontal: 12, paddingVertical: 6, borderRadius: 50, backgroundColor: Colors.grayLight },
   viewFilterChipActive: { backgroundColor: Colors.black },
   viewFilterText: { fontSize: 12, fontWeight: '500', color: Colors.gray, fontFamily: Fonts.medium },
   viewFilterTextActive: { color: Colors.white, fontWeight: '700', fontFamily: Fonts.bold },
+  viewFilterAdd: { paddingHorizontal: 12, paddingVertical: 6, borderRadius: 50, backgroundColor: Colors.grayLight, alignItems: 'center', justifyContent: 'center' },
+  viewFilterAddText: { fontSize: 14, fontWeight: '500', color: Colors.gray, lineHeight: 17 },
   inviteInput: { height: 44, borderWidth: 1.5, borderColor: Colors.grayBorder, borderRadius: 12, paddingHorizontal: 14, fontSize: 14, color: Colors.black, marginBottom: 12 },
   settingsSection: { marginBottom: 20 },
   settingsSectionTitle: { fontSize: 11, fontWeight: '600', color: Colors.gray, letterSpacing: 0.5, marginBottom: 8, textTransform: 'uppercase' },
@@ -1635,6 +2264,8 @@ const s = StyleSheet.create({
   // Attendees check-in
   checkedInBadge: { backgroundColor: '#E8FAF0', borderRadius: 50, paddingHorizontal: 10, paddingVertical: 5 },
   checkedInBadgeText: { fontSize: 11, fontWeight: '700', color: '#16A34A' },
+  meBadge: { backgroundColor: Colors.grayLight, borderRadius: 50, paddingHorizontal: 10, paddingVertical: 5 },
+  meBadgeText: { fontSize: 11, fontWeight: '600', color: Colors.gray },
   checkInBtn: { backgroundColor: Colors.grayLight, borderRadius: 50, paddingHorizontal: 12, paddingVertical: 6 },
   checkInBtnText: { fontSize: 11, fontWeight: '600', color: Colors.black, fontFamily: Fonts.semibold },
 

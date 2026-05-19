@@ -62,7 +62,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         finalStatus = status;
       }
       if (finalStatus !== 'granted') return;
-      const token = (await Notifications.getExpoPushTokenAsync()).data;
+      const token = (await Notifications.getExpoPushTokenAsync({ projectId: '8eddd0fa-6bb8-47a2-bb21-5eaa63f470a2' })).data;
       await supabase.from('profiles').update({ push_token: token }).eq('id', userId);
     } catch (_) {}
   }

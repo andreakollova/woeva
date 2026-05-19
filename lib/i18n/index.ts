@@ -6,12 +6,12 @@ export type { Lang };
 
 export const LANG_KEY = '@woeva_lang';
 
-export async function loadSavedLang(): Promise<Lang> {
+export async function loadSavedLang(): Promise<Lang | null> {
   try {
     const val = await AsyncStorage.getItem(LANG_KEY);
     if (val === 'sk' || val === 'en') return val;
   } catch {}
-  return 'en';
+  return null;
 }
 
 export async function saveLang(lang: Lang) {
