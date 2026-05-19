@@ -166,16 +166,7 @@ export default function ChatScreen() {
     if ((attendees ?? []).length > 0) {
       const attendeeIds = (attendees ?? []).map((a: any) => a.user_id);
 
-      // In-app notifications
-      const notifs = attendeeIds.map((uid: string) => ({
-        user_id: uid, type: 'chat',
-        title: eventTitle || 'New message',
-        body: `${(profile?.name ?? 'Someone').split(' ')[0]}: ${msg.length > 60 ? msg.slice(0, 60) + '…' : msg}`,
-        data: { event_id: roomId },
-      }));
-      supabase.from('notifications').insert(notifs).then(() => {});
-
-      // Push notifications
+      // Push notifications only — no in-app bell for chat (would feel like duplicate)
       const { data: pushProfiles } = await supabase
         .from('profiles')
         .select('push_token, muted_chats')
