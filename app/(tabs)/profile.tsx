@@ -144,11 +144,11 @@ export default function ProfileScreen() {
         {clubs.length > 0 && (
           <View style={styles.section}>
             <Text style={styles.sectionTitle}>{t.settings.myClubs}</Text>
-            <View style={styles.clubsGrid}>
-              {(showAllClubs ? clubs : clubs.slice(0, 4)).map((club) => (
+            <View style={styles.clubsList}>
+              {(showAllClubs ? clubs : clubs.slice(0, 4)).map((club, idx, arr) => (
                 <TouchableOpacity
                   key={club.id}
-                  style={styles.clubChip}
+                  style={[styles.clubRow, idx === arr.length - 1 && styles.clubRowLast]}
                   onPress={() => router.push(`/club/${club.id}` as any)}
                   onLongPress={async () => {
                     const { count } = await supabase.from('club_members').select('id', { count: 'exact', head: true }).eq('club_id', club.id).eq('role', 'admin').eq('status', 'approved');
@@ -168,12 +168,16 @@ export default function ProfileScreen() {
                   activeOpacity={0.7}
                 >
                   {club.logo_url || club.cover_url
-                    ? <Image source={{ uri: (club.logo_url ?? club.cover_url)! }} style={styles.clubChipAvatar} />
-                    : <View style={[styles.clubChipAvatar, styles.clubAvatarFallback]}>
+                    ? <Image source={{ uri: (club.logo_url ?? club.cover_url)! }} style={styles.clubAvatar} />
+                    : <View style={[styles.clubAvatar, styles.clubAvatarFallback]}>
                         <Text style={styles.clubAvatarInitial}>{club.name.charAt(0).toUpperCase()}</Text>
                       </View>
                   }
-                  <Text style={styles.clubChipName} numberOfLines={1}>{club.name}</Text>
+                  <View style={{ flex: 1 }}>
+                    <Text style={styles.clubName} numberOfLines={1}>{club.name}</Text>
+                    {club.category ? <Text style={styles.clubCategory}>{club.category}</Text> : null}
+                  </View>
+                  <Text style={styles.clubLeaveHint}>{t.settings.holdToLeave}</Text>
                 </TouchableOpacity>
               ))}
             </View>
@@ -257,16 +261,15 @@ const styles = StyleSheet.create({
   sectionTitle: { fontSize: 13, fontWeight: '700', fontFamily: Fonts.semibold, color: Colors.gray, letterSpacing: 0.8, textTransform: 'uppercase', marginBottom: 14 },
   bioText: { fontSize: 15, color: Colors.black, fontFamily: Fonts.regular, lineHeight: 23 },
   bioEmpty: { fontSize: 15, color: Colors.gray, fontFamily: Fonts.regular },
-  clubsGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
-  clubChip: { flexDirection: 'row', alignItems: 'center', gap: 8, backgroundColor: Colors.grayLight, borderRadius: 50, paddingVertical: 6, paddingLeft: 6, paddingRight: 14, maxWidth: '48%' },
-  clubChipAvatar: { width: 28, height: 28, borderRadius: 14 },
-  clubChipName: { fontSize: 13, fontWeight: '600', color: Colors.black, fontFamily: Fonts.semibold, flexShrink: 1 },
+  clubsList: { borderRadius: 16, overflow: 'hidden', borderWidth: 1, borderColor: Colors.grayBorder },
+  clubRow: { flexDirection: 'row', alignItems: 'center', gap: 12, paddingVertical: 10, paddingHorizontal: 12, borderBottomWidth: 1, borderBottomColor: Colors.grayBorder, backgroundColor: Colors.white },
+  clubRowLast: { borderBottomWidth: 0 },
   viewAllBtn: { paddingTop: 10, paddingBottom: 2, alignItems: 'center' },
   viewAllText: { fontSize: 13, fontWeight: '600', color: Colors.gray, fontFamily: Fonts.semibold },
-  clubAvatar: { width: 42, height: 42, borderRadius: 12 },
-  clubAvatarFallback: { backgroundColor: Colors.grayBorder, alignItems: 'center', justifyContent: 'center' },
+  clubAvatar: { width: 36, height: 36, borderRadius: 10 },
+  clubAvatarFallback: { backgroundColor: Colors.grayLight, alignItems: 'center', justifyContent: 'center' },
   clubAvatarInitial: { fontSize: 14, fontWeight: '700', color: Colors.black, fontFamily: Fonts.bold },
-  clubName: { fontSize: 15, fontWeight: '600', color: Colors.black, fontFamily: Fonts.semibold },
+  clubName: { fontSize: 14, fontWeight: '600', color: Colors.black, fontFamily: Fonts.semibold },
   clubCategory: { fontSize: 12, color: Colors.gray, fontFamily: Fonts.regular, marginTop: 1 },
   clubLeaveHint: { fontSize: 11, color: Colors.grayBorder, fontFamily: Fonts.regular },
   adminBtn: { marginTop: 32, backgroundColor: Colors.black, borderRadius: 16, padding: 16, alignItems: 'center' },
