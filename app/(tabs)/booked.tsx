@@ -13,6 +13,7 @@ import { WMark } from '@/components/ui/WMark';
 import { useAuth } from '@/context/AuthContext';
 import { notify } from '@/lib/notify';
 import { useTranslations } from '@/context/LanguageContext';
+import { expandRecurringEvents } from '@/lib/expandRecurring';
 
 type BookedEvent = Event & { attendee_id?: string };
 
@@ -32,7 +33,8 @@ export default function BookedScreen() {
 
   async function loadEvents() {
     if (!user) return;
-    const now = new Date().toISOString().split('T')[0];
+    const today = new Date();
+    const now = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`;
 
     const { data } = await supabase
       .from('event_attendees')
@@ -43,9 +45,10 @@ export default function BookedScreen() {
       .map((r: any) => ({ ...r.event, attendee_id: r.id }))
       .filter((e: any) => e?.id);
 
+    const expanded = expandRecurringEvents(allEvents.filter(e => e.status !== 'cancelled'));
     const filtered = tab === 'upcoming'
-      ? allEvents.filter(e => e.date >= now && e.status !== 'cancelled')
-      : allEvents.filter(e => e.date < now && e.status !== 'cancelled');
+      ? expanded.filter(e => (e.date || '').slice(0, 10) >= now)
+      : expanded.filter(e => (e.date || '').slice(0, 10) < now);
 
     setEvents(filtered.sort((a, b) => a.date.localeCompare(b.date)));
 
@@ -76,7 +79,7 @@ export default function BookedScreen() {
     const noRefund = !isFree && hoursUntil <= 48;
 
     const subtitle = refundEligible
-      ? `You paid €${event.price} for this ticket. Since the event is more than 48 hours away, you are eligible for a refund — contact support after leaving.`
+      ? `You paid €${event.price} for this ticket. Since the event is more than 48 hours away, you are eligible for a refund - contact support after leaving.`
       : noRefund
         ? `You paid €${event.price} for this ticket. The event is less than 48 hours away, so this ticket is non-refundable.`
         : t.tickets.leaveNoSpot;
@@ -154,6 +157,8 @@ export default function BookedScreen() {
     );
   }
 
+  if (!user) return null;
+
   return (
     <View style={[styles.container, { paddingTop: insets.top }]}>
       <View style={styles.topBar}>
@@ -197,7 +202,7 @@ export default function BookedScreen() {
           </Animated.View>
         ) : (
           events.map((event, i) => (
-            <Animated.View key={event.id} entering={FadeInDown.delay(i * 70)}>
+            <Animated.View key={`${event.id}-${event.date}`} entering={FadeInDown.delay(i * 70)}>
               <TicketCard
                 event={event}
                 userId={user!.id}
@@ -256,7 +261,7 @@ function TicketCard({ event, userId, userAvatar, userName, isPast, isRated, onPr
   const d = new Date(event.date + 'T00:00:00');
   const dayName = d.toLocaleDateString('en-US', { weekday: 'long' });
   const dateStr = `${d.getDate()} ${d.toLocaleDateString('en-US', { month: 'long' })} ${d.getFullYear()}`;
-  const qrValue = `woeva:event:${event.id}:${userId}`;
+  const qrValue = `woeva:ticket:${event.attendee_id ?? event.id}:${userId}`;
   const isFree = event.is_free || event.price === 0;
   const priceLabel = isFree ? t.tickets.free : `€${event.price}`;
 
@@ -378,7 +383,7 @@ function TicketCard({ event, userId, userAvatar, userName, isPast, isRated, onPr
           <View style={styles.ticketInfoDivider} />
           <View style={styles.ticketInfoCell}>
             <Text style={styles.ticketInfoLabel}>{t.tickets.timeLabel}</Text>
-            <Text style={styles.ticketInfoValue}>{event.time || '—'}</Text>
+            <Text style={styles.ticketInfoValue}>{event.time || '-'}</Text>
             {event.duration ? <Text style={styles.ticketInfoSub}>{t.tickets.duration_hours(event.duration)}</Text> : null}
           </View>
         </View>
@@ -391,7 +396,7 @@ function TicketCard({ event, userId, userAvatar, userName, isPast, isRated, onPr
           </View>
         ) : null}
 
-        {/* Going count — always show since user is attending */}
+        {/* Going count - always show since user is attending */}
         <View style={styles.ticketGoingRow}>
           <View style={styles.goingAvatars}>
             {/* User's own avatar always first */}
@@ -441,11 +446,21 @@ function TicketCard({ event, userId, userAvatar, userName, isPast, isRated, onPr
           </TouchableOpacity>
         </Modal>
         <View style={styles.qrSection}>
-          <TouchableOpacity style={styles.qrWrap} onPress={() => setQrModal(true)} activeOpacity={0.75}>
+          <TouchableOpacity
+            style={[styles.qrWrap, isFree && styles.qrWrapFree]}
+            onPress={() => {
+              if (isFree) {
+                Alert.alert(t.tickets.freeEventQrTitle, t.tickets.freeEventQrMsg);
+              } else {
+                setQrModal(true);
+              }
+            }}
+            activeOpacity={0.75}
+          >
             <QRCode
               value={qrValue}
               size={88}
-              color={isPast ? Colors.gray : Colors.black}
+              color={isFree ? '#C0C0C0' : isPast ? Colors.gray : Colors.black}
               backgroundColor={Colors.white}
             />
           </TouchableOpacity>
@@ -459,7 +474,7 @@ function TicketCard({ event, userId, userAvatar, userName, isPast, isRated, onPr
               <Text style={styles.qrClub}>{event.club.name}</Text>
             ) : null}
 
-            {isPast && !isRated && event.club_id && (
+            {isPast && !isRated && (
               <TouchableOpacity style={styles.rateBtn} onPress={onRate} activeOpacity={0.8}>
                 <Text style={styles.rateBtnText}>{t.tickets.rateEventArrow}</Text>
               </TouchableOpacity>
@@ -549,6 +564,7 @@ const styles = StyleSheet.create({
   // QR
   qrSection: { flexDirection: 'row', gap: 16, alignItems: 'center' },
   qrWrap: { padding: 10, backgroundColor: Colors.white, borderRadius: 16 },
+  qrWrapFree: { opacity: 0.4 },
   qrInfo: { flex: 1, gap: 5, justifyContent: 'center' },
   qrAttendeeRow: { flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 4 },
   qrAvatar: { width: 28, height: 28, borderRadius: 14 },
