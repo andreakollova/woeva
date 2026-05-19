@@ -1,7 +1,8 @@
-import React, { useEffect, useState } from 'react';
+import React, { useState, useCallback } from 'react';
 import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Image, Alert } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
+import { useFocusEffect } from 'expo-router';
 import Svg, { Path, Circle } from 'react-native-svg';
 import { Colors } from '@/constants/colors';
 import { Fonts } from '@/constants/fonts';
@@ -9,6 +10,7 @@ import { WMark } from '@/components/ui/WMark';
 import { supabase } from '@/lib/supabase';
 import { useAuth } from '@/context/AuthContext';
 import { useTranslations } from '@/context/LanguageContext';
+import { CATEGORY_SK, CATEGORY_EN } from '@/types';
 
 function SettingsIcon() {
   return (
@@ -27,14 +29,16 @@ export default function ProfileScreen() {
   const insets = useSafeAreaInsets();
   const router = useRouter();
   const { user, profile } = useAuth();
-  const { t } = useTranslations();
+  const { t, lang } = useTranslations();
   const [eventsCount, setEventsCount] = useState(0);
   const [clubsCount, setClubsCount] = useState(0);
   const [clubs, setClubs] = useState<{ id: string; name: string; cover_url: string | null; logo_url: string | null; category: string }[]>([]);
   const [myEvents, setMyEvents] = useState<{ id: string; title: string; date: string; cover_url: string | null }[]>([]);
   const [latestEvents, setLatestEvents] = useState<{ id: string; title: string; date: string; cover_url: string | null }[]>([]);
+  const [showAllClubs, setShowAllClubs] = useState(false);
+  const [showAllEvents, setShowAllEvents] = useState(false);
 
-  useEffect(() => {
+  useFocusEffect(useCallback(() => {
     if (!user) return;
     supabase.from('event_attendees').select('id', { count: 'exact' }).eq('user_id', user.id).then(({ count }) => setEventsCount(count ?? 0));
     supabase.from('club_members').select('id, club:clubs(id, name, cover_url, logo_url, category)').eq('user_id', user.id).eq('status', 'approved').then(({ data }) => {
@@ -52,19 +56,19 @@ export default function ProfileScreen() {
       .then(({ data }) => {
         setLatestEvents((data ?? []).map((r: any) => r.event).filter(Boolean));
       });
-  }, [user]);
+  }, [user]));
 
   const displayName = profile?.name || (user as any)?.user_metadata?.full_name || '';
   const initial = displayName.charAt(0).toUpperCase() || '?';
   const createdAt = user?.created_at || (user as any)?.created_at;
   const joinedDate = createdAt
-    ? new Date(createdAt).toLocaleDateString(undefined, { month: 'long', year: 'numeric' })
+    ? new Date(createdAt).toLocaleDateString(lang === 'sk' ? 'sk-SK' : 'en-US', { month: 'long', year: 'numeric' })
     : '';
   const city = profile?.city || '';
 
   return (
     <View style={[styles.container, { paddingTop: insets.top }]}>
-      <ScrollView contentContainerStyle={[styles.scroll, { paddingBottom: insets.bottom + 40 }]} showsVerticalScrollIndicator={false}>
+      <ScrollView contentContainerStyle={[styles.scroll, { paddingBottom: insets.bottom + 100 }]} showsVerticalScrollIndicator={false}>
         {/* Top bar */}
         <View style={styles.topBar}>
           <TouchableOpacity onPress={() => router.push('/(tabs)')} activeOpacity={0.7}>
@@ -104,7 +108,7 @@ export default function ProfileScreen() {
           </View>
           <View style={[styles.statCard, styles.statCardLime]}>
             <Text style={styles.statNum}>{clubsCount}</Text>
-            <Text style={styles.statLabel}>{t.dashboard.members}</Text>
+            <Text style={styles.statLabel}>{t.settings.clubs}</Text>
           </View>
         </View>
 
@@ -129,25 +133,70 @@ export default function ProfileScreen() {
             <View style={styles.tags}>
               {profile!.interests.map(tag => (
                 <View key={tag} style={styles.tag}>
-                  <Text style={styles.tagText}>{tag}</Text>
+                  <Text style={styles.tagText}>{lang === 'sk' ? (CATEGORY_SK[tag] ?? tag) : (CATEGORY_EN[tag] ?? tag)}</Text>
                 </View>
               ))}
             </View>
           </View>
         )}
 
-        {/* Latest events (attended) — only visible to self */}
+        {/* My clubs */}
+        {clubs.length > 0 && (
+          <View style={styles.section}>
+            <Text style={styles.sectionTitle}>{t.settings.myClubs}</Text>
+            <View style={styles.clubsGrid}>
+              {(showAllClubs ? clubs : clubs.slice(0, 4)).map((club) => (
+                <TouchableOpacity
+                  key={club.id}
+                  style={styles.clubChip}
+                  onPress={() => router.push(`/club/${club.id}` as any)}
+                  onLongPress={async () => {
+                    const { count } = await supabase.from('club_members').select('id', { count: 'exact', head: true }).eq('club_id', club.id).eq('role', 'admin').eq('status', 'approved');
+                    if ((count ?? 0) <= 1) {
+                      Alert.alert('Cannot leave', 'You are the only admin. Assign another admin first.');
+                      return;
+                    }
+                    Alert.alert(t.settings.leaveClub, t.settings.leaveClubConfirm(club.name), [
+                      { text: t.common.cancel, style: 'cancel' },
+                      { text: t.event.leave, style: 'destructive', onPress: async () => {
+                        await supabase.from('club_members').delete().eq('club_id', club.id).eq('user_id', user!.id);
+                        setClubs(prev => prev.filter(c => c.id !== club.id));
+                        setClubsCount(prev => Math.max(prev - 1, 0));
+                      }},
+                    ]);
+                  }}
+                  activeOpacity={0.7}
+                >
+                  {club.logo_url || club.cover_url
+                    ? <Image source={{ uri: (club.logo_url ?? club.cover_url)! }} style={styles.clubChipAvatar} />
+                    : <View style={[styles.clubChipAvatar, styles.clubAvatarFallback]}>
+                        <Text style={styles.clubAvatarInitial}>{club.name.charAt(0).toUpperCase()}</Text>
+                      </View>
+                  }
+                  <Text style={styles.clubChipName} numberOfLines={1}>{club.name}</Text>
+                </TouchableOpacity>
+              ))}
+            </View>
+            {clubs.length > 4 && !showAllClubs && (
+              <TouchableOpacity style={styles.viewAllBtn} onPress={() => setShowAllClubs(true)} activeOpacity={0.7}>
+                <Text style={styles.viewAllText}>View all ({clubs.length})</Text>
+              </TouchableOpacity>
+            )}
+          </View>
+        )}
+
+        {/* Latest events (attended) */}
         {latestEvents.length > 0 && (
           <View style={styles.section}>
             <Text style={styles.sectionTitle}>{t.settings.latestEvents}</Text>
             <View style={styles.clubsList}>
-              {latestEvents.map(event => {
+              {(showAllEvents ? latestEvents : latestEvents.slice(0, 4)).map((event, idx, arr) => {
                 const d = new Date(event.date + 'T00:00:00');
-                const dateStr = d.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' });
+                const dateStr = d.toLocaleDateString('sk-SK', { weekday: 'short', month: 'short', day: 'numeric' });
                 return (
                   <TouchableOpacity
                     key={event.id}
-                    style={styles.clubRow}
+                    style={[styles.clubRow, idx === arr.length - 1 && styles.clubRowLast]}
                     onPress={() => router.push(`/event/${event.id}` as any)}
                     activeOpacity={0.7}
                   >
@@ -165,45 +214,11 @@ export default function ProfileScreen() {
                 );
               })}
             </View>
-          </View>
-        )}
-
-        {/* My clubs */}
-        {clubs.length > 0 && (
-          <View style={styles.section}>
-            <Text style={styles.sectionTitle}>{t.settings.myClubs}</Text>
-            <View style={styles.clubsList}>
-              {clubs.map(club => (
-                <TouchableOpacity
-                  key={club.id}
-                  style={styles.clubRow}
-                  onPress={() => router.push(`/club/${club.id}` as any)}
-                  onLongPress={() => {
-                    Alert.alert(t.settings.leaveClub, t.settings.leaveClubConfirm(club.name), [
-                      { text: t.common.cancel, style: 'cancel' },
-                      { text: t.event.leave, style: 'destructive', onPress: async () => {
-                        await supabase.from('club_members').delete().eq('club_id', club.id).eq('user_id', user!.id);
-                        setClubs(prev => prev.filter(c => c.id !== club.id));
-                        setClubsCount(prev => Math.max(prev - 1, 0));
-                      }},
-                    ]);
-                  }}
-                  activeOpacity={0.7}
-                >
-                  {club.cover_url || club.logo_url
-                    ? <Image source={{ uri: (club.cover_url ?? club.logo_url)! }} style={styles.clubAvatar} />
-                    : <View style={[styles.clubAvatar, styles.clubAvatarFallback]}>
-                        <Text style={styles.clubAvatarInitial}>{club.name.charAt(0).toUpperCase()}</Text>
-                      </View>
-                  }
-                  <View style={{ flex: 1 }}>
-                    <Text style={styles.clubName}>{club.name}</Text>
-                    {club.category ? <Text style={styles.clubCategory}>{club.category}</Text> : null}
-                  </View>
-                  <Text style={styles.clubLeaveHint}>{t.settings.holdToLeave}</Text>
-                </TouchableOpacity>
-              ))}
-            </View>
+            {latestEvents.length > 4 && !showAllEvents && (
+              <TouchableOpacity style={styles.viewAllBtn} onPress={() => setShowAllEvents(true)} activeOpacity={0.7}>
+                <Text style={styles.viewAllText}>View all ({latestEvents.length})</Text>
+              </TouchableOpacity>
+            )}
           </View>
         )}
         {profile?.is_admin && (
@@ -242,11 +257,15 @@ const styles = StyleSheet.create({
   sectionTitle: { fontSize: 13, fontWeight: '700', fontFamily: Fonts.semibold, color: Colors.gray, letterSpacing: 0.8, textTransform: 'uppercase', marginBottom: 14 },
   bioText: { fontSize: 15, color: Colors.black, fontFamily: Fonts.regular, lineHeight: 23 },
   bioEmpty: { fontSize: 15, color: Colors.gray, fontFamily: Fonts.regular },
-  clubsList: { gap: 4 },
-  clubRow: { flexDirection: 'row', alignItems: 'center', gap: 12, paddingVertical: 10, borderBottomWidth: 1, borderBottomColor: Colors.grayBorder },
+  clubsGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
+  clubChip: { flexDirection: 'row', alignItems: 'center', gap: 8, backgroundColor: Colors.grayLight, borderRadius: 50, paddingVertical: 6, paddingLeft: 6, paddingRight: 14, maxWidth: '48%' },
+  clubChipAvatar: { width: 28, height: 28, borderRadius: 14 },
+  clubChipName: { fontSize: 13, fontWeight: '600', color: Colors.black, fontFamily: Fonts.semibold, flexShrink: 1 },
+  viewAllBtn: { paddingTop: 10, paddingBottom: 2, alignItems: 'center' },
+  viewAllText: { fontSize: 13, fontWeight: '600', color: Colors.gray, fontFamily: Fonts.semibold },
   clubAvatar: { width: 42, height: 42, borderRadius: 12 },
-  clubAvatarFallback: { backgroundColor: '#000', alignItems: 'center', justifyContent: 'center' },
-  clubAvatarInitial: { fontSize: 18, fontWeight: '700', color: '#fff', fontFamily: Fonts.bold },
+  clubAvatarFallback: { backgroundColor: Colors.grayBorder, alignItems: 'center', justifyContent: 'center' },
+  clubAvatarInitial: { fontSize: 14, fontWeight: '700', color: Colors.black, fontFamily: Fonts.bold },
   clubName: { fontSize: 15, fontWeight: '600', color: Colors.black, fontFamily: Fonts.semibold },
   clubCategory: { fontSize: 12, color: Colors.gray, fontFamily: Fonts.regular, marginTop: 1 },
   clubLeaveHint: { fontSize: 11, color: Colors.grayBorder, fontFamily: Fonts.regular },
