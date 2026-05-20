@@ -80,11 +80,8 @@ export default function SearchScreen() {
     }
   }
 
-  useEffect(() => {
-    loadMapEvents();
-  }, [profile?.city]);
-
   useFocusEffect(useCallback(() => {
+    loadMapEvents();
     loadMapClubs();
   }, [profile?.city]));
 
