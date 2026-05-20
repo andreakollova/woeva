@@ -246,49 +246,50 @@ export default function SearchScreen() {
         onLayout={e => setHeaderHeight(e.nativeEvent.layout.height)}
       >
         <View style={styles.header}>
-          <Text style={styles.title}>{t.search.discover}</Text>
-
-          {/* Toggle + filter row */}
-          <View style={styles.controlsRow}>
-            {/* Events/Clubs toggle pill */}
-            <View style={styles.togglePill}>
-              <TouchableOpacity
-                style={[styles.toggleBtn, tab === 'events' && styles.toggleBtnActive]}
-                onPress={() => { setTab('events'); setSearched(false); setMode('map'); setTimeout(() => fitMarkersToView(mapEvents.filter(e => e.lat && e.lng).map(e => ({ latitude: e.lat!, longitude: e.lng! }))), 50); }}
-                activeOpacity={0.8}
-              >
-                <Text style={[styles.toggleText, tab === 'events' && styles.toggleTextActive]}>Events</Text>
-              </TouchableOpacity>
-              <TouchableOpacity
-                style={[styles.toggleBtn, tab === 'clubs' && styles.toggleBtnActive]}
-                onPress={() => { setTab('clubs'); setSearched(false); setMode('map'); loadMapClubs(); }}
-                activeOpacity={0.8}
-              >
-                <Text style={[styles.toggleText, tab === 'clubs' && styles.toggleTextActive]}>Clubs</Text>
-              </TouchableOpacity>
-            </View>
-
-            {/* Filter icon */}
+          {/* Top row: title + filter */}
+          <View style={styles.titleRow}>
+            <Text style={styles.title}>{t.search.discover}</Text>
             <TouchableOpacity
               style={[styles.filterBtn, hasActiveFilter && styles.filterBtnActive]}
               onPress={() => setShowFilter(true)}
               activeOpacity={0.8}
             >
-              <Svg width={18} height={18} viewBox="0 0 24 24" fill="none">
-                <Line x1="3" y1="6" x2="21" y2="6" stroke={hasActiveFilter ? Colors.black : Colors.white} strokeWidth={2} strokeLinecap="round" />
-                <Line x1="6" y1="12" x2="18" y2="12" stroke={hasActiveFilter ? Colors.black : Colors.white} strokeWidth={2} strokeLinecap="round" />
-                <Line x1="9" y1="18" x2="15" y2="18" stroke={hasActiveFilter ? Colors.black : Colors.white} strokeWidth={2} strokeLinecap="round" />
+              <Svg width={16} height={16} viewBox="0 0 24 24" fill="none">
+                <Line x1="3" y1="6" x2="21" y2="6" stroke={hasActiveFilter ? Colors.black : 'rgba(255,255,255,0.85)'} strokeWidth={2} strokeLinecap="round" />
+                <Line x1="7" y1="12" x2="17" y2="12" stroke={hasActiveFilter ? Colors.black : 'rgba(255,255,255,0.85)'} strokeWidth={2} strokeLinecap="round" />
+                <Line x1="10" y1="18" x2="14" y2="18" stroke={hasActiveFilter ? Colors.black : 'rgba(255,255,255,0.85)'} strokeWidth={2} strokeLinecap="round" />
               </Svg>
               {hasActiveFilter && <View style={styles.filterDot} />}
             </TouchableOpacity>
           </View>
 
+          {/* Toggle */}
+          <View style={styles.togglePill}>
+            <TouchableOpacity
+              style={[styles.toggleBtn, tab === 'events' && styles.toggleBtnActive]}
+              onPress={() => { setTab('events'); setSearched(false); setMode('map'); setTimeout(() => fitMarkersToView(mapEvents.filter(e => e.lat && e.lng).map(e => ({ latitude: e.lat!, longitude: e.lng! }))), 50); }}
+              activeOpacity={0.8}
+            >
+              <Text style={[styles.toggleText, tab === 'events' && styles.toggleTextActive]}>Events</Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={[styles.toggleBtn, tab === 'clubs' && styles.toggleBtnActive]}
+              onPress={() => { setTab('clubs'); setSearched(false); setMode('map'); loadMapClubs(); }}
+              activeOpacity={0.8}
+            >
+              <Text style={[styles.toggleText, tab === 'clubs' && styles.toggleTextActive]}>Clubs</Text>
+            </TouchableOpacity>
+          </View>
+
           {/* Search bar */}
           <View style={styles.searchBar}>
+            <Svg width={16} height={16} viewBox="0 0 24 24" fill="none" style={{ marginRight: 8 }}>
+              <Path d="M21 21l-4.35-4.35M17 11A6 6 0 1 1 5 11a6 6 0 0 1 12 0z" stroke="rgba(255,255,255,0.4)" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" />
+            </Svg>
             <TextInput
               style={styles.searchInput}
               placeholder={tab === 'events' ? t.search.searchBarPlaceholder : 'Search clubs...'}
-              placeholderTextColor="rgba(255,255,255,0.5)"
+              placeholderTextColor="rgba(255,255,255,0.38)"
               value={query}
               onChangeText={onSearchChange}
               onSubmitEditing={() => handleSearch()}
@@ -436,57 +437,51 @@ const mapStyle = [
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: Colors.black },
   floatingHeader: {
-    position: 'absolute', top: 0, left: -6, right: -6,
+    position: 'absolute', top: 0, left: 0, right: 0,
     zIndex: 10,
-    backgroundColor: 'rgba(0,0,0,0.97)',
-    borderBottomLeftRadius: 20,
-    borderBottomRightRadius: 20,
-    borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.12)',
-    borderTopWidth: 0,
+    backgroundColor: 'rgba(8,8,8,0.96)',
+    borderBottomLeftRadius: 28,
+    borderBottomRightRadius: 28,
     shadowColor: '#000',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.25,
-    shadowRadius: 16,
+    shadowOffset: { width: 0, height: 8 },
+    shadowOpacity: 0.35,
+    shadowRadius: 24,
   },
-  header: { paddingHorizontal: 20, paddingTop: 8, paddingBottom: 16 },
-  title: { fontSize: 28, fontWeight: '700', fontFamily: Fonts.bold, color: Colors.white, marginBottom: 12, letterSpacing: -0.5 },
-  controlsRow: { flexDirection: 'row', alignItems: 'center', gap: 10, marginBottom: 12 },
+  header: { paddingHorizontal: 22, paddingTop: 6, paddingBottom: 18 },
+  titleRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 16 },
+  title: { fontSize: 34, fontWeight: '800', fontFamily: Fonts.extrabold, color: Colors.white, letterSpacing: -1 },
   togglePill: {
     flexDirection: 'row',
-    backgroundColor: 'rgba(255,255,255,0.1)',
+    backgroundColor: 'rgba(255,255,255,0.08)',
     borderRadius: 50,
-    padding: 3,
-    flex: 1,
+    padding: 4,
+    marginBottom: 12,
   },
-  toggleBtn: { flex: 1, paddingVertical: 7, borderRadius: 50, alignItems: 'center' },
+  toggleBtn: { flex: 1, paddingVertical: 9, borderRadius: 50, alignItems: 'center' },
   toggleBtnActive: { backgroundColor: Colors.lime },
-  toggleText: { fontSize: 13, fontWeight: '600', color: 'rgba(255,255,255,0.6)', fontFamily: Fonts.semibold },
-  toggleTextActive: { color: Colors.black },
+  toggleText: { fontSize: 14, fontWeight: '600', color: 'rgba(255,255,255,0.45)', fontFamily: Fonts.semibold },
+  toggleTextActive: { color: Colors.black, fontWeight: '700', fontFamily: Fonts.bold },
   filterBtn: {
-    width: 44, height: 44, borderRadius: 22,
+    width: 40, height: 40, borderRadius: 20,
     backgroundColor: 'rgba(255,255,255,0.1)',
     alignItems: 'center', justifyContent: 'center',
-    borderWidth: 1, borderColor: 'rgba(255,255,255,0.15)',
   },
-  filterBtnActive: { backgroundColor: Colors.lime, borderColor: Colors.lime },
+  filterBtnActive: { backgroundColor: Colors.lime },
   filterDot: {
-    position: 'absolute', top: 8, right: 8,
-    width: 7, height: 7, borderRadius: 4,
+    position: 'absolute', top: 7, right: 7,
+    width: 6, height: 6, borderRadius: 3,
     backgroundColor: Colors.black,
   },
   searchBar: {
-    backgroundColor: 'rgba(255,255,255,0.12)',
-    borderRadius: 50,
-    paddingHorizontal: 20,
+    backgroundColor: 'rgba(255,255,255,0.09)',
+    borderRadius: 16,
+    paddingHorizontal: 16,
     height: 48,
     flexDirection: 'row',
     alignItems: 'center',
-    borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.2)',
   },
-  searchInput: { flex: 1, fontSize: 15, color: Colors.white },
-  searchClear: { fontSize: 14, color: 'rgba(255,255,255,0.5)', paddingLeft: 8 },
+  searchInput: { flex: 1, fontSize: 15, color: Colors.white, fontFamily: Fonts.regular },
+  searchClear: { fontSize: 13, color: 'rgba(255,255,255,0.4)', paddingLeft: 8 },
   listContainer: { flex: 1, backgroundColor: Colors.white },
   pin: {
     backgroundColor: Colors.lime,
