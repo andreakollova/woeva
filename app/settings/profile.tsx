@@ -33,7 +33,7 @@ export default function EditProfileScreen() {
   const [focusedField, setFocusedField] = useState<string | null>(null);
 
   async function pickAvatar() {
-    const result = await ImagePicker.launchImageLibraryAsync({ mediaTypes: ['images'], quality: 0.8, aspect: [1, 1] });
+    const result = await ImagePicker.launchImageLibraryAsync({ mediaTypes: ['images'], quality: 0.8, allowsEditing: true, aspect: [1, 1] });
     if (!result.canceled) setAvatar(result.assets[0].uri);
   }
 

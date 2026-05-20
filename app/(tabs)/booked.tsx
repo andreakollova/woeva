@@ -25,7 +25,6 @@ export default function BookedScreen() {
   const { t } = useTranslations();
   const [tab, setTab] = useState<'upcoming' | 'past'>('upcoming');
   const [events, setEvents] = useState<BookedEvent[]>([]);
-  const [ratedIds, setRatedIds] = useState<Set<string>>(new Set());
   const [refreshing, setRefreshing] = useState(false);
   const [deletingId, setDeletingId] = useState<string | null>(null);
 
@@ -52,17 +51,6 @@ export default function BookedScreen() {
 
     setEvents(filtered.sort((a, b) => a.date.localeCompare(b.date)));
 
-    if (tab === 'past' && filtered.length > 0) {
-      const ids = filtered.map(e => e.id);
-      const { data: ratings } = await supabase
-        .from('event_ratings')
-        .select('event_id')
-        .eq('user_id', user.id)
-        .in('event_id', ids);
-      setRatedIds(new Set((ratings ?? []).map((r: any) => r.event_id)));
-    } else {
-      setRatedIds(new Set());
-    }
   }
 
   async function onRefresh() {
@@ -209,9 +197,8 @@ export default function BookedScreen() {
                 userAvatar={profile?.avatar_url ?? null}
                 userName={profile?.name ?? user!.email ?? ''}
                 isPast={tab === 'past'}
-                isRated={ratedIds.has(event.id)}
+
                 onPress={() => router.push(`/event/${event.id}`)}
-                onRate={() => router.push(`/event/${event.id}/rate`)}
                 onDelete={() => handleDeleteTicket(event)}
                 onLeave={() => handleLeaveEvent(event)}
               />
@@ -223,15 +210,13 @@ export default function BookedScreen() {
   );
 }
 
-function TicketCard({ event, userId, userAvatar, userName, isPast, isRated, onPress, onRate, onDelete, onLeave }: {
+function TicketCard({ event, userId, userAvatar, userName, isPast, onPress, onDelete, onLeave }: {
   event: BookedEvent;
   userId: string;
   userAvatar: string | null;
   userName: string;
   isPast: boolean;
-  isRated: boolean;
   onPress: () => void;
-  onRate: () => void;
   onDelete?: () => void;
   onLeave?: () => void;
 }) {
@@ -474,14 +459,6 @@ function TicketCard({ event, userId, userAvatar, userName, isPast, isRated, onPr
               <Text style={styles.qrClub}>{event.club.name}</Text>
             ) : null}
 
-            {isPast && !isRated && (
-              <TouchableOpacity style={styles.rateBtn} onPress={onRate} activeOpacity={0.8}>
-                <Text style={styles.rateBtnText}>{t.tickets.rateEventArrow}</Text>
-              </TouchableOpacity>
-            )}
-            {isPast && isRated && (
-              <Text style={styles.ratedText}>{t.tickets.rated}</Text>
-            )}
           </View>
         </View>
       </View>
@@ -575,9 +552,6 @@ const styles = StyleSheet.create({
   qrTitle: { fontSize: 13, fontWeight: '700', color: 'rgba(255,255,255,0.6)', fontFamily: Fonts.semibold },
   qrSub: { fontSize: 11, color: 'rgba(255,255,255,0.35)', fontFamily: Fonts.regular, lineHeight: 16 },
   qrClub: { fontSize: 11, color: 'rgba(255,255,255,0.35)', fontFamily: Fonts.medium, marginTop: 2 },
-  rateBtn: { marginTop: 8, backgroundColor: Colors.lime, borderRadius: 10, paddingVertical: 8, paddingHorizontal: 14, alignSelf: 'flex-start' },
-  rateBtnText: { fontSize: 12, fontWeight: '700', color: Colors.black, fontFamily: Fonts.semibold },
-  ratedText: { fontSize: 12, color: 'rgba(255,255,255,0.4)', fontFamily: Fonts.medium, marginTop: 6 },
 
   // Options sheet
   optionsOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'flex-end' },

@@ -1,4 +1,3 @@
-import { BackButton } from '@/components/ui/BackButton';
 import React, { useEffect, useState } from 'react';
 import { View, Text, StyleSheet, ScrollView, Image, TouchableOpacity, Alert } from 'react-native';
 import Animated, { useSharedValue, useAnimatedStyle, withSpring, withTiming, withDelay, FadeIn } from 'react-native-reanimated';
@@ -133,8 +132,13 @@ export default function PaymentScreen() {
       <Toast visible={toast} title="You're in" subtitle="See you out there." />
 
       <View style={styles.header}>
-        <BackButton />
+        <View style={styles.modalHandle} />
         <Text style={styles.headerTitle}>Payment</Text>
+        <TouchableOpacity onPress={() => router.back()} style={styles.closeBtn} hitSlop={12}>
+          <Svg width={18} height={18} viewBox="0 0 24 24" fill="none">
+            <Path d="M18 6L6 18M6 6l12 12" stroke="#0A0A0A" strokeWidth={2.5} strokeLinecap="round" />
+          </Svg>
+        </TouchableOpacity>
       </View>
 
       <ScrollView contentContainerStyle={[styles.scroll, { paddingTop: 8, paddingBottom: insets.bottom + 100 }]}>
@@ -218,9 +222,11 @@ export default function PaymentScreen() {
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: Colors.white },
-  header: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 20, paddingBottom: 10, gap: 12 },
+  container: { flex: 1, backgroundColor: Colors.white, borderTopLeftRadius: 20, borderTopRightRadius: 20 },
+  modalHandle: { position: 'absolute', top: -22, left: '50%', marginLeft: -20, width: 40, height: 4, borderRadius: 2, backgroundColor: 'rgba(255,255,255,0.5)' },
+  header: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', paddingHorizontal: 20, paddingBottom: 10, position: 'relative' },
   headerTitle: { fontSize: 20, fontWeight: '700', color: Colors.black },
+  closeBtn: { position: 'absolute', right: 20, width: 32, height: 32, borderRadius: 16, backgroundColor: Colors.grayLight, alignItems: 'center', justifyContent: 'center' },
   scroll: { paddingHorizontal: 20 },
   sectionLabel: { fontSize: 22, color: Colors.black, fontWeight: '700', marginBottom: 16, letterSpacing: -0.3 },
   eventCard: { backgroundColor: Colors.grayLight, borderRadius: 16, overflow: 'hidden', marginBottom: 12 },

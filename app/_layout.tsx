@@ -60,6 +60,7 @@ export default function RootLayout() {
             <Stack.Screen name="(auth)" options={{ animation: 'none' }} />
             <Stack.Screen name="(tabs)" options={{ animation: 'none' }} />
             <Stack.Screen name="event/[id]" options={{ animation: 'none', gestureEnabled: false, contentStyle: { backgroundColor: '#0A0A0A' } }} />
+            <Stack.Screen name="event/[id]/payment" options={{ animation: 'slide_from_bottom', presentation: 'modal' }} />
             <Stack.Screen name="event/[id]/edit" options={{ animation: 'slide_from_right' }} />
             <Stack.Screen name="event/create/step1" options={{ animation: 'slide_from_bottom', presentation: 'modal' }} />
             <Stack.Screen name="event/create/step2" options={{ animation: 'slide_from_right' }} />
@@ -77,7 +78,6 @@ export default function RootLayout() {
             <Stack.Screen name="settings/delete-account" options={{ animation: 'slide_from_right' }} />
             <Stack.Screen name="settings/legal" options={{ animation: 'slide_from_right' }} />
             <Stack.Screen name="notifications/index" options={{ animation: 'slide_from_right' }} />
-            <Stack.Screen name="event/[id]/rate" options={{ animation: 'slide_from_bottom', presentation: 'modal' }} />
             <Stack.Screen name="dashboard/index" options={{ animation: 'slide_from_right' }} />
             <Stack.Screen name="club/[id]/edit" options={{ animation: 'slide_from_right' }} />
             <Stack.Screen name="admin" options={{ animation: 'slide_from_right' }} />
