@@ -585,8 +585,8 @@ export default function EventDetailScreen() {
                     <Text style={s.inlinQRHint}>{t.event.ticketLabel}</Text>
                   </TouchableOpacity>
                   {!isFree && !isPayAtDoor && !isWoevaEvent && (
-                    <TouchableOpacity style={s.addTicketBtn} onPress={() => router.push(`/event/${id}/payment`)} activeOpacity={0.8}>
-                      <Text style={s.addTicketBtnText}>{t.event.addTicket}</Text>
+                    <TouchableOpacity style={s.addTicketBtn} onPress={() => router.push('/(tabs)/booked')} activeOpacity={0.8}>
+                      <Text style={s.addTicketBtnText}>🎫 {t.event.addTicket}</Text>
                     </TouchableOpacity>
                   )}
                 </View>
@@ -681,6 +681,28 @@ export default function EventDetailScreen() {
               <Path d="M9 18l6-6-6-6" stroke={Colors.gray} strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" />
             </Svg>}
           </TouchableOpacity>
+
+          {/* ── Buy another ticket ── */}
+          {isAttending && !isFree && !isPayAtDoor && !isWoevaEvent && !eventOver && (
+            <>
+              <View style={s.hairline} />
+              <TouchableOpacity
+                style={s.buyAnotherRow}
+                onPress={() => router.push(`/event/${id}/payment`)}
+                activeOpacity={0.7}
+              >
+                <View style={s.buyAnotherIcon}>
+                  <Svg width={15} height={15} viewBox="0 0 24 24" fill="none">
+                    <Path d="M12 5v14M5 12h14" stroke={Colors.black} strokeWidth={2.5} strokeLinecap="round" />
+                  </Svg>
+                </View>
+                <Text style={s.buyAnotherText}>{lang === 'sk' ? 'Zakúpiť ďalší lístok' : 'Buy another ticket'}</Text>
+                <Svg width={14} height={14} viewBox="0 0 24 24" fill="none">
+                  <Path d="M9 18l6-6-6-6" stroke={Colors.gray} strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" />
+                </Svg>
+              </TouchableOpacity>
+            </>
+          )}
 
         </Animated.View>
       </Animated.ScrollView>
@@ -826,6 +848,9 @@ const s = StyleSheet.create({
   unreadBadgeText: { fontSize: 11, fontWeight: '700', color: Colors.white },
 
   divider: { height: 1, backgroundColor: Colors.grayBorder },
+  buyAnotherRow: { flexDirection: 'row', alignItems: 'center', gap: 14, paddingHorizontal: 6, paddingVertical: 16 },
+  buyAnotherIcon: { width: 42, height: 42, borderRadius: 12, backgroundColor: Colors.grayLight, alignItems: 'center', justifyContent: 'center', flexShrink: 0 },
+  buyAnotherText: { flex: 1, fontSize: 15, fontWeight: '600', color: Colors.black, fontFamily: Fonts.semibold },
 
   // Cancelled banner
   cancelledBanner: { flexDirection: 'row', alignItems: 'center', gap: 10, backgroundColor: '#FFF0F0', borderRadius: 14, padding: 14, marginBottom: 4, borderWidth: 1, borderColor: '#FFD0D0' },
