@@ -16,6 +16,7 @@
     "ios": {
       "supportsTablet": false,
       "bundleIdentifier": "com.woeva.app",
+      "buildNumber": "25",
       "entitlements": {
         "com.apple.developer.in-app-payments": [
           "merchant.com.woeva.app"
