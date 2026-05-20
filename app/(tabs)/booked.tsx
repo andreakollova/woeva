@@ -285,17 +285,16 @@ function TicketCard({ event, userId, userAvatar, userName, isPast, onPress, onDe
           body: JSON.stringify({ event_id: event.id }),
         }
       );
-      if (!res.ok) throw new Error('Failed to generate pass');
-      const buffer = await res.arrayBuffer();
-      const base64 = btoa(String.fromCharCode(...new Uint8Array(buffer)));
+      const data = await res.json();
+      if (!res.ok || !data.pass) throw new Error(data.error || 'Failed to generate pass');
       const path = `${FileSystem.cacheDirectory}woeva-ticket-${event.id}.pkpass`;
-      await FileSystem.writeAsStringAsync(path, base64, { encoding: FileSystem.EncodingType.Base64 });
+      await FileSystem.writeAsStringAsync(path, data.pass, { encoding: FileSystem.EncodingType.Base64 });
       await Sharing.shareAsync(path, {
         mimeType: 'application/vnd.apple.pkpass',
         UTI: 'com.apple.pkpass',
       });
-    } catch {
-      Alert.alert('Error', 'Could not generate pass. Try again.');
+    } catch (e: any) {
+      Alert.alert('Error', e?.message || 'Could not generate pass. Try again.');
     } finally {
       setLoadingWallet(false);
     }
@@ -453,16 +452,6 @@ function TicketCard({ event, userId, userAvatar, userName, isPast, onPress, onDe
           <View style={styles.perfNub} />
         </View>
 
-        {/* Add to Wallet */}
-        {!isPast && !isFree && (
-          <TouchableOpacity onPress={handleAddToWallet} activeOpacity={0.8} style={styles.walletBtn} disabled={loadingWallet}>
-            {loadingWallet
-              ? <ActivityIndicator color={Colors.white} size="small" />
-              : <Image source={require('@/assets/images/add-to-wallet.png')} style={styles.walletBadge} resizeMode="contain" />
-            }
-          </TouchableOpacity>
-        )}
-
         {/* QR section */}
         <Modal visible={qrModal} transparent animationType="fade" onRequestClose={() => setQrModal(false)}>
           <TouchableOpacity style={styles.qrModalBg} activeOpacity={1} onPress={() => setQrModal(false)}>
@@ -476,6 +465,15 @@ function TicketCard({ event, userId, userAvatar, userName, isPast, onPress, onDe
             </View>
           </TouchableOpacity>
         </Modal>
+        {!isPast && !isFree && (
+          <TouchableOpacity onPress={handleAddToWallet} activeOpacity={0.8} style={styles.walletBtn} disabled={loadingWallet}>
+            {loadingWallet
+              ? <ActivityIndicator color={Colors.white} size="small" />
+              : <Image source={require('@/assets/images/add-to-wallet.png')} style={styles.walletBadge} resizeMode="contain" />
+            }
+          </TouchableOpacity>
+        )}
+
         <View style={styles.qrSection}>
           <TouchableOpacity
             style={[styles.qrWrap, isFree && styles.qrWrapFree]}
@@ -521,7 +519,7 @@ const styles = StyleSheet.create({
   tabBtnActive: { backgroundColor: Colors.black },
   tabText: { fontSize: 14, fontWeight: '500', fontFamily: Fonts.medium, color: Colors.gray },
   tabTextActive: { color: Colors.white },
-  scroll: { paddingHorizontal: 20, paddingBottom: 40, gap: 16 },
+  scroll: { paddingHorizontal: 20, paddingBottom: 120, gap: 16 },
   empty: { paddingTop: 60, alignItems: 'center', gap: 12 },
   emptyTitle: { fontSize: 22, fontWeight: '700', fontFamily: Fonts.extrabold, color: Colors.black },
   emptyText: { fontSize: 15, color: Colors.gray, textAlign: 'center', lineHeight: 22, fontFamily: Fonts.regular },

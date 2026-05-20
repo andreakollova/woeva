@@ -170,7 +170,8 @@ export default function ChatScreen() {
       .from('event_attendees').select('user_id')
       .eq('event_id', roomId).neq('user_id', user.id);
 
-    if ((attendees ?? []).length > 0) {
+    // Only admins (creator / club admin) send push notifications to attendees
+    if ((attendees ?? []).length > 0 && adminIds.has(user.id)) {
       const attendeeIds = (attendees ?? []).map((a: any) => a.user_id);
 
       // Push notifications only — no in-app bell for chat (would feel like duplicate)

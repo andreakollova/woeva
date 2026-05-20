@@ -1,7 +1,7 @@
 import { BackButton } from '@/components/ui/BackButton';
 import React from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, ScrollView, Alert } from 'react-native';
-import Svg, { Path } from 'react-native-svg';
+import Svg, { Path, Rect, Circle, Line } from 'react-native-svg';
 import { useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Colors } from '@/constants/colors';
@@ -18,6 +18,21 @@ function ChevronIcon() {
   );
 }
 
+function Icon({ name, color = '#0A0A0A' }: { name: string; color?: string }) {
+  const s = { stroke: color, strokeWidth: 1.8, strokeLinecap: 'round' as const, strokeLinejoin: 'round' as const };
+  switch (name) {
+    case 'user': return <Svg width={18} height={18} viewBox="0 0 24 24" fill="none"><Path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2" {...s}/><Circle cx="12" cy="7" r="4" {...s}/></Svg>;
+    case 'star': return <Svg width={18} height={18} viewBox="0 0 24 24" fill="none"><Path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z" {...s}/></Svg>;
+    case 'card': return <Svg width={18} height={18} viewBox="0 0 24 24" fill="none"><Rect x="1" y="4" width="22" height="16" rx="2" {...s}/><Line x1="1" y1="10" x2="23" y2="10" {...s}/></Svg>;
+    case 'bell': return <Svg width={18} height={18} viewBox="0 0 24 24" fill="none"><Path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9" {...s}/><Path d="M13.73 21a2 2 0 0 1-3.46 0" {...s}/></Svg>;
+    case 'chart': return <Svg width={18} height={18} viewBox="0 0 24 24" fill="none"><Line x1="18" y1="20" x2="18" y2="10" {...s}/><Line x1="12" y1="20" x2="12" y2="4" {...s}/><Line x1="6" y1="20" x2="6" y2="14" {...s}/></Svg>;
+    case 'info': return <Svg width={18} height={18} viewBox="0 0 24 24" fill="none"><Circle cx="12" cy="12" r="10" {...s}/><Line x1="12" y1="8" x2="12" y2="8" strokeWidth={2.5} stroke={color}/><Path d="M12 12v4" {...s}/></Svg>;
+    case 'logout': return <Svg width={18} height={18} viewBox="0 0 24 24" fill="none"><Path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4" {...s}/><Path d="M16 17l5-5-5-5" {...s}/><Path d="M21 12H9" {...s}/></Svg>;
+    case 'trash': return <Svg width={18} height={18} viewBox="0 0 24 24" fill="none"><Path d="M3 6h18M19 6l-1 14H6L5 6M10 11v6M14 11v6M9 6V4h6v2" {...s}/></Svg>;
+    default: return null;
+  }
+}
+
 export default function SettingsScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
@@ -28,22 +43,22 @@ export default function SettingsScreen() {
     {
       title: t.settings.account,
       items: [
-        { label: t.settings.profileInfo, route: '/settings/profile', icon: '👤' },
-        { label: t.settings.interests, route: '/settings/profile', icon: '✦' },
-        { label: t.settings.paymentMethods, route: '/settings/payment-methods', icon: '💳' },
+        { label: t.settings.profileInfo, route: '/settings/profile', icon: 'user' },
+        { label: t.settings.interests, route: '/settings/profile', icon: 'star' },
+        { label: t.settings.paymentMethods, route: '/settings/payment-methods', icon: 'card' },
       ],
     },
     {
       title: t.settings.creator,
       items: [
-        { label: t.common.notifications, route: '/settings/notifications', icon: '🔔' },
-        { label: t.dashboard.revenue, route: '/dashboard', icon: '📊' },
+        { label: t.common.notifications, route: '/settings/notifications', icon: 'bell' },
+        { label: t.dashboard.revenue, route: '/dashboard', icon: 'chart' },
       ],
     },
     {
       title: t.settings.support,
       items: [
-        { label: t.settings.about, route: '/settings/about', icon: 'ℹ' },
+        { label: t.settings.about, route: '/settings/about', icon: 'info' },
       ],
     },
   ];
@@ -95,7 +110,7 @@ export default function SettingsScreen() {
                 >
                   <View style={styles.rowLeft}>
                     <View style={styles.rowIconWrap}>
-                      <Text style={styles.rowIcon}>{item.icon}</Text>
+                      <Icon name={item.icon} />
                     </View>
                     <Text style={styles.rowLabel}>{item.label}</Text>
                   </View>
@@ -112,7 +127,7 @@ export default function SettingsScreen() {
             <TouchableOpacity style={styles.row} onPress={handleSignOut} activeOpacity={0.6}>
               <View style={styles.rowLeft}>
                 <View style={[styles.rowIconWrap, styles.rowIconWrapRed]}>
-                  <Text style={styles.rowIcon}>↩</Text>
+                  <Icon name="logout" color="#FF3B30" />
                 </View>
                 <Text style={[styles.rowLabel, styles.rowLabelRed]}>{t.settings.signOut}</Text>
               </View>
@@ -120,7 +135,7 @@ export default function SettingsScreen() {
             <TouchableOpacity style={[styles.row, styles.rowLast]} onPress={() => router.push('/settings/delete-account')} activeOpacity={0.6}>
               <View style={styles.rowLeft}>
                 <View style={[styles.rowIconWrap, styles.rowIconWrapRed]}>
-                  <Text style={styles.rowIcon}>🗑</Text>
+                  <Icon name="trash" color="#FF3B30" />
                 </View>
                 <Text style={[styles.rowLabel, styles.rowLabelRed]}>{t.settings.deleteAccount}</Text>
               </View>

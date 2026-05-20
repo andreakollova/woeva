@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { StatusBar } from 'expo-status-bar';
 import * as FileSystem from 'expo-file-system/legacy';
+import * as Sharing from 'expo-sharing';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { View, Text, StyleSheet, TouchableOpacity, Image, Alert, Dimensions, Modal, Share, Platform, TextInput, ScrollView as RNScrollView } from 'react-native';
 import QRCode from 'react-native-qrcode-svg';
@@ -50,6 +51,7 @@ export default function EventDetailScreen() {
   const [isMember, setIsMember] = useState(false);
   const [unreadCount, setUnreadCount] = useState(0);
   const [qrModal, setQrModal] = useState(false);
+  const [loadingWallet, setLoadingWallet] = useState(false);
   const [myTicketIds, setMyTicketIds] = useState<string[]>([]);
   const [cancelModal, setCancelModal] = useState(false);
   const [cancelReason, setCancelReason] = useState('');
@@ -134,6 +136,38 @@ export default function EventDetailScreen() {
         const { data: mem } = await supabase.from('club_members').select('id').eq('club_id', data.club_id).eq('user_id', user.id).single();
         setIsMember(!!mem);
       }
+    }
+  }
+
+  async function handleAddToWallet() {
+    if (loadingWallet) return;
+    setLoadingWallet(true);
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      const res = await fetch(
+        `${process.env.EXPO_PUBLIC_SUPABASE_URL}/functions/v1/generate-pass`,
+        {
+          method: 'POST',
+          headers: {
+            'Authorization': `Bearer ${session?.access_token}`,
+            'Content-Type': 'application/json',
+            'apikey': process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY!,
+          },
+          body: JSON.stringify({ event_id: id }),
+        }
+      );
+      const data = await res.json();
+      if (!res.ok || !data.pass) throw new Error(data.error || 'Failed to generate pass');
+      const path = `${FileSystem.documentDirectory}woeva-ticket-${id}.pkpass`;
+      await FileSystem.writeAsStringAsync(path, data.pass, { encoding: FileSystem.EncodingType.Base64 });
+      await Sharing.shareAsync(path, {
+        mimeType: 'application/vnd.apple.pkpass',
+        UTI: 'com.apple.pkpass',
+      });
+    } catch (e: any) {
+      Alert.alert('Error', e?.message || 'Could not generate pass. Try again.');
+    } finally {
+      setLoadingWallet(false);
     }
   }
 
@@ -585,8 +619,8 @@ export default function EventDetailScreen() {
                     <Text style={s.inlinQRHint}>{t.event.ticketLabel}</Text>
                   </TouchableOpacity>
                   {!isFree && !isPayAtDoor && !isWoevaEvent && (
-                    <TouchableOpacity style={s.addTicketBtn} onPress={() => router.push('/(tabs)/booked')} activeOpacity={0.8}>
-                      <Text style={s.addTicketBtnText}>🎫 {t.event.addTicket}</Text>
+                    <TouchableOpacity onPress={handleAddToWallet} activeOpacity={0.8} disabled={loadingWallet}>
+                      <Image source={require('@/assets/images/add-to-wallet.png')} style={{ width: 120, height: 34 }} resizeMode="contain" />
                     </TouchableOpacity>
                   )}
                 </View>
@@ -641,13 +675,13 @@ export default function EventDetailScreen() {
                   <Text style={s.hostName}>{hostName}</Text>
                 </View>
                 {isMember
-                  ? <View style={s.memberPill}><Text style={s.memberPillText}>{t.event.memberLabel}</Text></View>
+                  ? <View style={s.joinPill}><Text style={s.joinPillText}>✓ {t.event.memberLabel}</Text></View>
                   : event.club && user
                     ? <TouchableOpacity style={s.joinPill} onPress={async (e) => {
                         e.stopPropagation?.();
                         await supabase.from('club_members').insert({ club_id: event.club!.id, user_id: user.id, role: 'member', status: 'approved' });
                         setIsMember(true);
-                      }}><Text style={s.joinPillText}>{t.event.joinPlus}</Text></TouchableOpacity>
+                      }}><Text style={s.joinPillText}>+ {t.event.joinPlus}</Text></TouchableOpacity>
                     : event.club
                       ? <Svg width={16} height={16} viewBox="0 0 24 24" fill="none"><Path d="M9 18l6-6-6-6" stroke={Colors.gray} strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" /></Svg>
                       : null
