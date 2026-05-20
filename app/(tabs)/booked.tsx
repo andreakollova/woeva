@@ -1,5 +1,7 @@
 import React, { useEffect, useState } from 'react';
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity, RefreshControl, Image, ImageStyle, Modal, Alert, Share, Linking, Platform } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, TouchableOpacity, RefreshControl, Image, ImageStyle, Modal, Alert, Share, Linking, Platform, ActivityIndicator } from 'react-native';
+import * as FileSystem from 'expo-file-system';
+import * as Sharing from 'expo-sharing';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import Animated, { FadeInDown } from 'react-native-reanimated';
@@ -224,6 +226,7 @@ function TicketCard({ event, userId, userAvatar, userName, isPast, onPress, onDe
   const [qrModal, setQrModal] = useState(false);
   const [optionsModal, setOptionsModal] = useState(false);
   const [goingCount, setGoingCount] = useState(event.going_count ?? 0);
+  const [loadingWallet, setLoadingWallet] = useState(false);
 
   useEffect(() => {
     const channelName = `event_going_${event.id}_${Math.random().toString(36).slice(2)}`;
@@ -263,6 +266,39 @@ function TicketCard({ event, userId, userAvatar, userName, isPast, onPress, onDe
     Linking.openURL(url).catch(() => {
       Linking.openURL(`https://maps.google.com/?q=${query}`);
     });
+  }
+
+  async function handleAddToWallet() {
+    if (loadingWallet) return;
+    setLoadingWallet(true);
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      const res = await fetch(
+        `${process.env.EXPO_PUBLIC_SUPABASE_URL}/functions/v1/generate-pass`,
+        {
+          method: 'POST',
+          headers: {
+            'Authorization': `Bearer ${session?.access_token}`,
+            'Content-Type': 'application/json',
+            'apikey': process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY!,
+          },
+          body: JSON.stringify({ event_id: event.id }),
+        }
+      );
+      if (!res.ok) throw new Error('Failed to generate pass');
+      const buffer = await res.arrayBuffer();
+      const base64 = btoa(String.fromCharCode(...new Uint8Array(buffer)));
+      const path = `${FileSystem.cacheDirectory}woeva-ticket-${event.id}.pkpass`;
+      await FileSystem.writeAsStringAsync(path, base64, { encoding: FileSystem.EncodingType.Base64 });
+      await Sharing.shareAsync(path, {
+        mimeType: 'application/vnd.apple.pkpass',
+        UTI: 'com.apple.pkpass',
+      });
+    } catch {
+      Alert.alert('Error', 'Could not generate pass. Try again.');
+    } finally {
+      setLoadingWallet(false);
+    }
   }
 
   function handleCalendar() {
@@ -417,6 +453,16 @@ function TicketCard({ event, userId, userAvatar, userName, isPast, onPress, onDe
           <View style={styles.perfNub} />
         </View>
 
+        {/* Add to Wallet */}
+        {!isPast && !isFree && (
+          <TouchableOpacity onPress={handleAddToWallet} activeOpacity={0.8} style={styles.walletBtn} disabled={loadingWallet}>
+            {loadingWallet
+              ? <ActivityIndicator color={Colors.white} size="small" />
+              : <Image source={require('@/assets/images/add-to-wallet.png')} style={styles.walletBadge} resizeMode="contain" />
+            }
+          </TouchableOpacity>
+        )}
+
         {/* QR section */}
         <Modal visible={qrModal} transparent animationType="fade" onRequestClose={() => setQrModal(false)}>
           <TouchableOpacity style={styles.qrModalBg} activeOpacity={1} onPress={() => setQrModal(false)}>
@@ -565,6 +611,9 @@ const styles = StyleSheet.create({
   optionsRowLabel: { fontSize: 15, fontWeight: '600', color: Colors.black, fontFamily: Fonts.semibold },
   optionsRowLabelDestructive: { color: '#FF3B30' },
   optionsRowSub: { fontSize: 12, color: Colors.gray, fontFamily: Fonts.regular, marginTop: 1 },
+
+  walletBtn: { alignItems: 'center', justifyContent: 'center', paddingVertical: 6, marginBottom: 14, minHeight: 44 },
+  walletBadge: { width: 160, height: 44 },
 
   // QR modal
   qrModalBg: { flex: 1, backgroundColor: 'rgba(0,0,0,0.75)', alignItems: 'center', justifyContent: 'center' },
