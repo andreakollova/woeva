@@ -3,7 +3,7 @@ import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Image, Alert } fr
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import { useFocusEffect } from 'expo-router';
-import Svg, { Path, Circle } from 'react-native-svg';
+import Svg, { Path } from 'react-native-svg';
 import { Colors } from '@/constants/colors';
 import { Fonts } from '@/constants/fonts';
 import { WMark } from '@/components/ui/WMark';
@@ -15,11 +15,9 @@ import { CATEGORY_SK, CATEGORY_EN } from '@/types';
 function SettingsIcon() {
   return (
     <View style={{ width: 36, height: 36, borderRadius: 18, backgroundColor: '#F2F2F2', alignItems: 'center', justifyContent: 'center' }}>
-      <Svg width={17} height={17} viewBox="0 0 24 24" fill="none">
-        <Path d="M4 6h16M4 12h16M4 18h16" stroke="#0A0A0A" strokeWidth={2} strokeLinecap="round" />
-        <Circle cx="9" cy="6" r="2.2" fill="#fff" stroke="#0A0A0A" strokeWidth={1.8} />
-        <Circle cx="16" cy="12" r="2.2" fill="#fff" stroke="#0A0A0A" strokeWidth={1.8} />
-        <Circle cx="9" cy="18" r="2.2" fill="#fff" stroke="#0A0A0A" strokeWidth={1.8} />
+      <Svg width={18} height={18} viewBox="0 0 24 24" fill="none">
+        <Path d="M12 15a3 3 0 1 0 0-6 3 3 0 0 0 0 6z" stroke="#0A0A0A" strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round"/>
+        <Path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z" stroke="#0A0A0A" strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round"/>
       </Svg>
     </View>
   );

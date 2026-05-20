@@ -23,6 +23,7 @@ import { BackButton } from '@/components/ui/BackButton';
 import { useAuth } from '@/context/AuthContext';
 import { notify } from '@/lib/notify';
 import { useTranslations } from '@/context/LanguageContext';
+import { formatVenue } from '@/lib/formatVenue';
 
 const { height: SCREEN_H } = Dimensions.get('window');
 const COVER_HEIGHT = Math.round(SCREEN_H * 0.48);
@@ -548,7 +549,7 @@ export default function EventDetailScreen() {
                         </Svg>
                       </View>
                       <View style={{ flex: 1 }}>
-                        <Text style={s.infoText}>{event.city ? event.venue.replace(new RegExp(`,?\\s*${event.city}`, 'i'), '').trim() : event.venue}</Text>
+                        <Text style={s.infoText}>{formatVenue(event.venue)}</Text>
                         {event.city ? <Text style={s.infoSub}>{event.city}</Text> : null}
                       </View>
                     </View>

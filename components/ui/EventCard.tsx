@@ -7,6 +7,7 @@ import { Fonts } from '@/constants/fonts';
 import { Event } from '@/types';
 import { useAuth } from '@/context/AuthContext';
 import { useTranslations } from '@/context/LanguageContext';
+import { formatVenue } from '@/lib/formatVenue';
 
 interface EventCardProps {
   event: Event;
@@ -120,10 +121,7 @@ export function EventCard({ event, featured, attending }: EventCardProps) {
             <>
               <Text style={styles.rowDot}>·</Text>
               <Text style={[styles.rowMeta, { flex: 1 }]} numberOfLines={1} ellipsizeMode="tail">
-                {(() => {
-                  const parts = event.venue.split(',').map(p => p.trim());
-                  return parts.find(p => !/^[\d/\s]+$/.test(p)) ?? parts[0];
-                })()}
+                {formatVenue(event.venue)}
               </Text>
             </>
           ) : null}
