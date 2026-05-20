@@ -1,7 +1,7 @@
 import { BackButton } from '@/components/ui/BackButton';
 import React, { useEffect, useState, useRef } from 'react';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { View, Text, StyleSheet, FlatList, TextInput, TouchableOpacity, KeyboardAvoidingView, Platform, Image, Alert, ScrollView } from 'react-native';
+import { View, Text, StyleSheet, FlatList, TextInput, TouchableOpacity, KeyboardAvoidingView, Platform, Image, Alert, ScrollView, Keyboard } from 'react-native';
 import { useLocalSearchParams } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Colors } from '@/constants/colors';
@@ -27,7 +27,14 @@ export default function ChatScreen() {
   const [profileCache, setProfileCache] = useState<ProfileCache>({});
   const [adminIds, setAdminIds] = useState<Set<string>>(new Set());
   const [muted, setMuted] = useState(false);
+  const [keyboardVisible, setKeyboardVisible] = useState(false);
   const listRef = useRef<FlatList>(null);
+
+  useEffect(() => {
+    const show = Keyboard.addListener('keyboardWillShow', () => setKeyboardVisible(true));
+    const hide = Keyboard.addListener('keyboardWillHide', () => setKeyboardVisible(false));
+    return () => { show.remove(); hide.remove(); };
+  }, []);
 
   useEffect(() => {
     if (!user) return;
@@ -239,12 +246,12 @@ export default function ChatScreen() {
                 <Text style={styles.adminBadgeText}>★ {tr.chat.admin}</Text>
               </View>
             )}
+            <Text style={styles.msgTimeInline}>
+              {new Date(item.created_at).toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' })}
+            </Text>
           </View>
           <View style={[styles.bubble, isMe && styles.bubbleMe]}>
             <Text style={[styles.msgText, isMe && styles.msgTextMe]}>{item.content}</Text>
-            <Text style={[styles.msgTime, isMe && styles.msgTimeMe]}>
-              {new Date(item.created_at).toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' })}
-            </Text>
           </View>
         </View>
       </View>
@@ -294,7 +301,7 @@ export default function ChatScreen() {
       </ScrollView>
 
       {/* Input */}
-      <View style={[styles.inputBar, { paddingBottom: insets.bottom + 8 }]}>
+      <View style={[styles.inputBar, { paddingBottom: keyboardVisible ? 8 : insets.bottom + 8 }]}>
         <TextInput
           style={styles.input}
           value={text}
@@ -343,8 +350,7 @@ const styles = StyleSheet.create({
   adminBadgeText: { fontSize: 9, fontWeight: '700', color: Colors.black, fontFamily: Fonts.bold, letterSpacing: 0.2 },
   msgText: { fontSize: 15, color: Colors.black, lineHeight: 20 },
   msgTextMe: { color: Colors.white },
-  msgTime: { fontSize: 10, color: Colors.gray, alignSelf: 'flex-end' },
-  msgTimeMe: { color: 'rgba(255,255,255,0.5)' },
+  msgTimeInline: { fontSize: 10, color: Colors.gray, marginLeft: 'auto' },
   emojiBar: { flexGrow: 0, borderTopWidth: 1, borderColor: Colors.grayBorder },
   emojiBarContent: { paddingHorizontal: 12, paddingVertical: 8, gap: 8, flexDirection: 'row' },
   emojiBtn: { width: 40, height: 40, borderRadius: 20, backgroundColor: Colors.grayLight, alignItems: 'center', justifyContent: 'center' },

@@ -75,7 +75,7 @@ export default function PaymentScreen() {
 
     if (initError) {
       setLoading(false);
-      Alert.alert('Payment error', initError.message);
+      Alert.alert('Payment error (init)', `code: ${initError.code}\n${initError.message}`);
       return;
     }
 
@@ -83,7 +83,8 @@ export default function PaymentScreen() {
     setLoading(false);
 
     if (payError) {
-      Alert.alert('Payment error', `code: ${payError.code}\n${payError.message}`);
+      if (payError.code === 'Canceled') return;
+      Alert.alert('Payment error (pay)', `code: ${payError.code}\n${payError.message}`);
       return;
     }
 

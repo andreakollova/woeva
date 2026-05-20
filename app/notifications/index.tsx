@@ -108,6 +108,8 @@ export default function NotificationsScreen() {
       return;
     }
     const eventId = n.data?.event_id;
+    const isChat = n.type === 'chat' || n.data?.type === 'chat';
+    if (isChat && eventId) { router.push(`/chat/${eventId}` as any); return; }
     if (eventId) router.push(`/event/${eventId}` as any);
     const clubId = n.data?.club_id;
     if (clubId && !eventId) router.push(`/club/${clubId}` as any);
@@ -147,12 +149,14 @@ export default function NotificationsScreen() {
               {iconForType(n.type)}
             </View>
             <View style={styles.rowContent}>
-              <Text style={styles.rowTitle}>{n.title}</Text>
+              <View style={styles.rowTitleRow}>
+                <Text style={styles.rowTitle} numberOfLines={1}>{n.title}</Text>
+                <Text style={styles.rowTime}>{timeAgo(n.created_at)}</Text>
+              </View>
               {n.body ? <Text style={styles.rowBody}>{n.body}</Text> : null}
               {n.type === 'admin_invite' && !n.read && (
                 <Text style={styles.rowAction}>{t.notif.tapToAcceptDecline}</Text>
               )}
-              <Text style={styles.rowTime}>{timeAgo(n.created_at)}</Text>
             </View>
             {!n.read && <View style={styles.unreadDot} />}
           </TouchableOpacity>
@@ -171,9 +175,10 @@ const styles = StyleSheet.create({
   rowUnread: { backgroundColor: '#FAFFF0' },
   iconBox: { width: 40, height: 40, borderRadius: 12, alignItems: 'center', justifyContent: 'center', flexShrink: 0 },
   rowContent: { flex: 1, gap: 3 },
-  rowTitle: { fontSize: 14, fontWeight: '600', color: Colors.black, fontFamily: Fonts.semibold, lineHeight: 20 },
+  rowTitleRow: { flexDirection: 'row', alignItems: 'center', gap: 8 },
+  rowTitle: { fontSize: 14, fontWeight: '600', color: Colors.black, fontFamily: Fonts.semibold, lineHeight: 20, flex: 1 },
   rowBody: { fontSize: 13, color: Colors.gray, fontFamily: Fonts.regular, lineHeight: 18 },
-  rowTime: { fontSize: 11, color: Colors.gray, fontFamily: Fonts.regular, marginTop: 2 },
+  rowTime: { fontSize: 11, color: Colors.gray, fontFamily: Fonts.regular, flexShrink: 0 },
   rowAction: { fontSize: 12, color: Colors.black, fontFamily: Fonts.medium, fontWeight: '600', marginTop: 4 },
   unreadDot: { width: 8, height: 8, borderRadius: 4, backgroundColor: Colors.lime, marginTop: 6, flexShrink: 0 },
   empty: { flex: 1, alignItems: 'center', justifyContent: 'center', paddingTop: 80, gap: 12 },

@@ -1,4 +1,4 @@
-import { Stack } from 'expo-router';
+import { Stack, useRouter } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
@@ -6,6 +6,8 @@ import { StripeProvider } from '@stripe/stripe-react-native';
 import { StyleSheet } from 'react-native';
 import { AuthProvider } from '@/context/AuthContext';
 import { LanguageProvider } from '@/context/LanguageContext';
+import * as Notifications from 'expo-notifications';
+import { useEffect } from 'react';
 import {
   useFonts,
   Inter_400Regular,
@@ -14,6 +16,24 @@ import {
   Inter_700Bold,
   Inter_800ExtraBold,
 } from '@expo-google-fonts/inter';
+
+function NotificationHandler() {
+  const router = useRouter();
+  const response = Notifications.useLastNotificationResponse();
+
+  useEffect(() => {
+    if (!response) return;
+    const data = response.notification.request.content.data as any;
+    if (!data) return;
+    if (data.type === 'chat' && data.event_id) {
+      router.push(`/chat/${data.event_id}`);
+    } else if (data.event_id) {
+      router.push(`/event/${data.event_id}`);
+    }
+  }, [response]);
+
+  return null;
+}
 
 const STRIPE_KEY = process.env.EXPO_PUBLIC_STRIPE_PUBLISHABLE_KEY ?? '';
 
@@ -35,6 +55,7 @@ export default function RootLayout() {
         <AuthProvider>
         <StripeProvider publishableKey={STRIPE_KEY} merchantIdentifier="merchant.com.woeva.app">
           <StatusBar style="auto" />
+          <NotificationHandler />
           <Stack screenOptions={{ headerShown: false, animation: 'fade_from_bottom' }}>
             <Stack.Screen name="(auth)" options={{ animation: 'none' }} />
             <Stack.Screen name="(tabs)" options={{ animation: 'none' }} />

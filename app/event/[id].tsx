@@ -245,14 +245,6 @@ export default function EventDetailScreen() {
     } catch {}
   }
 
-  function onScrollEndDrag(e: any) {
-    const { contentOffset, contentSize, layoutMeasurement } = e.nativeEvent;
-    const overBottom = contentOffset.y - (contentSize.height - layoutMeasurement.height);
-    if (overBottom > 55) {
-      router.push(`/feed?startAfterId=${rawId}` as any);
-    }
-  }
-
   if (!event) return <View style={s.outerWrap} />;
 
   const isCreator = !!user && event.creator_id === user.id;
@@ -438,7 +430,6 @@ export default function EventDetailScreen() {
 
       <Animated.ScrollView
         onScroll={scrollHandler}
-        onScrollEndDrag={onScrollEndDrag}
         scrollEventThrottle={16}
         contentContainerStyle={{ paddingBottom: insets.bottom + 110 }}
         showsVerticalScrollIndicator={false}

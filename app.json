@@ -16,13 +16,19 @@
     "ios": {
       "supportsTablet": false,
       "bundleIdentifier": "com.woeva.app",
+      "entitlements": {
+        "com.apple.developer.in-app-payments": [
+          "merchant.com.woeva.app"
+        ]
+      },
       "infoPlist": {
         "NSLocationWhenInUseUsageDescription": "Woeva uses your location to show events near you.",
         "NSCameraUsageDescription": "Woeva uses your camera to upload event photos.",
         "NSPhotoLibraryUsageDescription": "Woeva uses your photo library to upload event photos.",
         "NSUserTrackingUsageDescription": "Woeva uses this to personalise your event feed.",
         "ITSAppUsesNonExemptEncryption": false
-      }
+      },
+      "appleTeamId": "J4YGZU25B2"
     },
     "android": {
       "adaptiveIcon": {
@@ -36,7 +42,9 @@
         "ACCESS_FINE_LOCATION",
         "ACCESS_COARSE_LOCATION",
         "CAMERA",
-        "READ_EXTERNAL_STORAGE"
+        "READ_EXTERNAL_STORAGE",
+        "android.permission.ACCESS_COARSE_LOCATION",
+        "android.permission.ACCESS_FINE_LOCATION"
       ]
     },
     "web": {

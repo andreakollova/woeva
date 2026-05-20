@@ -82,8 +82,10 @@ serve(async (req) => {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     });
   } catch (err: any) {
-    return new Response(JSON.stringify({ error: err.message }), {
-      status: 500,
+    const detail = err?.raw?.message ?? err?.message ?? String(err);
+    console.error('create-connect-account error:', detail);
+    return new Response(JSON.stringify({ error: detail }), {
+      status: 200, // return 200 so client can read the body
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     });
   }

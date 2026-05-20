@@ -1,0 +1,443 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+  <title>Woeva Feed</title>
+  <style>
+    *, *::before, *::after {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    html, body {
+      width: 100%;
+      height: 100%;
+      overflow: hidden;
+      overscroll-behavior: none;
+      background: #000;
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+      -webkit-font-smoothing: antialiased;
+    }
+
+    .feed {
+      position: fixed;
+      inset: 0;
+      width: 100vw;
+      height: 100dvh;
+      overflow: hidden;
+      touch-action: none;
+      will-change: transform;
+    }
+
+    .event-card {
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 100vw;
+      height: 100dvh;
+      will-change: transform;
+      backface-visibility: hidden;
+      contain: layout paint size;
+      overflow: hidden;
+    }
+
+    .event-card.snap {
+      transition: transform 360ms cubic-bezier(0.22, 1, 0.36, 1);
+    }
+
+    .card-img {
+      position: absolute;
+      inset: 0;
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+      pointer-events: none;
+    }
+
+    .card-gradient {
+      position: absolute;
+      inset: 0;
+      background: linear-gradient(
+        to bottom,
+        rgba(0,0,0,0.45) 0%,
+        rgba(0,0,0,0.05) 25%,
+        rgba(0,0,0,0.0)  50%,
+        rgba(0,0,0,0.55) 75%,
+        rgba(0,0,0,0.82) 100%
+      );
+    }
+
+    .card-body {
+      position: absolute;
+      bottom: 0;
+      left: 0;
+      right: 0;
+      padding: 24px 20px;
+      padding-bottom: max(40px, env(safe-area-inset-bottom, 40px));
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+    }
+
+    .card-category {
+      display: inline-flex;
+      align-self: flex-start;
+      background: #C8FF00;
+      border-radius: 50px;
+      padding: 4px 12px;
+    }
+    .card-category span {
+      font-size: 10px;
+      font-weight: 800;
+      color: #000;
+      letter-spacing: 1px;
+      text-transform: uppercase;
+    }
+
+    .card-title {
+      font-size: 30px;
+      font-weight: 800;
+      color: #fff;
+      line-height: 1.15;
+      letter-spacing: -0.5px;
+    }
+
+    .card-meta {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      flex-wrap: wrap;
+    }
+    .card-meta-text {
+      font-size: 14px;
+      color: rgba(255,255,255,0.72);
+    }
+    .card-meta-dot {
+      width: 3px;
+      height: 3px;
+      border-radius: 50%;
+      background: rgba(255,255,255,0.35);
+      flex-shrink: 0;
+    }
+
+    .card-actions {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      margin-top: 4px;
+    }
+
+    .btn-join {
+      flex: 1;
+      height: 54px;
+      border-radius: 50px;
+      border: none;
+      font-size: 15px;
+      font-weight: 700;
+      cursor: pointer;
+      -webkit-tap-highlight-color: transparent;
+      background: #C8FF00;
+      color: #000;
+      letter-spacing: -0.2px;
+    }
+    .btn-join.paid {
+      background: #fff;
+      color: #000;
+    }
+
+    .btn-arrow {
+      width: 54px;
+      height: 54px;
+      border-radius: 50px;
+      border: 1.5px solid rgba(255,255,255,0.25);
+      background: rgba(255,255,255,0.1);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      cursor: pointer;
+      -webkit-tap-highlight-color: transparent;
+      flex-shrink: 0;
+    }
+
+    /* Top bar */
+    .top-bar {
+      position: absolute;
+      top: 0;
+      left: 0;
+      right: 0;
+      padding-top: max(16px, env(safe-area-inset-top, 16px));
+      padding-bottom: 12px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      z-index: 20;
+      pointer-events: none;
+    }
+
+    .w-logo {
+      font-size: 22px;
+      font-weight: 900;
+      color: #C8FF00;
+      letter-spacing: -1px;
+    }
+
+    /* Progress bar */
+    .progress-bar {
+      position: absolute;
+      top: max(52px, calc(env(safe-area-inset-top, 0px) + 52px));
+      left: 20px;
+      right: 20px;
+      display: flex;
+      gap: 5px;
+      z-index: 20;
+      pointer-events: none;
+    }
+
+    .progress-seg {
+      flex: 1;
+      height: 2px;
+      border-radius: 2px;
+      background: rgba(255,255,255,0.25);
+      overflow: hidden;
+    }
+    .progress-seg-fill {
+      height: 100%;
+      background: #C8FF00;
+      border-radius: 2px;
+      transition: width 360ms cubic-bezier(0.22, 1, 0.36, 1);
+      width: 0%;
+    }
+    .progress-seg.done .progress-seg-fill { width: 100%; }
+    .progress-seg.active .progress-seg-fill { width: 100%; }
+  </style>
+</head>
+<body>
+
+<div class="feed" id="feed">
+
+  <!-- Top bar -->
+  <div class="top-bar">
+    <span class="w-logo">W</span>
+  </div>
+
+  <!-- Progress bar -->
+  <div class="progress-bar" id="progressBar"></div>
+
+  <!-- Cards inserted by JS -->
+</div>
+
+<script>
+  // ── Data ─────────────────────────────────────────────────────────────────
+  // Replace with real API data / pass from native via window.WOEVA_EVENTS
+  const events = window.WOEVA_EVENTS || [
+    {
+      id: '1',
+      title: 'Tanec pri fontáne',
+      category: 'Dance',
+      date: 'Str, 20 máj',
+      time: '17:30',
+      venue: 'Námestie slobody',
+      price: 0,
+      isFree: true,
+      cover: 'https://images.unsplash.com/photo-1504609813442-a8924e83f76e?w=900&q=80',
+    },
+    {
+      id: '2',
+      title: 'JAZZTIKOT | Silvia Josifoska & Pavol Breiner',
+      category: 'Music',
+      date: 'Str, 20 máj',
+      time: '19:00',
+      venue: 'Záhrada',
+      price: 12,
+      isFree: false,
+      cover: 'https://images.unsplash.com/photo-1511192336575-5a79af67a629?w=900&q=80',
+    },
+    {
+      id: '3',
+      title: 'Yoga v parku',
+      category: 'Yoga',
+      date: 'Štvr, 21 máj',
+      time: '08:00',
+      venue: 'Sad Janka Kráľa',
+      price: 0,
+      isFree: true,
+      cover: 'https://images.unsplash.com/photo-1506905925346-21bda4d32df4?w=900&q=80',
+    },
+    {
+      id: '4',
+      title: 'Tech Meetup Bratislava',
+      category: 'Tech',
+      date: 'Pia, 22 máj',
+      time: '18:00',
+      venue: 'Silo Coworking',
+      price: 0,
+      isFree: true,
+      cover: 'https://images.unsplash.com/photo-1540575467063-178a50c2df87?w=900&q=80',
+    },
+    {
+      id: '5',
+      title: 'Freshmarket Letné trhy',
+      category: 'Gastro',
+      date: 'So, 23 máj',
+      time: '10:00',
+      venue: 'Freshmarket BA',
+      price: 0,
+      isFree: true,
+      cover: 'https://images.unsplash.com/photo-1488459716781-31db52582fe9?w=900&q=80',
+    },
+  ];
+
+  // ── State ─────────────────────────────────────────────────────────────────
+  const feedEl = document.getElementById('feed');
+  const progressBar = document.getElementById('progressBar');
+  let cards = [];
+  let currentIndex = 0;
+  let startY = 0;
+  let deltaY = 0;
+  let isDragging = false;
+  const THRESHOLD = Math.min(80, window.innerHeight * 0.15);
+
+  // ── Build cards ────────────────────────────────────────────────────────────
+  function createCard(event, index) {
+    const el = document.createElement('div');
+    el.className = 'event-card';
+    el.dataset.index = index;
+
+    el.innerHTML = `
+      <img class="card-img" src="${event.cover}" alt="${event.title}" loading="lazy" decoding="async">
+      <div class="card-gradient"></div>
+      <div class="card-body">
+        <div class="card-category"><span>${event.category}</span></div>
+        <div class="card-title">${event.title}</div>
+        <div class="card-meta">
+          <span class="card-meta-text">${event.date} · ${event.time}</span>
+          ${event.venue ? `<div class="card-meta-dot"></div><span class="card-meta-text">${event.venue}</span>` : ''}
+        </div>
+        <div class="card-actions">
+          <button class="btn-join ${event.isFree ? '' : 'paid'}" data-id="${event.id}">
+            ${event.isFree ? 'Pridať sa — zadarmo' : `Kúpiť lístok · €${event.price}`}
+          </button>
+          <div class="btn-arrow" data-id="${event.id}">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none">
+              <path d="M9 18l6-6-6-6" stroke="#fff" stroke-width="2.2"
+                stroke-linecap="round" stroke-linejoin="round"/>
+            </svg>
+          </div>
+        </div>
+      </div>
+    `;
+
+    // Insert before progress bar (so top-bar and progress-bar stay on top)
+    feedEl.insertBefore(el, progressBar);
+    return el;
+  }
+
+  // ── Progress bar ───────────────────────────────────────────────────────────
+  function buildProgressBar() {
+    progressBar.innerHTML = '';
+    const max = Math.min(events.length, 8);
+    for (let i = 0; i < max; i++) {
+      const seg = document.createElement('div');
+      seg.className = 'progress-seg';
+      seg.innerHTML = '<div class="progress-seg-fill"></div>';
+      progressBar.appendChild(seg);
+    }
+    updateProgressBar();
+  }
+
+  function updateProgressBar() {
+    const segs = progressBar.querySelectorAll('.progress-seg');
+    segs.forEach((seg, i) => {
+      seg.classList.toggle('done', i < currentIndex);
+      seg.classList.toggle('active', i === currentIndex);
+    });
+  }
+
+  // ── Position cards ─────────────────────────────────────────────────────────
+  function positionCards(animate) {
+    const vh = window.innerHeight;
+    cards.forEach((card, i) => {
+      const offset = (i - currentIndex) * vh + deltaY;
+      if (animate) {
+        card.classList.add('snap');
+      } else {
+        card.classList.remove('snap');
+      }
+      card.style.transform = `translate3d(0, ${offset}px, 0)`;
+    });
+  }
+
+  // ── Touch events ───────────────────────────────────────────────────────────
+  feedEl.addEventListener('touchstart', (e) => {
+    startY = e.touches[0].clientY;
+    deltaY = 0;
+    isDragging = true;
+    positionCards(false);
+  }, { passive: true });
+
+  feedEl.addEventListener('touchmove', (e) => {
+    if (!isDragging) return;
+    deltaY = e.touches[0].clientY - startY;
+
+    // Rubber band resistance at edges
+    if (currentIndex === 0 && deltaY > 0)
+      deltaY = deltaY * 0.25;
+    if (currentIndex === events.length - 1 && deltaY < 0)
+      deltaY = deltaY * 0.25;
+
+    positionCards(false);
+  }, { passive: true });
+
+  feedEl.addEventListener('touchend', () => {
+    isDragging = false;
+
+    if (deltaY < -THRESHOLD && currentIndex < events.length - 1) {
+      currentIndex++;
+    } else if (deltaY > THRESHOLD && currentIndex > 0) {
+      currentIndex--;
+    }
+
+    deltaY = 0;
+    positionCards(true);
+    updateProgressBar();
+  });
+
+  // ── Button tap handlers ────────────────────────────────────────────────────
+  feedEl.addEventListener('click', (e) => {
+    const btn = e.target.closest('[data-id]');
+    if (!btn) return;
+    const id = btn.dataset.id;
+    if (btn.classList.contains('btn-join')) {
+      // Dispatch join event — handle in native or override window.onWoevaJoin
+      if (window.onWoevaJoin) window.onWoevaJoin(id);
+      else console.log('join', id);
+    } else if (btn.classList.contains('btn-arrow')) {
+      if (window.onWoevaOpen) window.onWoevaOpen(id);
+      else console.log('open', id);
+    }
+  });
+
+  // ── Keyboard (desktop dev) ─────────────────────────────────────────────────
+  document.addEventListener('keydown', (e) => {
+    if (e.key === 'ArrowDown' && currentIndex < events.length - 1) {
+      currentIndex++; positionCards(true); updateProgressBar();
+    }
+    if (e.key === 'ArrowUp' && currentIndex > 0) {
+      currentIndex--; positionCards(true); updateProgressBar();
+    }
+  });
+
+  // ── Resize ─────────────────────────────────────────────────────────────────
+  window.addEventListener('resize', () => positionCards(false));
+
+  // ── Init ───────────────────────────────────────────────────────────────────
+  events.forEach((event, i) => {
+    cards.push(createCard(event, i));
+  });
+  buildProgressBar();
+  positionCards(false);
+</script>
+</body>
+</html>
