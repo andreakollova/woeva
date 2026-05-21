@@ -120,25 +120,16 @@ serve(async (req) => {
 
     const pkpass = await zip.generateAsync({ type: 'uint8array', compression: 'DEFLATE' });
 
-    // Upload to Supabase Storage and return a short-lived signed URL
-    // iOS will open .pkpass URLs directly in Wallet (no Share Sheet)
-    const serviceDb = createClient(
-      Deno.env.get('SUPABASE_URL')!,
-      Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!,
-    );
+    // Return base64 — app saves locally and opens with Sharing (shows Add to Wallet directly)
+    let binary = '';
+    const chunkSize = 8192;
+    for (let i = 0; i < pkpass.length; i += chunkSize) {
+      const chunk = pkpass.subarray(i, i + chunkSize);
+      binary += String.fromCharCode(...chunk);
+    }
+    const base64 = btoa(binary);
 
-    const filePath = `${user.id}/${event_id}.pkpass`;
-    const { error: uploadError } = await serviceDb.storage
-      .from('wallet-passes')
-      .upload(filePath, pkpass, { contentType: 'application/vnd.apple.pkpass', upsert: true });
-    if (uploadError) throw new Error(`Storage upload failed: ${uploadError.message}`);
-
-    const { data: signed } = await serviceDb.storage
-      .from('wallet-passes')
-      .createSignedUrl(filePath, 300); // 5 min expiry
-    if (!signed?.signedUrl) throw new Error('Could not create signed URL');
-
-    return new Response(JSON.stringify({ url: signed.signedUrl }), {
+    return new Response(JSON.stringify({ pass: base64 }), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     });
   } catch (err) {

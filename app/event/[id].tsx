@@ -2,6 +2,8 @@ import React, { useState } from 'react';
 import { StatusBar } from 'expo-status-bar';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { View, Text, StyleSheet, TouchableOpacity, Image, Alert, Dimensions, Modal, Share, Platform, TextInput, ScrollView as RNScrollView, Linking } from 'react-native';
+import * as FileSystem from 'expo-file-system/legacy';
+import * as Sharing from 'expo-sharing';
 import QRCode from 'react-native-qrcode-svg';
 import { useLocalSearchParams, useRouter, useFocusEffect } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -155,8 +157,10 @@ export default function EventDetailScreen() {
         }
       );
       const data = await res.json();
-      if (!res.ok || !data.url) throw new Error(data.error || 'Failed to generate pass');
-      await Linking.openURL(data.url);
+      if (!res.ok || !data.pass) throw new Error(data.error || 'Failed to generate pass');
+      const path = `${FileSystem.documentDirectory}woeva-ticket-${id}.pkpass`;
+      await FileSystem.writeAsStringAsync(path, data.pass, { encoding: FileSystem.EncodingType.Base64 });
+      await Sharing.shareAsync(path, { mimeType: 'application/vnd.apple.pkpass', UTI: 'com.apple.pkpass' });
     } catch (e: any) {
       Alert.alert('Error', e?.message || 'Could not generate pass. Try again.');
     } finally {
