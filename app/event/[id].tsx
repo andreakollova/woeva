@@ -2,8 +2,6 @@ import React, { useState } from 'react';
 import { StatusBar } from 'expo-status-bar';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { View, Text, StyleSheet, TouchableOpacity, Image, Alert, Dimensions, Modal, Share, Platform, TextInput, ScrollView as RNScrollView, Linking } from 'react-native';
-import * as FileSystem from 'expo-file-system/legacy';
-import * as Sharing from 'expo-sharing';
 import QRCode from 'react-native-qrcode-svg';
 import { useLocalSearchParams, useRouter, useFocusEffect } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -144,23 +142,8 @@ export default function EventDetailScreen() {
     setLoadingWallet(true);
     try {
       const { data: { session } } = await supabase.auth.getSession();
-      const res = await fetch(
-        `${process.env.EXPO_PUBLIC_SUPABASE_URL}/functions/v1/generate-pass`,
-        {
-          method: 'POST',
-          headers: {
-            'Authorization': `Bearer ${session?.access_token}`,
-            'Content-Type': 'application/json',
-            'apikey': process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY!,
-          },
-          body: JSON.stringify({ event_id: id }),
-        }
-      );
-      const data = await res.json();
-      if (!res.ok || !data.pass) throw new Error(data.error || 'Failed to generate pass');
-      const path = `${FileSystem.documentDirectory}woeva-ticket-${id}.pkpass`;
-      await FileSystem.writeAsStringAsync(path, data.pass, { encoding: FileSystem.EncodingType.Base64 });
-      await Sharing.shareAsync(path, { mimeType: 'application/vnd.apple.pkpass', UTI: 'com.apple.pkpass' });
+      const passUrl = `${process.env.EXPO_PUBLIC_SUPABASE_URL}/functions/v1/generate-pass?event_id=${id}&token=${session?.access_token}`;
+      await Linking.openURL(passUrl);
     } catch (e: any) {
       Alert.alert('Error', e?.message || 'Could not generate pass. Try again.');
     } finally {
