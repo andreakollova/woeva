@@ -580,7 +580,7 @@ export default function EventDetailScreen() {
 
               {/* Inline QR */}
               {isAttending && user ? (
-                <View style={{ alignItems: 'center', gap: 3 }}>
+                <View style={{ alignItems: 'center', gap: 1 }}>
                   <TouchableOpacity
                     style={[s.inlinQR, (isFree || isWoevaEvent) && { opacity: 0.35 }]}
                     onPress={() => {
@@ -595,12 +595,12 @@ export default function EventDetailScreen() {
                     }}
                     activeOpacity={0.8}
                   >
-                    <QRCode value={`woeva:event:${id}:${user.id}`} size={48} color={Colors.black} backgroundColor={Colors.white} />
+                    <QRCode value={`woeva:event:${id}:${user.id}`} size={80} color={Colors.black} backgroundColor={Colors.white} />
                     
                   </TouchableOpacity>
                   {!isFree && !isPayAtDoor && !isWoevaEvent && (
                     <TouchableOpacity onPress={handleAddToWallet} activeOpacity={0.8} disabled={loadingWallet}>
-                      <Image source={require('@/assets/images/add-to-wallet.png')} style={{ width: 64, height: 22 }} resizeMode="contain" />
+                      <Image source={require('@/assets/images/add-to-wallet.png')} style={{ width: 96, height: 32 }} resizeMode="contain" />
                     </TouchableOpacity>
                   )}
                 </View>
@@ -820,7 +820,7 @@ const s = StyleSheet.create({
   infoText: { fontSize: 15, fontWeight: '600', color: Colors.black, fontFamily: Fonts.semibold },
   infoSub: { fontSize: 13, color: Colors.gray, fontFamily: Fonts.regular, marginTop: 2 },
   infoGoingNum: { fontSize: 14, fontWeight: '700', color: Colors.black },
-  inlinQR: { backgroundColor: Colors.white, borderRadius: 18, padding: 8, flexShrink: 0, overflow: 'hidden', alignItems: 'center', gap: 4 },
+  inlinQR: { backgroundColor: Colors.white, borderRadius: 18, padding: 8, width: 96, flexShrink: 0, overflow: 'hidden', alignItems: 'center', gap: 4 },
   inlinQRHint: { fontSize: 8, fontWeight: '700', color: Colors.black, letterSpacing: 1, textTransform: 'uppercase' },
   addTicketBtn: { backgroundColor: Colors.lime, borderRadius: 50, paddingVertical: 5, alignSelf: 'center', paddingHorizontal: 5 },
   addTicketBtnText: { fontSize: 6, fontWeight: '700', color: Colors.black, letterSpacing: 0.3 },
