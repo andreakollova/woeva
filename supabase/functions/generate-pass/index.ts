@@ -123,7 +123,8 @@ serve(async (req) => {
       });
     }
 
-    // POST: original API used by older builds (kept for compatibility)
+    // POST: generate pass, upload to Storage, return signed URL
+    // App opens signed URL in Safari → iOS recognises .pkpass → Add to Wallet dialog
     const { event_id } = await req.json();
     const supabase = createClient(
       Deno.env.get('SUPABASE_URL')!,
@@ -135,11 +136,22 @@ serve(async (req) => {
 
     const pkpass = await buildPass(supabase, user.id, event_id);
 
-    let binary = '';
-    for (let i = 0; i < pkpass.length; i += 8192) {
-      binary += String.fromCharCode(...pkpass.subarray(i, i + 8192));
-    }
-    return new Response(JSON.stringify({ pass: btoa(binary) }), {
+    const serviceDb = createClient(
+      Deno.env.get('SUPABASE_URL')!,
+      Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!,
+    );
+    const filePath = `${user.id}/${event_id}.pkpass`;
+    const { error: uploadError } = await serviceDb.storage
+      .from('wallet-passes')
+      .upload(filePath, pkpass, { contentType: 'application/vnd.apple.pkpass', upsert: true });
+    if (uploadError) throw new Error(`Upload failed: ${uploadError.message}`);
+
+    const { data: signed, error: signError } = await serviceDb.storage
+      .from('wallet-passes')
+      .createSignedUrl(filePath, 600);
+    if (signError || !signed?.signedUrl) throw new Error(`Sign failed: ${signError?.message ?? 'no url'}`);
+
+    return new Response(JSON.stringify({ url: signed.signedUrl }), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     });
 

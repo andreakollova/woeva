@@ -142,8 +142,21 @@ export default function EventDetailScreen() {
     setLoadingWallet(true);
     try {
       const { data: { session } } = await supabase.auth.getSession();
-      const passUrl = `${process.env.EXPO_PUBLIC_SUPABASE_URL}/functions/v1/generate-pass?event_id=${id}&token=${session?.access_token}`;
-      await Linking.openURL(passUrl);
+      const res = await fetch(
+        `${process.env.EXPO_PUBLIC_SUPABASE_URL}/functions/v1/generate-pass`,
+        {
+          method: 'POST',
+          headers: {
+            'Authorization': `Bearer ${session?.access_token}`,
+            'Content-Type': 'application/json',
+            'apikey': process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY!,
+          },
+          body: JSON.stringify({ event_id: id }),
+        }
+      );
+      const data = await res.json();
+      if (!res.ok || !data.url) throw new Error(data.error || 'Failed to generate pass');
+      await Linking.openURL(data.url);
     } catch (e: any) {
       Alert.alert('Error', e?.message || 'Could not generate pass. Try again.');
     } finally {
