@@ -1,6 +1,5 @@
 import React, { useState } from 'react';
 import { StatusBar } from 'expo-status-bar';
-import * as FileSystem from 'expo-file-system/legacy';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { View, Text, StyleSheet, TouchableOpacity, Image, Alert, Dimensions, Modal, Share, Platform, TextInput, ScrollView as RNScrollView, Linking } from 'react-native';
 import QRCode from 'react-native-qrcode-svg';
@@ -156,10 +155,8 @@ export default function EventDetailScreen() {
         }
       );
       const data = await res.json();
-      if (!res.ok || !data.pass) throw new Error(data.error || 'Failed to generate pass');
-      const path = `${FileSystem.documentDirectory}woeva-ticket-${id}.pkpass`;
-      await FileSystem.writeAsStringAsync(path, data.pass, { encoding: FileSystem.EncodingType.Base64 });
-      await Linking.openURL(path);
+      if (!res.ok || !data.url) throw new Error(data.error || 'Failed to generate pass');
+      await Linking.openURL(data.url);
     } catch (e: any) {
       Alert.alert('Error', e?.message || 'Could not generate pass. Try again.');
     } finally {

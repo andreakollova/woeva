@@ -14,15 +14,6 @@ function sha1Hex(data: Uint8Array): string {
   return md.digest().toHex();
 }
 
-function uint8ToBase64(data: Uint8Array): string {
-  let binary = '';
-  const chunkSize = 8192;
-  for (let i = 0; i < data.length; i += chunkSize) {
-    const chunk = data.subarray(i, i + chunkSize);
-    binary += String.fromCharCode(...chunk);
-  }
-  return btoa(binary);
-}
 
 serve(async (req) => {
   if (req.method === 'OPTIONS') return new Response('ok', { headers: corsHeaders });
@@ -129,10 +120,25 @@ serve(async (req) => {
 
     const pkpass = await zip.generateAsync({ type: 'uint8array', compression: 'DEFLATE' });
 
-    // Return base64 JSON — avoids binary response issues in React Native
-    const base64 = uint8ToBase64(pkpass);
+    // Upload to Supabase Storage and return a short-lived signed URL
+    // iOS will open .pkpass URLs directly in Wallet (no Share Sheet)
+    const serviceDb = createClient(
+      Deno.env.get('SUPABASE_URL')!,
+      Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!,
+    );
 
-    return new Response(JSON.stringify({ pass: base64 }), {
+    const filePath = `${user.id}/${event_id}.pkpass`;
+    const { error: uploadError } = await serviceDb.storage
+      .from('wallet-passes')
+      .upload(filePath, pkpass, { contentType: 'application/vnd.apple.pkpass', upsert: true });
+    if (uploadError) throw new Error(`Storage upload failed: ${uploadError.message}`);
+
+    const { data: signed } = await serviceDb.storage
+      .from('wallet-passes')
+      .createSignedUrl(filePath, 300); // 5 min expiry
+    if (!signed?.signedUrl) throw new Error('Could not create signed URL');
+
+    return new Response(JSON.stringify({ url: signed.signedUrl }), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     });
   } catch (err) {

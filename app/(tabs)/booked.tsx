@@ -1,6 +1,5 @@
 import React, { useEffect, useState } from 'react';
 import { View, Text, StyleSheet, ScrollView, TouchableOpacity, RefreshControl, Image, ImageStyle, Modal, Alert, Share, Linking, Platform, ActivityIndicator } from 'react-native';
-import * as FileSystem from 'expo-file-system';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import Animated, { FadeInDown } from 'react-native-reanimated';
@@ -285,10 +284,8 @@ function TicketCard({ event, userId, userAvatar, userName, isPast, onPress, onDe
         }
       );
       const data = await res.json();
-      if (!res.ok || !data.pass) throw new Error(data.error || 'Failed to generate pass');
-      const path = `${FileSystem.documentDirectory}woeva-ticket-${event.id}.pkpass`;
-      await FileSystem.writeAsStringAsync(path, data.pass, { encoding: FileSystem.EncodingType.Base64 });
-      await Linking.openURL(path);
+      if (!res.ok || !data.url) throw new Error(data.error || 'Failed to generate pass');
+      await Linking.openURL(data.url);
     } catch (e: any) {
       Alert.alert('Error', e?.message || 'Could not generate pass. Try again.');
     } finally {
