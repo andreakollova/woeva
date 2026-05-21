@@ -620,7 +620,7 @@ export default function EventDetailScreen() {
                   </TouchableOpacity>
                   {!isFree && !isPayAtDoor && !isWoevaEvent && (
                     <TouchableOpacity onPress={handleAddToWallet} activeOpacity={0.8} disabled={loadingWallet}>
-                      <Image source={require('@/assets/images/add-to-wallet.png')} style={{ width: 120, height: 34 }} resizeMode="contain" />
+                      <Image source={require('@/assets/images/add-to-wallet.png')} style={{ width: 64, height: 28 }} resizeMode="contain" />
                     </TouchableOpacity>
                   )}
                 </View>
