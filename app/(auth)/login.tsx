@@ -43,6 +43,8 @@ export default function LoginScreen() {
       const msg = error.message ?? '';
       if (msg.toLowerCase().includes('email') && msg.toLowerCase().includes('confirm')) {
         setErrors({ email: t.auth.checkEmail });
+      } else if (msg.toLowerCase().includes('invalid login') || msg.toLowerCase().includes('invalid credentials')) {
+        setErrors({ password: t.auth.socialAccountHint });
       } else if (msg.toLowerCase().includes('invalid')) {
         setErrors({ password: t.auth.validEmail });
       } else {

@@ -1,7 +1,8 @@
 import React, { useCallback, useState } from 'react';
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Alert } from 'react-native';
+import { View, Text, StyleSheet, FlatList, TouchableOpacity, Alert, Animated } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useRouter, useFocusEffect } from 'expo-router';
+import Swipeable from 'react-native-gesture-handler/Swipeable';
 import Svg, { Path } from 'react-native-svg';
 import { Colors } from '@/constants/colors';
 import { Fonts } from '@/constants/fonts';
@@ -82,6 +83,11 @@ export default function NotificationsScreen() {
     return Colors.grayLight;
   }
 
+  async function deleteNotification(id: string) {
+    setNotifications(prev => prev.filter(x => x.id !== id));
+    await supabase.from('notifications').delete().eq('id', id);
+  }
+
   async function handleAdminInvite(n: Notification, accept: boolean) {
     const clubId = n.data?.club_id;
     if (!clubId || !user) return;
@@ -128,40 +134,58 @@ export default function NotificationsScreen() {
         </TouchableOpacity>
       </View>
 
-      <ScrollView contentContainerStyle={{ paddingBottom: insets.bottom + 24 }} showsVerticalScrollIndicator={false}>
-        {notifications.length === 0 && (
+      <FlatList
+        data={notifications}
+        keyExtractor={n => n.id}
+        contentContainerStyle={{ paddingBottom: insets.bottom + 24, flexGrow: 1 }}
+        showsVerticalScrollIndicator={false}
+        ListEmptyComponent={
           <View style={styles.empty}>
             <Svg width={40} height={40} viewBox="0 0 24 24" fill="none">
               <Path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9M13.73 21a2 2 0 0 1-3.46 0" stroke={Colors.grayBorder} strokeWidth={1.5} strokeLinecap="round" strokeLinejoin="round" />
             </Svg>
             <Text style={styles.emptyText}>{t.notif.noNotifications}</Text>
           </View>
-        )}
-
-        {notifications.map((n, i) => (
-          <TouchableOpacity
-            key={n.id}
-            style={[styles.row, !n.read && styles.rowUnread]}
-            onPress={() => handleTap(n)}
-            activeOpacity={0.7}
+        }
+        renderItem={({ item: n }) => (
+          <Swipeable
+            renderRightActions={(progress, drag) => {
+              const scale = drag.interpolate({ inputRange: [-80, 0], outputRange: [1, 0.8], extrapolate: 'clamp' });
+              return (
+                <TouchableOpacity style={styles.deleteAction} onPress={() => deleteNotification(n.id)} activeOpacity={0.8}>
+                  <Animated.View style={{ transform: [{ scale }] }}>
+                    <Svg width={20} height={20} viewBox="0 0 24 24" fill="none">
+                      <Path d="M3 6h18M8 6V4h8v2M19 6l-1 14H6L5 6" stroke={Colors.white} strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" />
+                    </Svg>
+                  </Animated.View>
+                </TouchableOpacity>
+              );
+            }}
+            overshootRight={false}
           >
-            <View style={[styles.iconBox, { backgroundColor: iconBgForType(n.type) }]}>
-              {iconForType(n.type)}
-            </View>
-            <View style={styles.rowContent}>
-              <View style={styles.rowTitleRow}>
-                <Text style={styles.rowTitle} numberOfLines={1}>{n.title}</Text>
-                <Text style={styles.rowTime}>{timeAgo(n.created_at)}</Text>
+            <TouchableOpacity
+              style={[styles.row, !n.read && styles.rowUnread]}
+              onPress={() => handleTap(n)}
+              activeOpacity={0.7}
+            >
+              <View style={[styles.iconBox, { backgroundColor: iconBgForType(n.type) }]}>
+                {iconForType(n.type)}
               </View>
-              {n.body ? <Text style={styles.rowBody}>{n.body}</Text> : null}
-              {n.type === 'admin_invite' && !n.read && (
-                <Text style={styles.rowAction}>{t.notif.tapToAcceptDecline}</Text>
-              )}
-            </View>
-            {!n.read && <View style={styles.unreadDot} />}
-          </TouchableOpacity>
-        ))}
-      </ScrollView>
+              <View style={styles.rowContent}>
+                <View style={styles.rowTitleRow}>
+                  <Text style={styles.rowTitle} numberOfLines={1}>{n.title}</Text>
+                  <Text style={styles.rowTime}>{timeAgo(n.created_at)}</Text>
+                </View>
+                {n.body ? <Text style={styles.rowBody}>{n.body}</Text> : null}
+                {n.type === 'admin_invite' && !n.read && (
+                  <Text style={styles.rowAction}>{t.notif.tapToAcceptDecline}</Text>
+                )}
+              </View>
+              {!n.read && <View style={styles.unreadDot} />}
+            </TouchableOpacity>
+          </Swipeable>
+        )}
+      />
     </View>
   );
 }
@@ -181,6 +205,7 @@ const styles = StyleSheet.create({
   rowTime: { fontSize: 11, color: Colors.gray, fontFamily: Fonts.regular, flexShrink: 0 },
   rowAction: { fontSize: 12, color: Colors.black, fontFamily: Fonts.medium, fontWeight: '600', marginTop: 4 },
   unreadDot: { width: 8, height: 8, borderRadius: 4, backgroundColor: Colors.lime, marginTop: 6, flexShrink: 0 },
+  deleteAction: { width: 72, backgroundColor: '#FF3B30', alignItems: 'center', justifyContent: 'center' },
   empty: { flex: 1, alignItems: 'center', justifyContent: 'center', paddingTop: 80, gap: 12 },
   emptyText: { fontSize: 15, color: Colors.gray, fontFamily: Fonts.regular },
 });

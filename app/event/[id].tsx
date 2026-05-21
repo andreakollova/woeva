@@ -580,7 +580,7 @@ export default function EventDetailScreen() {
 
               {/* Inline QR */}
               {isAttending && user ? (
-                <View style={{ alignItems: 'center', gap: 6 }}>
+                <View style={{ alignItems: 'center', gap: 3 }}>
                   <TouchableOpacity
                     style={[s.inlinQR, (isFree || isWoevaEvent) && { opacity: 0.35 }]}
                     onPress={() => {
@@ -596,11 +596,11 @@ export default function EventDetailScreen() {
                     activeOpacity={0.8}
                   >
                     <QRCode value={`woeva:event:${id}:${user.id}`} size={48} color={Colors.black} backgroundColor={Colors.white} />
-                    <Text style={s.inlinQRHint}>{t.event.ticketLabel}</Text>
+                    
                   </TouchableOpacity>
                   {!isFree && !isPayAtDoor && !isWoevaEvent && (
                     <TouchableOpacity onPress={handleAddToWallet} activeOpacity={0.8} disabled={loadingWallet}>
-                      <Image source={require('@/assets/images/add-to-wallet.png')} style={{ width: 64, height: 28 }} resizeMode="contain" />
+                      <Image source={require('@/assets/images/add-to-wallet.png')} style={{ width: 64, height: 22 }} resizeMode="contain" />
                     </TouchableOpacity>
                   )}
                 </View>

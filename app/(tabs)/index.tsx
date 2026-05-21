@@ -70,6 +70,8 @@ const CITY_DISPLAY_EN: Record<string, string> = {
 };
 
 // city → country mapping for grouping
+const CITY_NORMALIZE: Record<string, string> = { Praha: 'Prague', Wien: 'Vienna' };
+
 const CITY_COUNTRY: Record<string, string> = {
   Bratislava: 'SK', Košice: 'SK', Prešov: 'SK', Žilina: 'SK', Nitra: 'SK',
   'Banská Bystrica': 'SK', Trnava: 'SK', Trenčín: 'SK', Martin: 'SK', Poprad: 'SK',
@@ -110,7 +112,7 @@ export default function HomeScreen() {
           .gte('date', today)
           .not('city', 'is', null);
 
-        const citySet = new Set<string>((cityRows ?? []).map((r: any) => r.city).filter(Boolean));
+        const citySet = new Set<string>((cityRows ?? []).map((r: any) => { const c = r.city; return CITY_NORMALIZE[c] ?? c; }).filter(Boolean));
         const grouped = COUNTRY_META.map(c => ({
           ...c,
           cities: [...citySet].filter(city => (CITY_COUNTRY[city] ?? 'SK') === c.code).sort(),
