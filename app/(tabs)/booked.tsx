@@ -1,7 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { View, Text, StyleSheet, ScrollView, TouchableOpacity, RefreshControl, Image, ImageStyle, Modal, Alert, Share, Linking, Platform, ActivityIndicator } from 'react-native';
 import * as FileSystem from 'expo-file-system';
-import { Linking } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import Animated, { FadeInDown } from 'react-native-reanimated';
@@ -462,34 +461,35 @@ function TicketCard({ event, userId, userAvatar, userName, isPast, onPress, onDe
             </View>
           </TouchableOpacity>
         </Modal>
-        {!isPast && !isFree && (
-          <TouchableOpacity onPress={handleAddToWallet} activeOpacity={0.8} style={styles.walletBtn} disabled={loadingWallet}>
-            {loadingWallet
-              ? <ActivityIndicator color={Colors.white} size="small" />
-              : <Image source={require('@/assets/images/add-to-wallet.png')} style={styles.walletBadge} resizeMode="contain" />
-            }
-          </TouchableOpacity>
-        )}
-
         <View style={styles.qrSection}>
-          <TouchableOpacity
-            style={[styles.qrWrap, isFree && styles.qrWrapFree]}
-            onPress={() => {
-              if (isFree) {
-                Alert.alert(t.tickets.freeEventQrTitle, t.tickets.freeEventQrMsg);
-              } else {
-                setQrModal(true);
-              }
-            }}
-            activeOpacity={0.75}
-          >
-            <QRCode
-              value={qrValue}
-              size={88}
-              color={isFree ? '#C0C0C0' : isPast ? Colors.gray : Colors.black}
-              backgroundColor={Colors.white}
-            />
-          </TouchableOpacity>
+          <View style={styles.qrLeft}>
+            <TouchableOpacity
+              style={[styles.qrWrap, isFree && styles.qrWrapFree]}
+              onPress={() => {
+                if (isFree) {
+                  Alert.alert(t.tickets.freeEventQrTitle, t.tickets.freeEventQrMsg);
+                } else {
+                  setQrModal(true);
+                }
+              }}
+              activeOpacity={0.75}
+            >
+              <QRCode
+                value={qrValue}
+                size={88}
+                color={isFree ? '#C0C0C0' : isPast ? Colors.gray : Colors.black}
+                backgroundColor={Colors.white}
+              />
+            </TouchableOpacity>
+            {!isPast && !isFree && (
+              <TouchableOpacity onPress={handleAddToWallet} activeOpacity={0.8} style={styles.walletBtn} disabled={loadingWallet}>
+                {loadingWallet
+                  ? <ActivityIndicator color={Colors.white} size="small" />
+                  : <Image source={require('@/assets/images/add-to-wallet.png')} style={styles.walletBadge} resizeMode="contain" />
+                }
+              </TouchableOpacity>
+            )}
+          </View>
           <View style={styles.qrInfo}>
             <Text style={styles.qrAttendeeName} numberOfLines={1}>{userName}</Text>
             <Text style={styles.qrTitle}>{isPast ? t.tickets.eventAttended : t.tickets.yourTicket}</Text>
@@ -580,7 +580,8 @@ const styles = StyleSheet.create({
   perfDash: { width: 8, height: 3, backgroundColor: 'rgba(255,255,255,0.18)', borderRadius: 2 },
 
   // QR
-  qrSection: { flexDirection: 'row', gap: 16, alignItems: 'center' },
+  qrSection: { flexDirection: 'row', gap: 16, alignItems: 'flex-start' },
+  qrLeft: { alignItems: 'flex-start', gap: 8 },
   qrWrap: { padding: 10, backgroundColor: Colors.white, borderRadius: 16 },
   qrWrapFree: { opacity: 0.4 },
   qrInfo: { flex: 1, gap: 5, justifyContent: 'center' },
@@ -607,8 +608,8 @@ const styles = StyleSheet.create({
   optionsRowLabelDestructive: { color: '#FF3B30' },
   optionsRowSub: { fontSize: 12, color: Colors.gray, fontFamily: Fonts.regular, marginTop: 1 },
 
-  walletBtn: { alignItems: 'center', justifyContent: 'center', paddingVertical: 6, marginBottom: 14, minHeight: 44 },
-  walletBadge: { width: 160, height: 44 },
+  walletBtn: { width: 108, height: 30, alignItems: 'center', justifyContent: 'center' },
+  walletBadge: { width: 108, height: 30 },
 
   // QR modal
   qrModalBg: { flex: 1, backgroundColor: 'rgba(0,0,0,0.75)', alignItems: 'center', justifyContent: 'center' },
