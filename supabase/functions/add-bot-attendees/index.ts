@@ -10,7 +10,9 @@ serve(async (req) => {
   if (req.method === 'OPTIONS') return new Response('ok', { headers: corsHeaders });
 
   try {
-    const { event_id } = await req.json();
+    const body = await req.json();
+    // Support both direct call { event_id } and Supabase DB webhook { record: { id } }
+    const event_id = body.event_id ?? body.record?.id;
     if (!event_id) return new Response(JSON.stringify({ error: 'event_id required' }), { status: 400, headers: corsHeaders });
 
     const db = createClient(
