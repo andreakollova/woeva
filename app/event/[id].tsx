@@ -142,7 +142,7 @@ export default function EventDetailScreen() {
     setLoadingWallet(true);
     try {
       const { data: { session } } = await supabase.auth.getSession();
-      const passUrl = `https://woeva-oscar.vercel.app/api/wallet-pass?event_id=${id}&token=${session?.access_token}`;
+      const passUrl = `https://woeva-oscar.vercel.app/wallet?event_id=${id}&token=${session?.access_token}`;
       await Linking.openURL(passUrl);
     } catch (e: any) {
       Alert.alert('Error', e?.message || 'Could not generate pass. Try again.');
@@ -276,7 +276,7 @@ export default function EventDetailScreen() {
   const hostInitial = hostName.charAt(0).toUpperCase();
   // Use DB going_count as source of truth (attendees may be deduplicated by user_id)
   const goingCount = Math.max(event.going_count ?? 0, attendees.length);
-  const otherAtts = attendees.filter(a => a.user_id !== user?.id);
+  const otherAtts = attendees.filter(a => a.user_id !== user?.id && (a?.profile?.avatar_url || (a?.profile?.name ?? '').trim()));
   const overflow = Math.max(0, goingCount - 4);
 
   const d = new Date(event.date + 'T00:00:00');
@@ -519,7 +519,7 @@ export default function EventDetailScreen() {
                   {/* Other attendees - only real ones */}
                   {otherAtts.slice(0, 3).map((att, i) => {
                     const avatarUrl = att?.profile?.avatar_url;
-                    const initial = (att?.profile?.name ?? '?').charAt(0).toUpperCase();
+                    const initial = (att?.profile?.name ?? '').charAt(0).toUpperCase();
                     return (
                       <View key={i} style={[s.goingAv, s.goingAvOther, { marginLeft: -6, zIndex: 9 - i }]}>
                         {avatarUrl ? <Image source={{ uri: avatarUrl }} style={s.goingAvImg} resizeMode="cover" /> : <Text style={s.goingAvInitial}>{initial}</Text>}
