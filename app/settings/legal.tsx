@@ -9,68 +9,129 @@ import { useTranslations } from '@/context/LanguageContext';
 
 const PRIVACY_POLICY = `Last updated: May 2026
 
-Woeva ("we", "us", "our") operates the Woeva mobile application. This policy explains what data we collect and how we use it.
+Woeva ("we", "us", "our") operates the Woeva mobile application. This policy explains what personal data we collect, why we collect it, and your rights under the General Data Protection Regulation (GDPR) and applicable Slovak law.
 
-DATA WE COLLECT
-• Account data: name, email address, profile photo
-• Location: city and approximate GPS location (only when you grant permission) to show nearby events
-• Device token: push notification token to send you event updates
-• Content: events you create, clubs you manage, messages you send in event chats
-• Usage: events you join or leave, reviews you leave
+1. DATA WE COLLECT
 
-HOW WE USE YOUR DATA
-• To provide and personalise the app experience
-• To send push and email notifications about events you are attending or managing
-• To process payments via Stripe (payment data is handled solely by Stripe and never stored by us)
-• To show your profile and content to other users in the context of events and clubs
+Account data
+• Name, email address, and profile photo when you register with email/password or via Apple Sign-In / Google Sign-In. When using social login we receive only the data you authorise the provider to share.
 
-DATA SHARING
-• We do not sell your personal data
-• Stripe processes payment data under their own privacy policy
-• Supabase provides our database and authentication infrastructure
-• Push notifications are delivered via Expo's push service
+Location
+• City (stored on your profile) and approximate GPS coordinates (only when you explicitly grant permission) to show events near you. GPS is never stored — it is used in-session only to rank nearby events.
 
-YOUR RIGHTS
-• You may edit or delete your profile at any time in Settings → Profile
-• You may delete your account and all associated data in Settings → Delete account
-• You may revoke location and notification permissions in your device settings at any time
+Device & notifications
+• Push notification token to deliver event reminders, chat messages, and activity alerts.
 
-DATA RETENTION
-Deleting your account permanently removes your profile, events, clubs, messages, and all associated data within 30 days.
+Content you create
+• Events, club details, event cover photos, and chat messages you send in event rooms.
 
-CONTACT
-For privacy questions contact us at: hello@woeva.app`;
+Usage
+• Events you join or leave, ticket records, club memberships, and any reviews you submit.
+
+Payment data
+• Stripe processes all card payments. We store only the Stripe customer ID and connect account ID — no card numbers, CVVs, or full payment details are ever held by us.
+
+Apple Wallet
+• When you generate an Apple Wallet pass, your name and event details are embedded in the pass file, which is delivered directly to your device and stored only in Apple Wallet.
+
+Camera & photo library
+• Used only when you choose to upload an event cover photo. Images are uploaded to our secure storage and never processed for any other purpose.
+
+2. HOW WE USE YOUR DATA
+• To provide, operate, and personalise the Woeva experience
+• To display your events and profile to other users in the context of events and clubs
+• To send push notifications and emails about events you are attending or managing
+• To process ticket payments and issue refunds via Stripe
+• To generate Apple Wallet passes on request
+• To show events relevant to your location (GPS used in-session, never stored)
+
+3. LEGAL BASIS (GDPR)
+• Contract performance: account management, event registration, payments
+• Legitimate interests: push notifications for events you have joined, security monitoring
+• Consent: GPS location access, optional marketing communications
+
+4. DATA SHARING
+• We do not sell your personal data to any third party
+• Stripe (stripe.com) — payment processing, governed by Stripe's Privacy Policy
+• Apple / Google — social sign-in, governed by their respective privacy policies
+• Supabase — database and authentication infrastructure (EU data region)
+• Expo — push notification delivery
+• No other third parties receive your personal data
+
+5. YOUR RIGHTS (GDPR)
+You have the right to:
+• Access: request a copy of your personal data
+• Rectification: correct inaccurate data via Settings → Profile
+• Erasure: delete your account and all data via Settings → Delete account
+• Portability: request your data in a machine-readable format
+• Objection: opt out of processing based on legitimate interests
+• Withdraw consent: revoke location or notification permissions at any time in your device settings
+
+To exercise any right, email us at hello@woeva.app. We will respond within 30 days.
+
+6. DATA RETENTION
+Your data is retained for as long as your account is active. Deleting your account permanently removes your profile, events, clubs, messages, tickets, and all associated data within 30 days. Anonymised aggregate statistics may be retained.
+
+7. CHILDREN
+Woeva is not directed at children under 16. We do not knowingly collect data from anyone under 16.
+
+8. CONTACT & COMPLAINTS
+For privacy questions: hello@woeva.app
+You also have the right to lodge a complaint with the Slovak Data Protection Authority (dataprotection.gov.sk).`;
 
 const TERMS = `Last updated: May 2026
 
-By using Woeva you agree to these Terms of Service.
+By downloading or using Woeva you agree to these Terms of Service. Please read them carefully.
 
 1. ELIGIBILITY
 You must be at least 16 years old to use Woeva. By using the app you confirm that you meet this requirement.
 
 2. ACCOUNT RESPONSIBILITY
-You are responsible for keeping your account credentials secure and for all activity that occurs under your account.
+You are responsible for keeping your login credentials secure and for all activity that occurs under your account. Notify us immediately at hello@woeva.app if you suspect unauthorised access. You may sign in with email/password, Apple Sign-In, or Google Sign-In.
 
 3. CONTENT
-You retain ownership of content you create (events, clubs, messages). By posting content you grant Woeva a non-exclusive licence to display it within the app. You must not post illegal, harmful, or misleading content.
+You retain ownership of content you create (events, clubs, photos, messages). By posting content you grant Woeva a non-exclusive, royalty-free licence to display it within the app to other users. You must not post content that is illegal, harmful, misleading, discriminatory, or violates any third-party rights.
 
-4. EVENTS AND PAYMENTS
-Event creators are responsible for the accuracy of event details. Payments are processed by Stripe. Our refund policy is: full refund if an event is cancelled 48+ hours before start; no refund if cancelled less than 48 hours before start.
+4. EVENTS
+Event creators are responsible for the accuracy of event details including date, time, location, and price. Woeva is a platform connecting organisers and attendees — we are not the organiser of any event listed in the app.
 
-5. PROHIBITED CONDUCT
-You may not: impersonate others, spam users, use the app for illegal activity, scrape or systematically extract data, or attempt to compromise the security of the platform.
+5. TICKETS & PAYMENTS
+Paid tickets are processed by Stripe. You may also purchase tickets payable at the door. Apple Wallet passes are available for your tickets.
 
-6. TERMINATION
-We reserve the right to suspend or delete accounts that violate these terms.
+Refund policy:
+• Full refund if the organiser cancels the event, regardless of timing
+• Full refund if you cancel your attendance 48+ hours before the event starts
+• No refund for cancellations made less than 48 hours before the event
 
-7. LIMITATION OF LIABILITY
-Woeva is provided "as is". We are not liable for losses arising from your use of the platform beyond the maximum extent permitted by applicable law.
+Refunds are processed to your original payment method within 5–10 business days.
 
-8. GOVERNING LAW
-These terms are governed by the laws of the Slovak Republic.
+6. CLUBS
+Club owners may invite admins. Admin invitations are sent in-app and must be accepted. Admins may manage events on behalf of the club. Club owners are responsible for ensuring all club activity complies with these terms.
 
-9. CONTACT
-Questions? Email us at: hello@woeva.app`;
+7. PROHIBITED CONDUCT
+You may not:
+• Impersonate any person or entity
+• Harass, threaten, or abuse other users
+• Post spam or unsolicited promotional content
+• Use the app for any illegal purpose
+• Scrape, crawl, or systematically extract data from the platform
+• Attempt to compromise the security or integrity of the platform
+• Create fake events or mislead attendees about event details
+
+8. TERMINATION
+We reserve the right to suspend or permanently delete accounts that violate these terms, at our sole discretion, with or without notice.
+
+9. LIMITATION OF LIABILITY
+Woeva is provided "as is" without warranties of any kind. We are not liable for the accuracy of event information posted by third-party organisers, cancellations, or losses arising from your use of the platform, to the maximum extent permitted by applicable law.
+
+10. CHANGES TO TERMS
+We may update these terms from time to time. Continued use of the app after changes constitutes acceptance of the updated terms. Material changes will be notified in-app.
+
+11. GOVERNING LAW
+These terms are governed by the laws of the Slovak Republic. Any disputes shall be subject to the jurisdiction of Slovak courts, without prejudice to your rights as a consumer under EU law.
+
+12. CONTACT
+Questions or complaints? Email us at: hello@woeva.app`;
 
 export default function LegalScreen() {
   const insets = useSafeAreaInsets();
