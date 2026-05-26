@@ -48,10 +48,7 @@ serve(async (req) => {
 
     // Add first bot immediately
     const firstBot = selected[0];
-    await db.from('event_attendees').upsert(
-      { event_id, user_id: firstBot.id, paid: false },
-      { onConflict: 'event_id,user_id', ignoreDuplicates: true }
-    );
+    await db.from('event_attendees').insert({ event_id, user_id: firstBot.id, paid: false });
 
     // Schedule remaining bots with delays via recursive invocation (fire & forget)
     for (let i = 1; i < selected.length; i++) {

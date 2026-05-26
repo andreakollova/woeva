@@ -177,39 +177,25 @@ export interface Report {
 }
 
 export const CATEGORIES = [
-  'Sport', 'Coffee', 'Sober party', 'Party', 'Music', 'Art',
-  'Film', 'Yoga', 'Tech', 'Gardening', 'Gaming',
-  'Running', 'Hockey', 'Dance', 'Food', 'Networking', 'Matches', 'Gastro',
+  'Movement & Sport',
+  'Wellness & Body',
+  'Food & Drinks',
+  'Art & Creation',
+  'Music & Nightlife',
+  'Learning & Mind',
+  'Community & Belonging',
 ] as const;
 
 export const CATEGORY_SK: Record<string, string> = {
-  'Sport': 'Šport',
-  'Coffee': 'Káva',
-  'Sober party': 'Sober party',
-  'Party': 'Párty',
-  'Music': 'Hudba',
-  'Art': 'Umenie',
-  'Film': 'Film',
-  'Yoga': 'Jóga',
-  'Tech': 'Tech',
-  'Gardening': 'Záhradníctvo',
-  'Gaming': 'Gaming',
-  'Running': 'Beh',
-  'Hockey': 'Hokej',
-  'Dance': 'Tanec',
-  'Food': 'Jedlo',
-  'Networking': 'Networking',
-  'Free': 'Zadarmo',
-  'Matches': 'Zápasy',
-  'matches': 'Zápasy',
-  'Gastro': 'Gastro',
-  'trhy': 'Trhy',
-  'Trhy': 'Trhy',
+  'Movement & Sport': 'Pohyb & Šport',
+  'Wellness & Body': 'Wellness & Telo',
+  'Food & Drinks': 'Jedlo & Pitie',
+  'Art & Creation': 'Umenie & Tvorba',
+  'Music & Nightlife': 'Hudba & Nightlife',
+  'Learning & Mind': 'Učenie & Myseľ',
+  'Community & Belonging': 'Komunita & Spolupatričnosť',
 };
 
-// EN display overrides (for categories whose DB key differs from desired EN label)
-export const CATEGORY_EN: Record<string, string> = {
-  'Gastro': 'Food',
-};
+export const CATEGORY_EN: Record<string, string> = {};
 
 export type CategoryName = typeof CATEGORIES[number];

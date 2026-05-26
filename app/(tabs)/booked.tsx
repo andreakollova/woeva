@@ -476,7 +476,7 @@ function TicketCard({ event, userId, userAvatar, userName, isPast, onPress, onDe
           </View>
           <View style={styles.qrInfo}>
             <Text style={styles.qrAttendeeName} numberOfLines={1}>{userName}</Text>
-            <Text style={styles.qrTitle}>{isPast ? t.tickets.eventAttended : t.tickets.yourTicket}</Text>
+            {!isPast && <Text style={styles.qrTitle}>{t.tickets.yourTicket}</Text>}
             <Text style={styles.qrSub}>
               {isPast ? t.tickets.thanksForComing : t.tickets.showAtDoor}
             </Text>

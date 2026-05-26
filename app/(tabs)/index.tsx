@@ -12,23 +12,18 @@ import { Tag } from '@/components/ui/Tag';
 import { Colors } from '@/constants/colors';
 import { Fonts } from '@/constants/fonts';
 import { supabase } from '@/lib/supabase';
-import { Event } from '@/types';
+import { Event, CATEGORY_SK } from '@/types';
 import { useAuth } from '@/context/AuthContext';
 import { useTranslations } from '@/context/LanguageContext';
 import { expandRecurringEvents } from '@/lib/expandRecurring';
 
 
-const FILTER_TAGS = ['My Interests', 'Free', 'Coffee', 'Sport', 'Party', 'Music', 'Art', 'Markets', 'All Events'];
-
-// Maps UI filter label → DB category values
-const TAG_CATEGORIES: Record<string, string[]> = {
-  Coffee:  ['coffee'],
-  Sport:   ['sport', 'zapasy'],
-  Party:   ['party', 'dance'],
-  Music:   ['music', 'umenie'],
-  Art:     ['umenie', 'historia'],
-  Markets: ['markets'],
-};
+const FILTER_TAGS = [
+  'My Interests', 'Free',
+  'Movement & Sport', 'Wellness & Body', 'Food & Drinks',
+  'Art & Creation', 'Music & Nightlife', 'Learning & Mind',
+  'Community & Belonging', 'All Events',
+];
 
 const SK_MONTHS = ['Január', 'Február', 'Marec', 'Apríl', 'Máj', 'Jún', 'Júl', 'August', 'September', 'Október', 'November', 'December'];
 const EN_MONTHS = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
@@ -157,11 +152,7 @@ export default function HomeScreen() {
     let query = supabase.from('events').select('*, club:clubs(id, name, cover_url), creator:profiles!creator_id(id, name, avatar_url), attendees:event_attendees(profile:profiles(id, name, avatar_url))').or(`date.gte.${today},and(is_recurring.eq.true,recurring_end_date.gte.${today})`).order('date', { ascending: true }).limit(50);
     if (filter === 'Free') query = query.eq('is_free', true);
     else if (filter !== 'My Interests' && filter !== 'All Events') {
-      const cats = TAG_CATEGORIES[filter];
-      if (cats) {
-        if (cats.length === 1) query = query.eq('category', cats[0]);
-        else query = query.or(cats.map(c => `category.eq.${c}`).join(','));
-      }
+      query = query.eq('category', filter);
     }
     // All filters (including All Events) filter by city
     if (city && city !== 'Your city' && city !== 'Select city' && city !== null) query = query.eq('city', city);
@@ -256,7 +247,7 @@ export default function HomeScreen() {
           {FILTER_TAGS.map(tag => (
             <Tag
               key={tag}
-              label={tag === 'My Interests' ? 'My Interests' : tag === 'All Events' ? 'All Events' : tag === 'Free' ? t.home.free : tag}
+              label={tag === 'My Interests' ? 'My Interests' : tag === 'All Events' ? 'All Events' : tag === 'Free' ? t.home.free : (lang === 'sk' ? (CATEGORY_SK[tag] ?? tag) : tag)}
               selected={filter === tag}
               onPress={() => setFilter(tag)}
               small
