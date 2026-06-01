@@ -11,7 +11,8 @@ import { useTranslations } from '@/context/LanguageContext';
 export default function OtpScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
-  const { phone } = useLocalSearchParams<{ phone: string }>();
+  const { phone, email, name, type: otpType } = useLocalSearchParams<{ phone?: string; email?: string; name?: string; type?: string }>();
+  const isEmail = otpType === 'email';
   const { t } = useTranslations();
   const [otp, setOtp] = useState(['', '', '', '', '', '']);
   const [loading, setLoading] = useState(false);
@@ -30,19 +31,41 @@ export default function OtpScreen() {
     const code = otp.join('');
     if (code.length < 6) { setError(t.auth.enter6Digit); return; }
     setLoading(true);
-    const { error } = await supabase.auth.verifyOtp({ phone: phone!, token: code, type: 'sms' });
-    setLoading(false);
-    if (error) { setError(t.auth.invalidCode); return; }
-    router.replace('/(auth)/interests');
+
+    if (isEmail) {
+      const { data, error: verifyError } = await supabase.auth.verifyOtp({ email: email!, token: code, type: 'email' });
+      setLoading(false);
+      if (verifyError) { setError(t.auth.invalidCode); return; }
+      // Save profile name now that we have a verified session
+      if (data.user && name) {
+        await supabase.from('profiles').upsert({ id: data.user.id, name: decodeURIComponent(name), email: email!.toLowerCase() });
+      }
+      router.replace('/(auth)/profile-setup');
+    } else {
+      const { error: verifyError } = await supabase.auth.verifyOtp({ phone: phone!, token: code, type: 'sms' });
+      setLoading(false);
+      if (verifyError) { setError(t.auth.invalidCode); return; }
+      router.replace('/(auth)/interests');
+    }
   }
+
+  function handleResend() {
+    if (isEmail) {
+      supabase.auth.signInWithOtp({ email: email!, options: { shouldCreateUser: false } });
+    } else {
+      supabase.auth.signInWithOtp({ phone: phone! });
+    }
+  }
+
+  const destination = isEmail ? email! : phone!;
 
   return (
     <View style={[styles.container, { paddingTop: insets.top + 20, paddingBottom: insets.bottom + 24 }]}>
       <BackButton />
 
       <View style={styles.header}>
-        <Text style={styles.title}>{t.auth.checkMessages}</Text>
-        <Text style={styles.subtitle}>{t.auth.codeSentTo(phone!)}</Text>
+        <Text style={styles.title}>{isEmail ? t.auth.checkEmail : t.auth.checkMessages}</Text>
+        <Text style={styles.subtitle}>{t.auth.codeSentTo(destination)}</Text>
       </View>
 
       <View style={styles.otpRow}>
@@ -52,7 +75,7 @@ export default function OtpScreen() {
             ref={r => { if (r) inputs.current[i] = r; }}
             style={[styles.otpBox, digit && styles.otpBoxFilled, error && styles.otpBoxError]}
             value={digit}
-            onChangeText={t => handleChange(t.slice(-1), i)}
+            onChangeText={v => handleChange(v.slice(-1), i)}
             keyboardType="number-pad"
             maxLength={1}
             textAlign="center"
@@ -64,7 +87,7 @@ export default function OtpScreen() {
 
       <View style={styles.bottom}>
         <Button label={t.auth.verify} onPress={handleVerify} loading={loading} variant="black" />
-        <Button label={t.auth.resendCode} onPress={() => supabase.auth.signInWithOtp({ phone: phone! })} variant="ghost" />
+        <Button label={t.auth.resendCode} onPress={handleResend} variant="ghost" />
       </View>
     </View>
   );

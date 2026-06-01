@@ -48,6 +48,15 @@ export default function EventDetailScreen() {
   const [attendees, setAttendees] = useState<Attendee[]>([]);
   const [isMember, setIsMember] = useState(false);
   const [unreadCount, setUnreadCount] = useState(0);
+  const [coverLoaded, setCoverLoaded] = useState(false);
+  const shimmerOpacity = useSharedValue(0.4);
+  React.useEffect(() => {
+    shimmerOpacity.value = withRepeat(
+      withSequence(withTiming(1, { duration: 700 }), withTiming(0.4, { duration: 700 })),
+      -1, false
+    );
+  }, []);
+  const shimmerStyle = useAnimatedStyle(() => ({ opacity: shimmerOpacity.value }));
   const [qrModal, setQrModal] = useState(false);
   const [loadingWallet, setLoadingWallet] = useState(false);
   const [myTicketIds, setMyTicketIds] = useState<string[]>([]);
@@ -103,10 +112,14 @@ export default function EventDetailScreen() {
       const { data: p } = await supabase.from('profiles').select('*').eq('id', data.creator_id).single();
       setCreator(p);
     }
-    const { data: attData } = await supabase
+    let attQuery = supabase
       .from('event_attendees')
       .select('id, user_id, profile:profiles(name, avatar_url)')
       .eq('event_id', id).limit(10);
+    if (data?.is_recurring && occurrenceDate) {
+      attQuery = (attQuery as any).eq('occurrence_date', occurrenceDate);
+    }
+    const { data: attData } = await attQuery;
     // Deduplicate by user_id — one person can have multiple tickets
     const seen = new Set<string>();
     const unique = (attData ?? []).filter((a: any) => {
@@ -117,7 +130,11 @@ export default function EventDetailScreen() {
     setAttendees(unique as any);
 
     if (user) {
-      const { data: myAtts } = await supabase.from('event_attendees').select('id').eq('event_id', id).eq('user_id', user.id);
+      let myQuery = supabase.from('event_attendees').select('id').eq('event_id', id).eq('user_id', user.id);
+      if (data?.is_recurring && occurrenceDate) {
+        myQuery = (myQuery as any).eq('occurrence_date', occurrenceDate);
+      }
+      const { data: myAtts } = await myQuery;
       const ids = (myAtts ?? []).map((a: any) => a.id);
       setIsAttending(ids.length > 0);
       setMyTicketIds(ids);
@@ -155,7 +172,8 @@ export default function EventDetailScreen() {
     if (!user) { router.push('/(auth)/login'); return; }
     if (event?.is_free || event?.price === 0 || (event as any)?.pay_at_door) {
       setLoading(true);
-      await supabase.from('event_attendees').insert({ event_id: id, user_id: user.id, paid: true });
+      const occDate = (event?.is_recurring && occurrenceDate) ? occurrenceDate : null;
+      await supabase.from('event_attendees').insert({ event_id: id, user_id: user.id, paid: true, ...(occDate ? { occurrence_date: occDate } : {}) });
       if (event?.creator_id && event.creator_id !== user.id) {
         await supabase.from('notifications').insert({
           user_id: event.creator_id, type: 'join',
@@ -301,7 +319,7 @@ export default function EventDetailScreen() {
     <View style={s.outerWrap}>
     <StatusBar style="light" />
     <View style={s.container}>
-      <Toast visible={toast} title={t.event.joined} subtitle={t.event.eventCreatedSub} onHide={() => setToast(false)} />
+      <Toast visible={toast} title={t.event.joined} subtitle={t.event.joinedSub} onHide={() => setToast(false)} />
 
       {/* QR fullscreen modal */}
       <Modal visible={qrModal} transparent animationType="fade" onRequestClose={() => setQrModal(false)}>
@@ -361,6 +379,7 @@ export default function EventDetailScreen() {
                 multiline
                 numberOfLines={2}
                 textAlignVertical="top"
+                maxLength={300}
               />
             )}
 
@@ -453,7 +472,17 @@ export default function EventDetailScreen() {
         <View style={[s.coverWrap, { height: COVER_HEIGHT }]}>
           <Animated.View style={[s.coverInner, parallaxStyle]}>
             {activeCoverUrl
-              ? <Image source={{ uri: activeCoverUrl }} style={s.coverImg} resizeMode="cover" />
+              ? <>
+                  <Image
+                    source={{ uri: activeCoverUrl }}
+                    style={s.coverImg}
+                    resizeMode="cover"
+                    onLoad={() => setCoverLoaded(true)}
+                  />
+                  {!coverLoaded && (
+                    <Animated.View style={[StyleSheet.absoluteFill, { backgroundColor: '#1A1A1A' }, shimmerStyle]} />
+                  )}
+                </>
               : <View style={[s.coverImg, { backgroundColor: '#111' }]} />
             }
           </Animated.View>
@@ -643,8 +672,8 @@ export default function EventDetailScreen() {
               <View style={s.hairline} />
               <TouchableOpacity
                 style={s.hostRow}
-                onPress={() => event.club ? router.push(`/club/${event.club!.id}`) : null}
-                activeOpacity={event.club ? 0.7 : 1}
+                onPress={() => event.club ? router.push(`/club/${event.club!.id}`) : event.creator_id ? router.push(`/profile/${event.creator_id}` as any) : undefined}
+                activeOpacity={0.7}
               >
                 {(event.club?.logo_url ?? event.club?.cover_url ?? creator?.avatar_url)
                   ? <Image source={{ uri: (event.club?.logo_url ?? event.club?.cover_url ?? creator?.avatar_url)! }} style={s.hostAvatar} />
@@ -662,7 +691,7 @@ export default function EventDetailScreen() {
                         await supabase.from('club_members').insert({ club_id: event.club!.id, user_id: user.id, role: 'member', status: 'approved' });
                         setIsMember(true);
                       }}><Text style={s.joinPillText}>+ {t.event.joinPlus}</Text></TouchableOpacity>
-                    : event.club
+                    : (event.club || event.creator_id)
                       ? <Svg width={16} height={16} viewBox="0 0 24 24" fill="none"><Path d="M9 18l6-6-6-6" stroke={Colors.gray} strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" /></Svg>
                       : null
                 }
@@ -781,7 +810,7 @@ const s = StyleSheet.create({
 
   // Cover bottom overlay (title + price on image)
   coverBottom: { position: 'absolute', bottom: 0, left: 0, right: 0, padding: 20, paddingBottom: 36, gap: 8 },
-  catPill: { backgroundColor: Colors.lime, borderRadius: 50, paddingHorizontal: 10, paddingVertical: 4, alignSelf: 'flex-start' },
+  catPill: { backgroundColor: Colors.lime, borderTopRightRadius: 50, borderBottomRightRadius: 50, paddingLeft: 36, paddingRight: 14, paddingVertical: 6, marginLeft: -20, alignSelf: 'flex-start' },
   catText: { fontSize: 9, fontWeight: '800', color: Colors.black, letterSpacing: 1 },
   coverTitleRow: { flexDirection: 'row', alignItems: 'flex-end', gap: 10 },
   coverTitle: { flex: 1, fontSize: 26, fontWeight: '800', color: Colors.white, letterSpacing: -0.5, lineHeight: 32, fontFamily: Fonts.extrabold },

@@ -1,5 +1,5 @@
-import React from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, Image, ImageBackground, ImageStyle } from 'react-native';
+import React, { useState } from 'react';
+import { View, Text, StyleSheet, TouchableOpacity, Image, ImageBackground, ImageStyle, ActivityIndicator } from 'react-native';
 import { useRouter } from 'expo-router';
 import Svg, { Defs, LinearGradient as SvgGrad, Stop, Rect } from 'react-native-svg';
 import { Colors } from '@/constants/colors';
@@ -28,15 +28,19 @@ export function EventCard({ event, featured, attending }: EventCardProps) {
   const monthShort = d.toLocaleDateString(locale, { month: 'short' }).toUpperCase();
   const isToday = new Date().toDateString() === d.toDateString();
 
+  const { t } = useTranslations();
   const isPayAtDoor = !!(event as any).pay_at_door;
   const isFree = !isPayAtDoor && (event.is_free || event.price === 0);
-  const priceLabel = isPayAtDoor ? `€${event.price} at door` : (isFree ? 'Free' : `€${event.price}`);
+  const priceLabel = isPayAtDoor ? `€${event.price} at door` : (isFree ? t.event.freeLabel : `€${event.price}`);
   const clubName = event.club?.name ?? (event as any).creator?.name ?? null;
   // Use attendees length as fallback if going_count is stale/0
   const goingCount = Math.max(event.going_count ?? 0, event.attendees?.length ?? 0, attending ? 1 : 0);
 
+  const [imageLoading, setImageLoading] = useState(true);
+
   if (featured) {
     return (
+      <View style={{ overflow: 'visible' }}>
       <TouchableOpacity
         style={styles.featured}
         onPress={() => router.push(`/event/${event.id}`)}
@@ -47,7 +51,11 @@ export function EventCard({ event, featured, attending }: EventCardProps) {
             source={{ uri: coverUrl }}
             style={styles.featuredBg}
             imageStyle={styles.featuredImage}
+            onLoadEnd={() => setImageLoading(false)}
           >
+            {imageLoading && (
+              <ActivityIndicator color="rgba(200,255,0,0.5)" size="small" style={styles.featuredLoader} />
+            )}
             <Svg style={StyleSheet.absoluteFill} preserveAspectRatio="none">
               <Defs>
                 <SvgGrad id="fg" x1="0" y1="0" x2="0" y2="1">
@@ -88,6 +96,12 @@ export function EventCard({ event, featured, attending }: EventCardProps) {
           </View>
         )}
       </TouchableOpacity>
+      {event.category ? (
+        <View style={styles.featuredCategoryPill} pointerEvents="none">
+          <Text style={styles.categoryPillText}>{event.category.toUpperCase()}</Text>
+        </View>
+      ) : null}
+      </View>
     );
   }
 
@@ -100,7 +114,7 @@ export function EventCard({ event, featured, attending }: EventCardProps) {
     >
       {/* Date block */}
       {(() => {
-        const isGoing = attending || event.creator_id === user?.id;
+        const isGoing = attending || (!event.is_recurring && event.creator_id === user?.id);
         return (
           <View style={[styles.dateBlock, isToday && styles.dateBlockToday, isGoing && styles.dateBlockGoing]}>
             <Text style={[styles.dateBlockDay, isToday && styles.dateBlockTextToday, isGoing && styles.dateBlockTextGoing]}>
@@ -166,9 +180,7 @@ function GoingAvatars({ count, attendees, attending, userProfile, userId }: {
   userProfile?: { name?: string | null; avatar_url?: string | null } | null;
   userId?: string;
 }) {
-  // Check if user is in attendees list (fallback when attending prop not yet set)
-  const userInList = userId ? (attendees ?? []).some((a: any) => a?.profile?.id === userId) : false;
-  const isAttending = attending || userInList;
+  const isAttending = attending ?? false;
 
   // Build ordered list: exclude current user, others fill remaining slots
   const others = (attendees ?? []).filter((a: any) => a?.profile?.id !== userId);
@@ -225,18 +237,15 @@ const avStyles = StyleSheet.create({
 });
 
 function FeaturedContent({ event, isToday, dayName, dayNum, monthShort, priceLabel, isFree, clubName, goingCount, dark }: any) {
+  const { t } = useTranslations();
   const textColor = dark ? Colors.white : Colors.white;
   const subColor = dark ? 'rgba(255,255,255,0.75)' : 'rgba(255,255,255,0.7)';
 
   return (
     <View style={styles.featuredContent}>
-      {/* Top row: category + price */}
+      {/* Top row: price only (category pill rendered outside card) */}
       <View style={styles.featuredTopRow}>
-        {event.category ? (
-          <View style={styles.categoryPill}>
-            <Text style={styles.categoryPillText}>{event.category.toUpperCase()}</Text>
-          </View>
-        ) : <View />}
+        <View />
         <View style={[styles.featuredPricePill, isFree && styles.featuredPricePillFree]}>
           <Text style={[styles.featuredPriceText, isFree && styles.featuredPriceTextFree]}>{priceLabel}</Text>
         </View>
@@ -251,7 +260,7 @@ function FeaturedContent({ event, isToday, dayName, dayNum, monthShort, priceLab
         <View style={styles.featuredTextCol}>
           <Text style={[styles.featuredTitle, { color: textColor }]} numberOfLines={2}>{event.title}</Text>
           <Text style={[styles.featuredMeta, { color: subColor }]} numberOfLines={1}>
-            {clubName ? `${clubName}  ·  ` : ''}{formatTime(event.time)}{goingCount > 0 ? `  ·  ${goingCount} going` : ''}
+            {clubName ? `${clubName}  ·  ` : ''}{formatTime(event.time)}{goingCount > 0 ? `  ·  ${t.event.going_count(goingCount)}` : ''}
           </Text>
         </View>
       </View>
@@ -287,14 +296,26 @@ function getEventDate(date: string, isRecurring?: boolean): Date {
 
 const styles = StyleSheet.create({
   // ── Featured ──
-  featured: { borderRadius: 20, overflow: 'hidden', height: 240 },
-  featuredBg: { flex: 1 },
-  featuredImage: { borderRadius: 20 },
+  featured: { borderRadius: 20, borderBottomRightRadius: 0, overflow: 'hidden', height: 240 },
+  featuredBg: { flex: 1, backgroundColor: Colors.black },
+  featuredLoader: { position: 'absolute', top: 16, right: 16 },
+  featuredImage: { borderRadius: 20, borderBottomRightRadius: 0 },
   featuredContent: { flex: 1, justifyContent: 'space-between', padding: 16 },
   featuredTopRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start' },
   categoryPill: {
     backgroundColor: Colors.lime, borderRadius: 50,
     paddingHorizontal: 10, paddingVertical: 4,
+  },
+  featuredCategoryPill: {
+    position: 'absolute',
+    top: 16,
+    left: -24,
+    backgroundColor: Colors.lime,
+    borderTopRightRadius: 50,
+    borderBottomRightRadius: 50,
+    paddingLeft: 32,
+    paddingRight: 12,
+    paddingVertical: 5,
   },
   categoryPillText: { fontSize: 9, fontWeight: '800', color: Colors.black, letterSpacing: 1 },
   featuredPricePill: {
@@ -307,7 +328,7 @@ const styles = StyleSheet.create({
 
   featuredBottom: { flexDirection: 'row', alignItems: 'flex-end', gap: 12 },
   featuredDateBadge: {
-    backgroundColor: 'rgba(0,0,0,0.5)', borderRadius: 12,
+    backgroundColor: 'rgba(0,0,0,0.5)', borderRadius: 12, borderBottomLeftRadius: 0,
     paddingHorizontal: 10, paddingVertical: 6, alignItems: 'center', minWidth: 46,
   },
   featuredDateDay: { fontSize: 9, fontWeight: '700', color: 'rgba(255,255,255,0.7)', letterSpacing: 0.5 },
@@ -329,6 +350,7 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     backgroundColor: Colors.grayLight,
     borderRadius: 12,
+    borderBottomLeftRadius: 0,
     paddingVertical: 8,
     gap: 0,
   },
@@ -357,7 +379,7 @@ const styles = StyleSheet.create({
   goingBadge: { position: 'absolute', bottom: 4, right: 4, width: 20, height: 20, borderRadius: 10, backgroundColor: Colors.lime, alignItems: 'center', justifyContent: 'center' },
   goingBadgeText: { fontSize: 9, fontWeight: '800', color: Colors.black },
 
-  rowThumbWrap: { width: 64, height: 64, borderRadius: 12, overflow: 'hidden' },
+  rowThumbWrap: { width: 64, height: 64, borderRadius: 12, borderTopRightRadius: 0, overflow: 'hidden' },
   rowThumb: { width: 64, height: 64 },
   rowThumbRight: { position: 'absolute', right: 0, height: 64, width: 180 },
 });

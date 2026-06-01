@@ -60,38 +60,38 @@ export default function RegisterScreen() {
       password,
       options: { data: { full_name: name } },
     });
-    setLoading(false);
 
     if (error) {
       if (error.message.toLowerCase().includes('already registered') || error.message.toLowerCase().includes('already exists')) {
+        // Try signing them in with the same credentials — they may have quit mid-onboarding
+        const { data: signInData, error: signInError } = await supabase.auth.signInWithPassword({ email, password });
+        setLoading(false);
+        if (!signInError && signInData.user) {
+          const { data: existingProfile } = await supabase.from('profiles').select('interests').eq('id', signInData.user.id).single();
+          if (!existingProfile?.interests?.length) {
+            router.replace('/(auth)/profile-setup');
+          } else {
+            router.replace('/(tabs)');
+          }
+          return;
+        }
+        // Wrong password or other error — show normal alert
         setErrors({ email: t.auth.emailAlreadyRegistered });
         Alert.alert(t.auth.accountExists, t.auth.accountExistsMsg, [
           { text: t.auth.cancel, style: 'cancel' },
           { text: t.auth.signInAction, onPress: () => router.replace('/(auth)/login') },
         ]);
       } else {
+        setLoading(false);
         setErrors({ email: error.message });
       }
       return;
     }
+    // Send email OTP for verification
+    await supabase.auth.signInWithOtp({ email, options: { shouldCreateUser: false } });
+    setLoading(false);
 
-    if (!data.session) {
-      // Email confirmation required - user must confirm before they can log in
-      Alert.alert(
-        t.auth.checkEmail,
-        t.auth.checkEmailMsg(email),
-        [{ text: t.auth.ok, onPress: () => router.replace('/(auth)') }],
-      );
-      return;
-    }
-
-    // Session created - save profile with name immediately
-    if (data.user) {
-      await supabase.from('profiles').upsert({ id: data.user.id, name: name.trim(), email: email.trim().toLowerCase() });
-      notify.welcome({ email: email.trim().toLowerCase(), name: name.trim() });
-    }
-
-    router.push('/(auth)/profile-setup');
+    router.push(`/(auth)/otp?email=${encodeURIComponent(email)}&name=${encodeURIComponent(name.trim())}&type=email`);
   }
 
   return (
@@ -101,16 +101,7 @@ export default function RegisterScreen() {
         contentContainerStyle={[styles.content, { paddingTop: insets.top + 20, paddingBottom: insets.bottom + 24 }]}
         keyboardShouldPersistTaps="handled"
       >
-        <View style={styles.langRow}>
-          <BackButton />
-          <View style={styles.langPicker}>
-            {(['en', 'sk'] as Lang[]).map(l => (
-              <TouchableOpacity key={l} style={[styles.langBtn, lang === l && styles.langBtnActive]} onPress={() => setLang(l)} activeOpacity={0.7}>
-                <Text style={[styles.langBtnText, lang === l && styles.langBtnTextActive]}>{t.languages[l]}</Text>
-              </TouchableOpacity>
-            ))}
-          </View>
-        </View>
+        <BackButton />
 
         <View style={styles.header}>
           <Text style={styles.title}>{t.auth.createAccount}</Text>

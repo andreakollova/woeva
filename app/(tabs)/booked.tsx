@@ -1,9 +1,10 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useCallback } from 'react';
 import { View, Text, StyleSheet, ScrollView, TouchableOpacity, RefreshControl, Image, ImageStyle, Modal, Alert, Share, Linking, Platform, ActivityIndicator } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { useRouter } from 'expo-router';
+import { useRouter, useFocusEffect } from 'expo-router';
 import Animated, { FadeInDown } from 'react-native-reanimated';
 import QRCode from 'react-native-qrcode-svg';
+import Svg, { Path, Circle } from 'react-native-svg';
 import { Colors } from '@/constants/colors';
 import { Fonts } from '@/constants/fonts';
 import { supabase } from '@/lib/supabase';
@@ -13,7 +14,6 @@ import { WMark } from '@/components/ui/WMark';
 import { useAuth } from '@/context/AuthContext';
 import { notify } from '@/lib/notify';
 import { useTranslations } from '@/context/LanguageContext';
-import { expandRecurringEvents } from '@/lib/expandRecurring';
 
 type BookedEvent = Event & { attendee_id?: string };
 
@@ -28,7 +28,7 @@ export default function BookedScreen() {
   const [refreshing, setRefreshing] = useState(false);
   const [deletingId, setDeletingId] = useState<string | null>(null);
 
-  useEffect(() => { loadEvents(); }, [tab, user]);
+  useFocusEffect(useCallback(() => { loadEvents(); }, [tab, user]));
 
   async function loadEvents() {
     if (!user) return;
@@ -42,12 +42,43 @@ export default function BookedScreen() {
 
     const allEvents: BookedEvent[] = (data ?? [])
       .map((r: any) => ({ ...r.event, attendee_id: r.id }))
-      .filter((e: any) => e?.id);
+      .filter((e: any) => e?.id)
+      .filter((e: any) => e.status !== 'cancelled');
 
-    const expanded = expandRecurringEvents(allEvents.filter(e => e.status !== 'cancelled'));
+    const withDates = allEvents.map(e => {
+      if (!e.is_recurring) return e;
+      // For recurring events find the single relevant occurrence
+      const todayDate = new Date();
+      todayDate.setHours(0, 0, 0, 0);
+      const maxDate = new Date();
+      maxDate.setMonth(maxDate.getMonth() + 3);
+      const endDate = (e as any).recurring_end_date ? new Date((e as any).recurring_end_date + 'T00:00:00') : maxDate;
+      const cap = endDate < maxDate ? endDate : maxDate;
+      const cancelled = new Set(e.cancelled_dates ?? []);
+      let cur = new Date(e.date + 'T00:00:00');
+      if (tab === 'upcoming') {
+        while (cur < todayDate) cur.setDate(cur.getDate() + 7);
+        while (cur <= cap) {
+          const ds = cur.toISOString().slice(0, 10);
+          if (!cancelled.has(ds)) return { ...e, date: ds };
+          cur.setDate(cur.getDate() + 7);
+        }
+        return null; // no upcoming occurrence
+      } else {
+        // past: find most recent past occurrence
+        let last: string | null = null;
+        while (cur < todayDate && cur <= cap) {
+          const ds = cur.toISOString().slice(0, 10);
+          if (!cancelled.has(ds)) last = ds;
+          cur.setDate(cur.getDate() + 7);
+        }
+        return last ? { ...e, date: last } : null;
+      }
+    }).filter(Boolean) as BookedEvent[];
+
     const filtered = tab === 'upcoming'
-      ? expanded.filter(e => (e.date || '').slice(0, 10) >= now)
-      : expanded.filter(e => (e.date || '').slice(0, 10) < now);
+      ? withDates.filter(e => (e.date || '').slice(0, 10) >= now)
+      : withDates.filter(e => (e.date || '').slice(0, 10) < now);
 
     setEvents(filtered.sort((a, b) => a.date.localeCompare(b.date)));
 
@@ -220,7 +251,7 @@ function TicketCard({ event, userId, userAvatar, userName, isPast, onPress, onDe
   onDelete?: () => void;
   onLeave?: () => void;
 }) {
-  const { t } = useTranslations();
+  const { t, lang } = useTranslations();
   const [qrModal, setQrModal] = useState(false);
   const [optionsModal, setOptionsModal] = useState(false);
   const [goingCount, setGoingCount] = useState(event.going_count ?? 0);
@@ -245,11 +276,13 @@ function TicketCard({ event, userId, userAvatar, userName, isPast, onPress, onDe
   }, [event.id]);
 
   const d = new Date(event.date + 'T00:00:00');
-  const dayName = d.toLocaleDateString('en-US', { weekday: 'long' });
-  const dateStr = `${d.getDate()} ${d.toLocaleDateString('en-US', { month: 'long' })} ${d.getFullYear()}`;
+  const locale = lang === 'sk' ? 'sk-SK' : 'en-US';
+  const dayName = d.toLocaleDateString(locale, { weekday: 'long' }).replace(/^\w/, c => c.toUpperCase());
+  const dateStr = `${d.getDate()} ${d.toLocaleDateString(locale, { month: 'long' })} ${d.getFullYear()}`;
   const qrValue = `woeva:ticket:${event.attendee_id ?? event.id}:${userId}`;
   const isFree = event.is_free || event.price === 0;
   const priceLabel = isFree ? t.tickets.free : `€${event.price}`;
+  const isWoevaEvent = event.source === 'woeva_picks' || event.source === 'instagram';
 
   function handleShare() {
     Share.share({ message: `Check out "${event.title}" on Woeva!` });
@@ -297,7 +330,13 @@ function TicketCard({ event, userId, userAvatar, userName, isPast, onPress, onDe
 
             {!isPast && onLeave && (
               <TouchableOpacity style={[styles.optionsRow, styles.optionsRowDestructive]} onPress={() => { setOptionsModal(false); onLeave(); }} activeOpacity={0.7}>
-                <Text style={styles.optionsRowIconText}>🚪</Text>
+                <View style={[styles.optionsIconBox, { backgroundColor: '#FFF0F0' }]}>
+                  <Svg width={18} height={18} viewBox="0 0 24 24" fill="none">
+                    <Path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4" stroke="#FF3B30" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" />
+                    <Path d="M16 17l5-5-5-5" stroke="#FF3B30" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" />
+                    <Path d="M21 12H9" stroke="#FF3B30" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" />
+                  </Svg>
+                </View>
                 <View style={styles.optionsRowBody}>
                   <Text style={[styles.optionsRowLabel, styles.optionsRowLabelDestructive]}>{t.tickets.leaveEvent}</Text>
                   <Text style={styles.optionsRowSub}>{t.tickets.leaveEventSub}</Text>
@@ -306,7 +345,13 @@ function TicketCard({ event, userId, userAvatar, userName, isPast, onPress, onDe
             )}
 
             <TouchableOpacity style={styles.optionsRow} onPress={() => { setOptionsModal(false); handleShare(); }} activeOpacity={0.7}>
-              <Text style={styles.optionsRowIconText}>🔗</Text>
+              <View style={styles.optionsIconBox}>
+                <Svg width={18} height={18} viewBox="0 0 24 24" fill="none">
+                  <Path d="M4 12v8a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-8" stroke={Colors.black} strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" />
+                  <Path d="M16 6l-4-4-4 4" stroke={Colors.black} strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" />
+                  <Path d="M12 2v13" stroke={Colors.black} strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" />
+                </Svg>
+              </View>
               <View style={styles.optionsRowBody}>
                 <Text style={styles.optionsRowLabel}>{t.tickets.shareTicket}</Text>
                 <Text style={styles.optionsRowSub}>{t.tickets.shareTicketSub}</Text>
@@ -315,7 +360,12 @@ function TicketCard({ event, userId, userAvatar, userName, isPast, onPress, onDe
 
             {event.venue ? (
               <TouchableOpacity style={styles.optionsRow} onPress={() => { setOptionsModal(false); handleDirections(); }} activeOpacity={0.7}>
-                <Text style={styles.optionsRowIconText}>📍</Text>
+                <View style={styles.optionsIconBox}>
+                  <Svg width={18} height={18} viewBox="0 0 24 24" fill="none">
+                    <Path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7z" stroke={Colors.black} strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" />
+                    <Circle cx="12" cy="9" r="2.5" stroke={Colors.black} strokeWidth={2} />
+                  </Svg>
+                </View>
                 <View style={styles.optionsRowBody}>
                   <Text style={styles.optionsRowLabel}>{t.tickets.getDirections}</Text>
                   <Text style={styles.optionsRowSub}>{event.venue}</Text>
@@ -324,7 +374,12 @@ function TicketCard({ event, userId, userAvatar, userName, isPast, onPress, onDe
             ) : null}
 
             <TouchableOpacity style={styles.optionsRow} onPress={() => { setOptionsModal(false); handleCalendar(); }} activeOpacity={0.7}>
-              <Text style={styles.optionsRowIconText}>📅</Text>
+              <View style={styles.optionsIconBox}>
+                <Svg width={18} height={18} viewBox="0 0 24 24" fill="none">
+                  <Path d="M3 9h18M16 2v4M8 2v4" stroke={Colors.black} strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" />
+                  <Path d="M5 4h14a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2z" stroke={Colors.black} strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" />
+                </Svg>
+              </View>
               <View style={styles.optionsRowBody}>
                 <Text style={styles.optionsRowLabel}>{t.tickets.eventDetails}</Text>
                 <Text style={styles.optionsRowSub}>{event.date}{event.time ? ' · ' + event.time : ''}</Text>
@@ -405,15 +460,16 @@ function TicketCard({ event, userId, userAvatar, userName, isPast, onPress, onDe
               {userAvatar ? <Image source={{ uri: userAvatar }} style={[StyleSheet.absoluteFill, { borderRadius: 11 }] as ImageStyle} /> : null}
             </View>
             {/* Other attendees */}
-            {Array.from({ length: 2 }).map((_, i) => {
-              const others = ((event as any).attendees ?? []).filter((a: any) => a?.profile?.id !== userId);
-              const att = others[i];
-              const avatarUrl = att?.profile?.avatar_url;
-              const initial = (att?.profile?.name ?? '?').charAt(0).toUpperCase();
-              return avatarUrl
-                ? <Image key={i} source={{ uri: avatarUrl }} style={[styles.goingAvatar, { marginLeft: -7 }] as ImageStyle} />
-                : <View key={i} style={[styles.goingAvatar, styles.goingAvatarFallback, { marginLeft: -7 }]}><Text style={styles.goingAvatarInitial}>{initial}</Text></View>;
-            })}
+            {((event as any).attendees ?? [])
+              .filter((a: any) => a?.profile?.id && a.profile.id !== userId)
+              .slice(0, 2)
+              .map((att: any, i: number) => {
+                const avatarUrl = att?.profile?.avatar_url;
+                const initial = (att?.profile?.name ?? '').charAt(0).toUpperCase();
+                return avatarUrl
+                  ? <Image key={i} source={{ uri: avatarUrl }} style={[styles.goingAvatar, { marginLeft: -7 }] as ImageStyle} />
+                  : <View key={i} style={[styles.goingAvatar, styles.goingAvatarFallback, { marginLeft: -7 }]}><Text style={styles.goingAvatarInitial}>{initial}</Text></View>;
+              })}
           </View>
           <Text style={styles.goingLabel}>{t.tickets.going_people(Math.max(goingCount, 1))}</Text>
           <View style={[styles.pricePill, isFree && styles.pricePillFree]}>
@@ -478,12 +534,15 @@ function TicketCard({ event, userId, userAvatar, userName, isPast, onPress, onDe
             <Text style={styles.qrAttendeeName} numberOfLines={1}>{userName}</Text>
             {!isPast && <Text style={styles.qrTitle}>{t.tickets.yourTicket}</Text>}
             <Text style={styles.qrSub}>
-              {isPast ? t.tickets.thanksForComing : t.tickets.showAtDoor}
+              {isPast
+                ? t.tickets.thanksForComing
+                : isWoevaEvent
+                  ? (lang === 'sk' ? 'Táto udalosť je zadarmo - QR kód pri vstupe nepotrebuješ.' : 'This event is free - no QR code needed at the door.')
+                  : t.tickets.showAtDoor}
             </Text>
             {event.club?.name ? (
               <Text style={styles.qrClub}>{event.club.name}</Text>
             ) : null}
-
           </View>
         </View>
       </View>
@@ -524,7 +583,7 @@ const styles = StyleSheet.create({
   ticketCoverOverlay: { ...StyleSheet.absoluteFillObject, backgroundColor: 'rgba(0,0,0,0.5)' },
   ticketCoverContent: { position: 'absolute', bottom: 0, left: 0, right: 0, padding: 18, gap: 6 },
   ticketDeleteBtn: { position: 'absolute', top: 12, right: 12, width: 28, height: 28, borderRadius: 14, backgroundColor: 'rgba(0,0,0,0.5)', alignItems: 'center', justifyContent: 'center' },
-  ticketDeleteIcon: { fontSize: 18, color: Colors.white, lineHeight: 22, fontWeight: '300' },
+  ticketDeleteIcon: { fontSize: 18, color: Colors.white, lineHeight: 18, fontWeight: '300', marginTop: -2 },
   ticketOptionsBtn: { position: 'absolute', top: 12, right: 12, width: 32, height: 28, borderRadius: 14, backgroundColor: 'rgba(0,0,0,0.4)', alignItems: 'center', justifyContent: 'center' },
   ticketOptionsIcon: { fontSize: 16, color: Colors.white, lineHeight: 20, letterSpacing: 1 },
   ticketStatusPill: { flexDirection: 'row', alignItems: 'center', gap: 6, alignSelf: 'flex-start', backgroundColor: 'rgba(255,255,255,0.15)', borderRadius: 50, paddingHorizontal: 10, paddingVertical: 5 },
@@ -587,11 +646,15 @@ const styles = StyleSheet.create({
   optionsRow: { flexDirection: 'row', alignItems: 'center', gap: 14, paddingVertical: 14, borderTopWidth: 1, borderTopColor: '#F0F0F0' },
   optionsRowDestructive: {},
   optionsRowIconText: { fontSize: 22, width: 32, textAlign: 'center' },
+  optionsIconBox: { width: 40, height: 40, borderRadius: 12, backgroundColor: Colors.grayLight, alignItems: 'center', justifyContent: 'center', flexShrink: 0 },
   optionsRowBody: { flex: 1 },
   optionsRowLabel: { fontSize: 15, fontWeight: '600', color: Colors.black, fontFamily: Fonts.semibold },
   optionsRowLabelDestructive: { color: '#FF3B30' },
   optionsRowSub: { fontSize: 12, color: Colors.gray, fontFamily: Fonts.regular, marginTop: 1 },
 
+  woevaNotice: { flexDirection: 'row', alignItems: 'center', gap: 10, backgroundColor: 'rgba(200,255,0,0.08)', borderRadius: 14, padding: 14, borderWidth: 1, borderColor: 'rgba(200,255,0,0.15)' },
+  woevaNoticeIcon: { width: 32, height: 32, borderRadius: 10, backgroundColor: 'rgba(200,255,0,0.12)', alignItems: 'center', justifyContent: 'center', flexShrink: 0 },
+  woevaNoticeText: { flex: 1, fontSize: 13, color: 'rgba(255,255,255,0.7)', fontFamily: Fonts.regular, lineHeight: 18 },
   walletBtn: { width: 108, height: 30, alignItems: 'center', justifyContent: 'center' },
   walletBadge: { width: 108, height: 30 },
 

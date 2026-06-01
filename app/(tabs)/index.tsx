@@ -1,9 +1,13 @@
 import React, { useEffect, useState, useCallback } from 'react';
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity, RefreshControl, Image, Modal, ImageBackground } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, TouchableOpacity, RefreshControl, Image, Modal, ImageBackground, InteractionManager } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import { useFocusEffect } from 'expo-router';
-import Animated, { FadeInDown } from 'react-native-reanimated';
+import Animated, {
+  FadeInDown,
+  useSharedValue, useAnimatedStyle,
+  withRepeat, withSequence, withTiming,
+} from 'react-native-reanimated';
 import * as Location from 'expo-location';
 import Svg, { Path, Circle } from 'react-native-svg';
 import { WMark } from '@/components/ui/WMark';
@@ -90,6 +94,15 @@ export default function HomeScreen() {
   const [refreshing, setRefreshing] = useState(false);
   const [loading, setLoading] = useState(true);
 
+  const shimmer = useSharedValue(0);
+  useEffect(() => {
+    shimmer.value = withRepeat(
+      withSequence(withTiming(1, { duration: 750 }), withTiming(0, { duration: 750 })),
+      -1, false
+    );
+  }, []);
+  const shimmerStyle = useAnimatedStyle(() => ({ opacity: 0.4 + shimmer.value * 0.5 }));
+
   const [city, setCity] = useState<string | null>(null);
   const [showCityPicker, setShowCityPicker] = useState(false);
   const [expandedCountries, setExpandedCountries] = useState<Set<string>>(new Set(['SK']));
@@ -151,7 +164,11 @@ export default function HomeScreen() {
     const today = new Date().toISOString().split('T')[0];
     let query = supabase.from('events').select('*, club:clubs(id, name, cover_url), creator:profiles!creator_id(id, name, avatar_url), attendees:event_attendees(profile:profiles(id, name, avatar_url))').or(`date.gte.${today},and(is_recurring.eq.true,recurring_end_date.gte.${today})`).order('date', { ascending: true }).limit(50);
     if (filter === 'Free') query = query.eq('is_free', true);
-    else if (filter !== 'My Interests' && filter !== 'All Events') {
+    else if (filter === 'My Interests') {
+      const VALID_CATS = ['Movement & Sport', 'Wellness & Body', 'Food & Drinks', 'Art & Creation', 'Music & Nightlife', 'Learning & Mind', 'Community & Belonging'];
+      const interests = (profile?.interests ?? []).filter((i: string) => VALID_CATS.includes(i));
+      if (interests.length > 0) query = query.in('category', interests);
+    } else if (filter !== 'All Events') {
       query = query.eq('category', filter);
     }
     // All filters (including All Events) filter by city
@@ -166,11 +183,23 @@ export default function HomeScreen() {
       const hideAfter = new Date(start.getTime() + (durationH + 3) * 60 * 60 * 1000);
       return now < hideAfter;
     });
-    setEvents(expandRecurringEvents(filtered));
+    const expanded = expandRecurringEvents(filtered);
+    setEvents(expanded);
+    // Prefetch featured image so it's ready before the skeleton fades
+    const firstCover = (expanded[0] as any)?.cover_url;
+    if (firstCover) Image.prefetch(firstCover).catch(() => {});
 
     if (user) {
-      const { data: att } = await supabase.from('event_attendees').select('event_id').eq('user_id', user.id);
-      setAttendingIds(new Set((att ?? []).map((a: any) => a.event_id)));
+      const { data: att } = await supabase.from('event_attendees').select('event_id, occurrence_date').eq('user_id', user.id);
+      const ids = new Set<string>();
+      (att ?? []).forEach((a: any) => {
+        if (a.occurrence_date) {
+          ids.add(`${a.event_id}_${a.occurrence_date}`);
+        } else {
+          ids.add(a.event_id);
+        }
+      });
+      setAttendingIds(ids);
     }
     setLoading(false);
   }
@@ -229,53 +258,70 @@ export default function HomeScreen() {
 
         {/* Header */}
         <View style={styles.header}>
-          <TouchableOpacity onPress={() => setShowCityPicker(true)} style={styles.cityRow}>
-            <Text style={styles.cityLabel}>{city ?? t.home.selectCity}</Text>
-            <Svg width={14} height={14} viewBox="0 0 24 24" fill="none">
-              <Path d="M6 9l6 6 6-6" stroke={Colors.gray} strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" />
-            </Svg>
-          </TouchableOpacity>
-          <Text style={styles.title}>{t.home.yourCityMoving}</Text>
+          {loading ? (
+            <Animated.View style={[{ gap: 10 }, shimmerStyle]}>
+              <View style={{ width: 110, height: 18, borderRadius: 9, backgroundColor: Colors.grayLight }} />
+              <View style={{ width: 200, height: 28, borderRadius: 10, backgroundColor: Colors.grayLight }} />
+            </Animated.View>
+          ) : (
+            <>
+              <TouchableOpacity onPress={() => setShowCityPicker(true)} style={styles.cityRow}>
+                <Text style={styles.cityLabel}>{city ?? t.home.selectCity}</Text>
+                <Svg width={14} height={14} viewBox="0 0 24 24" fill="none">
+                  <Path d="M6 9l6 6 6-6" stroke={Colors.gray} strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" />
+                </Svg>
+              </TouchableOpacity>
+              <Text style={styles.title}>{t.home.yourCityMoving}</Text>
+            </>
+          )}
         </View>
 
         {/* Filter chips */}
-        <ScrollView
-          horizontal
-          showsHorizontalScrollIndicator={false}
-          contentContainerStyle={styles.filters}
-        >
-          {FILTER_TAGS.map(tag => (
-            <Tag
-              key={tag}
-              label={tag === 'My Interests' ? 'My Interests' : tag === 'All Events' ? 'All Events' : tag === 'Free' ? t.home.free : (lang === 'sk' ? (CATEGORY_SK[tag] ?? tag) : tag)}
-              selected={filter === tag}
-              onPress={() => setFilter(tag)}
-              small
-              floatDelay={-1}
-            />
-          ))}
-        </ScrollView>
+        {loading ? (
+          <Animated.View style={[styles.filters, shimmerStyle, { flexDirection: 'row', gap: 8, paddingHorizontal: 20, paddingBottom: 16 }]}>
+            {[72, 52, 90, 68, 80].map((w, i) => (
+              <View key={i} style={[styles.skeletonChip, { width: w }]} />
+            ))}
+          </Animated.View>
+        ) : (
+          <ScrollView
+            horizontal
+            showsHorizontalScrollIndicator={false}
+            contentContainerStyle={styles.filters}
+          >
+            {FILTER_TAGS.map(tag => (
+              <Tag
+                key={tag}
+                label={tag === 'My Interests' ? 'My Interests' : tag === 'All Events' ? 'All Events' : tag === 'Free' ? t.home.free : (lang === 'sk' ? (CATEGORY_SK[tag] ?? tag) : tag)}
+                selected={filter === tag}
+                onPress={() => setFilter(tag)}
+                small
+                floatDelay={-1}
+              />
+            ))}
+          </ScrollView>
+        )}
 
         {/* Featured event */}
         {loading ? (
-          <View style={[styles.featured, styles.skeletonFeatured]} />
+          <Animated.View style={[styles.featured, styles.skeletonFeatured, shimmerStyle]} />
         ) : featured ? (
-          <Animated.View entering={FadeInDown.delay(100).duration(300)} style={styles.featured}>
+          <View style={styles.featured}>
             <EventCard event={featured} featured attending={attendingIds.has(featured.id)} />
-          </Animated.View>
+          </View>
         ) : null}
 
         {/* Event list */}
         <View style={styles.list}>
         {loading && [0,1,2,3].map(i => (
-          <View key={i} style={styles.skeletonRow}>
+          <Animated.View key={i} style={[styles.skeletonRow, shimmerStyle]}>
             <View style={styles.skeletonDate} />
             <View style={styles.skeletonInfo}>
-              <View style={[styles.skeletonLine, { width: '70%' }]} />
-              <View style={[styles.skeletonLine, { width: '45%', marginTop: 6 }]} />
+              <View style={[styles.skeletonLine, { width: `${60 + (i % 3) * 10}%` }]} />
+              <View style={[styles.skeletonLine, { width: `${35 + (i % 2) * 15}%`, marginTop: 6 }]} />
             </View>
             <View style={styles.skeletonThumb} />
-          </View>
+          </Animated.View>
         ))}
           {rest.map((event, i) => {
             const prevEvent = i === 0 ? featured : rest[i - 1];
@@ -351,7 +397,11 @@ export default function HomeScreen() {
                       activeOpacity={0.7}
                     >
                       <Text style={[styles.cityModalLabel, city === c && styles.cityModalLabelActive]}>{cityDisplay[c] ?? c}</Text>
-                      {city === c && <Text style={styles.cityModalCheck}>✓</Text>}
+                      {city === c && (
+                        <View style={styles.cityModalCheck}>
+                          <Text style={styles.cityModalCheckText}>✓</Text>
+                        </View>
+                      )}
                     </TouchableOpacity>
                   ))}
                 </View>
@@ -388,6 +438,7 @@ const styles = StyleSheet.create({
   monthDividerLine: { flex: 1, height: 2, borderRadius: 2, backgroundColor: Colors.lime },
   monthDividerText: { fontSize: 11, fontWeight: '700', color: Colors.black, fontFamily: Fonts.bold, letterSpacing: 1, textTransform: 'uppercase' },
   skeletonFeatured: { height: 240, backgroundColor: Colors.grayLight, borderRadius: 20, marginHorizontal: 20, marginBottom: 20 },
+  skeletonChip: { height: 32, borderRadius: 50, backgroundColor: Colors.grayLight },
   skeletonRow: { flexDirection: 'row', alignItems: 'center', gap: 12, paddingVertical: 12 },
   skeletonDate: { width: 52, height: 64, borderRadius: 12, backgroundColor: Colors.grayLight },
   skeletonInfo: { flex: 1, gap: 0 },
@@ -408,5 +459,6 @@ const styles = StyleSheet.create({
   cityModalRowActive: { },
   cityModalLabel: { fontSize: 15, fontFamily: Fonts.regular, color: Colors.black },
   cityModalLabelActive: { fontWeight: '700', fontFamily: Fonts.bold },
-  cityModalCheck: { fontSize: 16, color: Colors.lime, fontWeight: '700' },
+  cityModalCheck: { width: 22, height: 22, borderRadius: 11, backgroundColor: Colors.lime, alignItems: 'center', justifyContent: 'center' },
+  cityModalCheckText: { fontSize: 12, fontWeight: '800', color: Colors.black, lineHeight: 14 },
 });

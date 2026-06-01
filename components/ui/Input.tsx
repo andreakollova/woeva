@@ -59,7 +59,7 @@ const styles = StyleSheet.create({
     color: Colors.error,
   },
   rightLabel: {
-    fontSize: 14,
+    fontSize: 12,
     color: Colors.gray,
   },
   input: {

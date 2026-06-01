@@ -36,7 +36,7 @@ export default function LoginScreen() {
     if (!password) { setErrors(e => ({ ...e, password: t.auth.minPassword })); return; }
 
     setLoading(true);
-    const { error } = await supabase.auth.signInWithPassword({ email, password });
+    const { data, error } = await supabase.auth.signInWithPassword({ email, password });
     setLoading(false);
 
     if (error) {
@@ -51,7 +51,12 @@ export default function LoginScreen() {
         setErrors({ password: msg });
       }
     } else {
-      router.replace('/(tabs)');
+      const { data: profile } = await supabase.from('profiles').select('interests').eq('id', data.user!.id).single();
+      if (!profile?.interests?.length) {
+        router.replace('/(auth)/profile-setup');
+      } else {
+        router.replace('/(tabs)');
+      }
     }
   }
 

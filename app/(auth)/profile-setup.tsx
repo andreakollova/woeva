@@ -28,6 +28,13 @@ export default function ProfileSetupScreen() {
     });
   }, []);
   const [loading, setLoading] = useState(false);
+  const [socialAvatars, setSocialAvatars] = useState<{ id: string; avatar_url: string }[]>([]);
+
+  React.useEffect(() => {
+    supabase.from('profiles').select('id, avatar_url').not('avatar_url', 'is', null).limit(12).then(({ data }) => {
+      setSocialAvatars((data ?? []).filter((p: any) => p.avatar_url));
+    });
+  }, []);
 
   async function pickAvatar() {
     const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
@@ -105,12 +112,20 @@ export default function ProfileSetupScreen() {
           </TouchableOpacity>
         )}
 
-        {/* Motivation nudge */}
+        {/* Social proof */}
         {!hasPhoto && (
-          <View style={styles.nudge}>
-            <Text style={styles.nudgeText}>
-              👥{'  '}<Text style={styles.nudgeBold}>{t.auth.photoNudge}</Text>
-            </Text>
+          <View style={styles.socialProof}>
+            <View style={styles.avatarRow}>
+              {socialAvatars.slice(0, 8).map((p, i) => (
+                <Image
+                  key={p.id}
+                  source={{ uri: p.avatar_url }}
+                  style={[styles.socialAvatar, i > 0 && { marginLeft: -10 }]}
+                  onError={() => setSocialAvatars(prev => prev.filter(a => a.id !== p.id))}
+                />
+              ))}
+            </View>
+            <Text style={styles.socialProofText}>{t.auth.addYourPhoto}</Text>
           </View>
         )}
 
@@ -178,13 +193,32 @@ const styles = StyleSheet.create({
   changePhotoBtn: { alignSelf: 'center', marginBottom: 20 },
   changePhotoText: { fontSize: 13, color: Colors.gray, fontFamily: Fonts.regular, textDecorationLine: 'underline' },
 
-  nudge: {
-    backgroundColor: Colors.grayLight,
-    borderRadius: 14, paddingHorizontal: 16, paddingVertical: 12,
+  socialProof: {
+    alignItems: 'center',
     marginBottom: 28,
+    gap: 10,
   },
-  nudgeText: { fontSize: 14, color: Colors.black, fontFamily: Fonts.regular, textAlign: 'center' },
-  nudgeBold: { fontFamily: Fonts.bold, fontWeight: '700' },
+  avatarRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  socialAvatar: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    borderWidth: 2,
+    borderColor: Colors.white,
+    backgroundColor: '#E0E0E0',
+  },
+  socialAvatarPlaceholder: {
+    backgroundColor: '#E8E8E8',
+  },
+  socialProofText: {
+    fontSize: 13,
+    color: Colors.gray,
+    fontFamily: Fonts.regular,
+    textAlign: 'center',
+  },
 
   label: { fontSize: 13, fontWeight: '600', color: Colors.black, fontFamily: Fonts.semibold, marginBottom: 8 },
   optional: { fontWeight: '400', color: Colors.gray, fontFamily: Fonts.regular },

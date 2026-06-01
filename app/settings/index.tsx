@@ -134,10 +134,10 @@ export default function SettingsScreen() {
             </TouchableOpacity>
             <TouchableOpacity style={[styles.row, styles.rowLast]} onPress={() => router.push('/settings/delete-account')} activeOpacity={0.6}>
               <View style={styles.rowLeft}>
-                <View style={[styles.rowIconWrap, styles.rowIconWrapRed]}>
-                  <Icon name="trash" color="#FF3B30" />
+                <View style={[styles.rowIconWrap, { backgroundColor: '#F2F2F2', width: 28, height: 28, borderRadius: 8, transform: [{ scale: 0.85 }] }]}>
+                  <Icon name="trash" color="#999999" />
                 </View>
-                <Text style={[styles.rowLabel, styles.rowLabelRed]}>{t.settings.deleteAccount}</Text>
+                <Text style={[styles.rowLabel, { fontSize: 12, color: '#999999' }]}>{t.settings.deleteAccount}</Text>
               </View>
             </TouchableOpacity>
           </View>
