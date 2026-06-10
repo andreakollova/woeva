@@ -52,7 +52,14 @@ export default function ProfileScreen() {
   const initial = displayName.charAt(0).toUpperCase() || '?';
   const createdAt = user?.created_at || (user as any)?.created_at;
   const joinedDate = createdAt
-    ? new Date(createdAt).toLocaleDateString(lang === 'sk' ? 'sk-SK' : 'en-US', { month: 'long', year: 'numeric' })
+    ? (() => {
+        const d = new Date(createdAt);
+        if (lang === 'sk') {
+          const skMonths = ['januára','februára','marca','apríla','mája','júna','júla','augusta','septembra','októbra','novembra','decembra'];
+          return `${skMonths[d.getMonth()]} ${d.getFullYear()}`;
+        }
+        return d.toLocaleDateString('en-US', { month: 'long', year: 'numeric' });
+      })()
     : '';
   const city = profile?.city || '';
 
@@ -92,7 +99,7 @@ export default function ProfileScreen() {
 
           <Text style={styles.heroName}>{displayName || t.settings.yourName}</Text>
           <Text style={styles.heroSub}>
-            {[city, joinedDate ? `joined ${joinedDate}` : ''].filter(Boolean).join('  ·  ')}
+            {[city, joinedDate ? t.settings.joinedOn(joinedDate) : ''].filter(Boolean).join('  ·  ')}
           </Text>
 
           {/* Stats */}
@@ -170,7 +177,7 @@ export default function ProfileScreen() {
               ))}
               {clubs.length > 4 && !showAllClubs && (
                 <TouchableOpacity style={styles.showMore} onPress={() => setShowAllClubs(true)}>
-                  <Text style={styles.showMoreText}>Show {clubs.length - 4} more</Text>
+                  <Text style={styles.showMoreText}>{t.settings.showMore(clubs.length - 4)}</Text>
                 </TouchableOpacity>
               )}
             </View>
@@ -206,7 +213,7 @@ export default function ProfileScreen() {
               })}
               {latestEvents.length > 4 && !showAllEvents && (
                 <TouchableOpacity style={styles.showMore} onPress={() => setShowAllEvents(true)}>
-                  <Text style={styles.showMoreText}>Show {latestEvents.length - 4} more</Text>
+                  <Text style={styles.showMoreText}>{t.settings.showMore(latestEvents.length - 4)}</Text>
                 </TouchableOpacity>
               )}
             </View>
@@ -266,7 +273,7 @@ const styles = StyleSheet.create({
     width: 26,
     height: 26,
     borderRadius: 13,
-    backgroundColor: 'rgba(255,255,255,0.2)',
+    backgroundColor: 'rgba(0,0,0,0.6)',
     alignItems: 'center',
     justifyContent: 'center',
     borderWidth: 2,
@@ -355,7 +362,7 @@ const styles = StyleSheet.create({
     borderBottomColor: '#EBEBEB',
   },
   rowLast: { borderBottomWidth: 0 },
-  rowImg: { width: 42, height: 42, borderRadius: 12 },
+  rowImg: { width: 56, height: 56, borderRadius: 14 },
   rowImgFallback: { backgroundColor: '#F2F2F2', alignItems: 'center', justifyContent: 'center' },
   rowImgInitial: { fontSize: 16, fontWeight: '700', fontFamily: Fonts.bold, color: Colors.black },
   rowTitle: { fontSize: 14, fontWeight: '600', fontFamily: Fonts.semibold, color: Colors.black },

@@ -49,6 +49,7 @@ export default function EventDetailScreen() {
   const [isMember, setIsMember] = useState(false);
   const [unreadCount, setUnreadCount] = useState(0);
   const [coverLoaded, setCoverLoaded] = useState(false);
+  const [botGoingAdjust, setBotGoingAdjust] = useState(0);
   const shimmerOpacity = useSharedValue(0.4);
   React.useEffect(() => {
     shimmerOpacity.value = withRepeat(
@@ -117,7 +118,7 @@ export default function EventDetailScreen() {
       .select('id, user_id, profile:profiles(name, avatar_url)')
       .eq('event_id', id).limit(10);
     if (data?.is_recurring && occurrenceDate) {
-      attQuery = (attQuery as any).eq('occurrence_date', occurrenceDate);
+      attQuery = (attQuery as any).or(`occurrence_date.eq.${occurrenceDate},occurrence_date.is.null`);
     }
     const { data: attData } = await attQuery;
     // Deduplicate by user_id — one person can have multiple tickets
@@ -127,7 +128,10 @@ export default function EventDetailScreen() {
       seen.add(a.user_id);
       return true;
     });
-    setAttendees(unique as any);
+    const BOT_ID = '00000000-0000-0000-0000-000000000001';
+    const botPresent = unique.some((a: any) => a.user_id === BOT_ID);
+    setBotGoingAdjust(botPresent ? 1 : 0);
+    setAttendees(unique.filter((a: any) => a.user_id !== BOT_ID) as any);
 
     if (user) {
       let myQuery = supabase.from('event_attendees').select('id').eq('event_id', id).eq('user_id', user.id);
@@ -292,8 +296,8 @@ export default function EventDetailScreen() {
   const eventOver = eventEnd < new Date();
   const hostName = event.club?.name ?? creator?.name ?? '';
   const hostInitial = hostName.charAt(0).toUpperCase();
-  // Use DB going_count as source of truth (attendees may be deduplicated by user_id)
-  const goingCount = Math.max(event.going_count ?? 0, attendees.length);
+  // Use DB going_count minus bot adjustment as source of truth
+  const goingCount = Math.max((event.going_count ?? 0) - botGoingAdjust, attendees.length);
   const otherAtts = attendees.filter(a => a.user_id !== user?.id && (a?.profile?.avatar_url || (a?.profile?.name ?? '').trim()));
   const overflow = Math.max(0, goingCount - 4);
 
@@ -505,7 +509,7 @@ export default function EventDetailScreen() {
           <View style={s.coverBottom}>
             {event.category && (
               <View style={s.catPill}>
-                <Text style={s.catText}>{event.category.toUpperCase()}</Text>
+                <Text style={s.catText}>{(({ 'Movement & Sport': 'Pohyb & Šport', 'Wellness & Body': 'Wellness & Telo', 'Food & Drinks': 'Jedlo & Pitie', 'Art & Creation': 'Umenie & Tvorba', 'Music & Nightlife': 'Hudba & Nočný život', 'Learning & Mind': 'Vzdelávanie', 'Community & Belonging': 'Komunita' } as Record<string,string>)[event.category] ?? event.category).toUpperCase()}</Text>
               </View>
             )}
             <View style={s.coverTitleRow}>
@@ -778,7 +782,7 @@ export default function EventDetailScreen() {
               </View>
             )
             : <Button
-                label={user ? (isFree ? t.event.joinFree : isPayAtDoor ? `Pay €${event.price} at the venue` : t.event.buyTicket(priceLabel)) : t.event.getWoeva}
+                label={user ? (isFree ? t.event.joinFree : isPayAtDoor ? (lang === 'sk' ? `Zaplatiť €${event.price} na mieste` : `Pay €${event.price} at the venue`) : t.event.buyTicket(priceLabel)) : t.event.getWoeva}
                 onPress={handleJoin}
                 loading={loading}
                 variant="lime"

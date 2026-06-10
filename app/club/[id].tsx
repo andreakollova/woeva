@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Image, Alert, Modal, FlatList, Pressable } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Image, Alert, Modal, FlatList, Pressable, Share } from 'react-native';
 import { useLocalSearchParams, useRouter, useFocusEffect } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Animated, { FadeInDown, FadeInUp, FadeIn, FadeOut, ZoomIn } from 'react-native-reanimated';
@@ -56,10 +56,10 @@ export default function ClubDetailScreen() {
     ]);
 
     const today = new Date().toISOString().slice(0, 10);
-    const city = profile?.city;
+    const clubCity = clubData?.city;
     const base = supabase.from('events').select('*, club:clubs(id, name, cover_url), attendees:event_attendees(profile:profiles(id, name, avatar_url))')
       .eq('club_id', id).gte('date', today);
-    const { data: eventsData } = await (city ? base.ilike('city', `%${city}%`) : base)
+    const { data: eventsData } = await (clubCity ? base.ilike('city', `%${clubCity}%`) : base)
       .order('date', { ascending: true }).limit(100);
 
     setClub(clubData);
@@ -208,6 +208,16 @@ export default function ClubDetailScreen() {
           <View style={[styles.backWrap, { top: insets.top + 8 }]}>
             <BackButton color={Colors.white} style={styles.backCircle} />
           </View>
+
+          <TouchableOpacity
+            style={[styles.shareBtn, { top: insets.top + 8 }]}
+            onPress={() => Share.share({ message: `${club.name} na Woeva`, url: `https://woeva.com/club/${id}` })}
+            activeOpacity={0.8}
+          >
+            <Svg width={16} height={16} viewBox="0 0 24 24" fill="none">
+              <Path d="M4 12v8a2 2 0 002 2h12a2 2 0 002-2v-8M16 6l-4-4-4 4M12 2v13" stroke={Colors.white} strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" />
+            </Svg>
+          </TouchableOpacity>
 
           {isAdmin && (
             <TouchableOpacity
@@ -441,6 +451,12 @@ const styles = StyleSheet.create({
   },
   backWrap: { position: 'absolute', left: 16 },
   backCircle: { backgroundColor: 'rgba(0,0,0,0.4)', borderRadius: 20 },
+  shareBtn: {
+    position: 'absolute', right: 60,
+    width: 36, height: 36, borderRadius: 18,
+    backgroundColor: 'rgba(0,0,0,0.4)',
+    alignItems: 'center', justifyContent: 'center',
+  },
   adminBadge: {
     position: 'absolute', right: 16,
     backgroundColor: 'rgba(0,0,0,0.55)', borderRadius: 50,
