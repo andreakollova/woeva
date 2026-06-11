@@ -90,7 +90,7 @@ export default function CreateStep2Screen() {
   function toggleTag(cat: string) {
     setTags(prev => {
       if (prev.includes(cat)) return prev.filter(t => t !== cat);
-      if (prev.length >= 3) { Alert.alert('', 'Max 3 categories allowed'); return prev; }
+      if (prev.length >= 2) { Alert.alert('', 'Max 2 categories allowed'); return prev; }
       return [...prev, cat];
     });
   }
@@ -129,6 +129,7 @@ export default function CreateStep2Screen() {
             value={title}
             onChangeText={setTitle}
             placeholder={t.event.eventNamePlaceholder}
+            maxLength={120}
           />
 
           {/* Post as selector */}
@@ -202,6 +203,7 @@ export default function CreateStep2Screen() {
                 if (words.length <= 30) setTagline(v);
               }}
               placeholder={t.event.descriptionPlaceholder}
+              maxLength={300}
             />
             {wordCount > 28 && wordCount <= 30 && (
               <Text style={styles.hint}>{t.event.wordsLeft(30 - wordCount)}</Text>
@@ -216,16 +218,16 @@ export default function CreateStep2Screen() {
             <View style={styles.labelRow}>
               <View style={{ gap: 2 }}>
                 <Text style={[styles.label, { marginBottom: 0 }]}>{t.event.category}</Text>
-                <Text style={[styles.labelRequired, { fontSize: 10 }]}>Select all that apply</Text>
+                <Text style={[styles.labelRequired, { fontSize: 10 }]}>Vyber všetky ktoré sa hodia</Text>
               </View>
               <TouchableOpacity onPress={() => { setShowCatRequest(true); setCatRequestSent(false); setCatRequestName(''); setCatRequestClub(''); }} activeOpacity={0.7}>
-                <Text style={styles.catMissingLink}>Is your category missing?</Text>
+                <Text style={styles.catMissingLink}>Chýba ti kategória?</Text>
               </TouchableOpacity>
             </View>
             <View style={[styles.chipsWrap, { marginTop: 10 }]}>
               {categories.map(cat => {
                 const active = tags.includes(cat);
-                const disabled = !active && tags.length >= 3;
+                const disabled = !active && tags.length >= 2;
                 return (
                   <TouchableOpacity
                     key={cat}
@@ -294,6 +296,7 @@ export default function CreateStep2Screen() {
                     placeholder="e.g. Cycling, Meditation..."
                     placeholderTextColor={Colors.gray}
                     selectionColor={Colors.lime}
+                    maxLength={60}
                   />
                 </View>
                 <View style={{ gap: 6 }}>
@@ -305,6 +308,7 @@ export default function CreateStep2Screen() {
                     placeholder="e.g. Bratislava Cyclists"
                     placeholderTextColor={Colors.gray}
                     selectionColor={Colors.lime}
+                    maxLength={80}
                   />
                 </View>
               </View>

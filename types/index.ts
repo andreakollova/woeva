@@ -192,7 +192,7 @@ export const CATEGORY_SK: Record<string, string> = {
   'Food & Drinks': 'Jedlo & Pitie',
   'Art & Creation': 'Umenie & Tvorba',
   'Music & Nightlife': 'Hudba & Nightlife',
-  'Learning & Mind': 'Učenie & Myseľ',
+  'Learning & Mind': 'Vzdelávanie & Myseľ',
   'Community & Belonging': 'Komunita & Spolupatričnosť',
 };
 

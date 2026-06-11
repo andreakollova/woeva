@@ -139,6 +139,7 @@ export default function CreateClubScreen() {
               placeholder={t.club.clubNamePlaceholder}
               placeholderTextColor={D.placeholder}
               selectionColor={Colors.lime}
+              maxLength={60}
             />
             {name.length > 16 && <Text style={styles.nameWarning}>{t.club.nameTooLong}</Text>}
           </View>
@@ -153,6 +154,7 @@ export default function CreateClubScreen() {
               placeholder={t.club.taglinePlaceholder}
               placeholderTextColor={D.placeholder}
               selectionColor={Colors.lime}
+              maxLength={120}
             />
           </View>
 
@@ -168,10 +170,10 @@ export default function CreateClubScreen() {
             <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginBottom: 4, alignItems: 'center' }}>
               <Text style={styles.label}>{t.club.category}</Text>
               <TouchableOpacity onPress={() => { setShowCatRequest(true); setCatRequestSent(false); setCatRequestName(''); setCatRequestClub(''); }} activeOpacity={0.7}>
-                <Text style={styles.catMissingLink}>Is your category missing?</Text>
+                <Text style={styles.catMissingLink}>Chýba ti kategória?</Text>
               </TouchableOpacity>
             </View>
-            <Text style={styles.catSubLabel}>Select all that apply</Text>
+            <Text style={styles.catSubLabel}>Vyber všetky ktoré sa hodia</Text>
             <View style={[styles.chipsWrap, { marginTop: 10 }]}>
               {categories.map(cat => {
                 const active = tags.includes(cat);
@@ -229,6 +231,7 @@ export default function CreateClubScreen() {
               numberOfLines={3}
               textAlignVertical="top"
               selectionColor={Colors.lime}
+              maxLength={1000}
             />
           </View>
 
@@ -264,6 +267,7 @@ export default function CreateClubScreen() {
                     placeholder="e.g. Cycling, Meditation..."
                     placeholderTextColor={D.placeholder}
                     selectionColor={Colors.lime}
+                    maxLength={60}
                   />
                 </View>
                 <View style={{ gap: 6 }}>
@@ -274,6 +278,7 @@ export default function CreateClubScreen() {
                     onChangeText={setCatRequestClub}
                     placeholder="e.g. Bratislava Cyclists"
                     placeholderTextColor={D.placeholder}
+                    maxLength={80}
                     selectionColor={Colors.lime}
                   />
                 </View>
