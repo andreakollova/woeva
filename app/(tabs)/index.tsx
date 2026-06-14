@@ -690,14 +690,6 @@ export default function HomeScreen() {
           </View>
         )}
 
-        {/* ── Budúci týždeň ── */}
-        {!loading && nextWeekEvents.length > 0 && (
-          <View style={styles.section}>
-            <SectionHeader title="📅 Budúci týždeň" />
-            <EventCarousel events={nextWeekEvents} attendingIds={attendingIds} onPress={goToEvent} lang={lang} userProfile={profile} sharpCorner="topLeft" />
-          </View>
-        )}
-
         {/* ── V tvojom okolí ── */}
         {!loading && nearbyEvents.length > 0 && (
           <View style={styles.section}>
@@ -711,6 +703,14 @@ export default function HomeScreen() {
           <View style={styles.section}>
             <SectionHeader title="🚀 Zaži niečo nové" />
             <EventCarousel events={discoverEvents} attendingIds={attendingIds} onPress={goToEvent} lang={lang} userProfile={profile} sharpCorner="bottomRight" />
+          </View>
+        )}
+
+        {/* ── Budúci týždeň ── */}
+        {!loading && nextWeekEvents.length > 0 && (
+          <View style={styles.section}>
+            <SectionHeader title="🔜 Budúci týždeň" />
+            <EventCarousel events={nextWeekEvents} attendingIds={attendingIds} onPress={goToEvent} lang={lang} userProfile={profile} sharpCorner="topLeft" />
           </View>
         )}
 
