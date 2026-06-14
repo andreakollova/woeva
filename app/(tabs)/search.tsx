@@ -1,10 +1,11 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { useFocusEffect } from 'expo-router';
-import { View, Text, StyleSheet, TextInput, ScrollView, TouchableOpacity, Modal, Pressable } from 'react-native';
-import { StatusBar } from 'expo-status-bar';
+import { View, Text, StyleSheet, TextInput, ScrollView, TouchableOpacity, Modal, Pressable, Image } from 'react-native';
+import { StatusBar, setStatusBarStyle } from 'expo-status-bar';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
-import MapView, { Marker, PROVIDER_DEFAULT } from 'react-native-maps';
+import { Platform } from 'react-native';
+import MapView, { Marker, PROVIDER_GOOGLE, PROVIDER_DEFAULT } from 'react-native-maps';
 import Animated, { FadeInDown, FadeIn } from 'react-native-reanimated';
 import Svg, { Path, Line } from 'react-native-svg';
 import { Colors } from '@/constants/colors';
@@ -17,6 +18,7 @@ import { useTranslations } from '@/context/LanguageContext';
 import { expandRecurringEvents } from '@/lib/expandRecurring';
 import { useCategories } from '@/hooks/useCategories';
 import { useAuth } from '@/context/AuthContext';
+import { CATEGORY_SK } from '@/types';
 
 type Tab = 'events' | 'clubs';
 type PriceFilter = 'all' | 'paid' | 'free';
@@ -26,7 +28,7 @@ type ClubWithLocation = Club & { lat?: number | null; lng?: number | null; addre
 export default function SearchScreen() {
   const insets = useSafeAreaInsets();
   const router = useRouter();
-  const { t } = useTranslations();
+  const { t, lang } = useTranslations();
   const { categories } = useCategories();
   const { profile } = useAuth();
 
@@ -80,7 +82,24 @@ export default function SearchScreen() {
     }
   }
 
+  const cityCoords: Record<string, { latitude: number; longitude: number }> = {
+    Bratislava: { latitude: 48.1486, longitude: 17.1077 },
+    Košice: { latitude: 48.7164, longitude: 21.2611 },
+    Žilina: { latitude: 49.2231, longitude: 18.7394 },
+    Prešov: { latitude: 49.0018, longitude: 21.2396 },
+    Nitra: { latitude: 48.3069, longitude: 18.0873 },
+    Banská_Bystrica: { latitude: 48.7395, longitude: 19.1528 },
+    'Banská Bystrica': { latitude: 48.7395, longitude: 19.1528 },
+    Trnava: { latitude: 48.3774, longitude: 17.5878 },
+    Trenčín: { latitude: 48.8943, longitude: 18.0438 },
+  };
+
+  const defaultCoords = profile?.city
+    ? (cityCoords[profile.city] ?? { latitude: 48.1486, longitude: 17.1077 })
+    : { latitude: 48.1486, longitude: 17.1077 };
+
   useFocusEffect(useCallback(() => {
+    setStatusBarStyle('light');
     loadMapEvents();
     loadMapClubs();
   }, [profile?.city]));
@@ -107,7 +126,8 @@ export default function SearchScreen() {
     }
     const events = Array.from(seen.values());
     setMapEvents(events);
-    if (events.length > 0) {
+    // Only fit to events if events tab is active
+    if (events.length > 0 && tab === 'events') {
       fitMarkersToView(events.map(e => ({ latitude: e.lat!, longitude: e.lng! })));
     }
   }
@@ -124,7 +144,8 @@ export default function SearchScreen() {
     const { data } = await q;
     const clubs = (data ?? []) as ClubWithLocation[];
     setMapClubs(clubs);
-    if (clubs.length > 0) {
+    // Only fit to clubs if clubs tab is active
+    if (clubs.length > 0 && tab === 'clubs') {
       fitMarkersToView(clubs.map(c => ({ latitude: c.lat!, longitude: c.lng! })));
     }
   }
@@ -204,12 +225,12 @@ export default function SearchScreen() {
         <MapView
           ref={mapRef}
           style={StyleSheet.absoluteFill}
-          provider={PROVIDER_DEFAULT}
+          provider={Platform.OS === 'android' ? PROVIDER_GOOGLE : PROVIDER_DEFAULT}
           initialRegion={{
-            latitude: 48.1486,
-            longitude: 17.1077,
-            latitudeDelta: 0.15,
-            longitudeDelta: 0.15,
+            latitude: defaultCoords.latitude,
+            longitude: defaultCoords.longitude,
+            latitudeDelta: 0.12,
+            longitudeDelta: 0.12,
           }}
           customMapStyle={mapStyle}
           legalLabelInsets={{ bottom: -9999, left: -9999, top: 0, right: 0 }}
@@ -222,7 +243,7 @@ export default function SearchScreen() {
               onPress={() => router.push(`/event/${event.id}`)}
             >
               <View style={styles.pin}>
-                <Text style={styles.pinIcon}>◎</Text>
+                <Image source={require('../../assets/images/marker-logo.png')} style={{ width: 20, height: 20 }} resizeMode="contain" />
               </View>
             </Marker>
           ))}
@@ -270,14 +291,14 @@ export default function SearchScreen() {
               onPress={() => { setTab('events'); setSearched(false); setMode('map'); setTimeout(() => fitMarkersToView(mapEvents.filter(e => e.lat && e.lng).map(e => ({ latitude: e.lat!, longitude: e.lng! }))), 50); }}
               activeOpacity={0.8}
             >
-              <Text style={[styles.toggleText, tab === 'events' && styles.toggleTextActive]}>Events</Text>
+              <Text style={[styles.toggleText, tab === 'events' && styles.toggleTextActive]}>{t.search.events}</Text>
             </TouchableOpacity>
             <TouchableOpacity
               style={[styles.toggleBtn, tab === 'clubs' && styles.toggleBtnActive]}
               onPress={() => { setTab('clubs'); setSearched(false); setMode('map'); loadMapClubs(); }}
               activeOpacity={0.8}
             >
-              <Text style={[styles.toggleText, tab === 'clubs' && styles.toggleTextActive]}>Clubs</Text>
+              <Text style={[styles.toggleText, tab === 'clubs' && styles.toggleTextActive]}>{t.search.clubs}</Text>
             </TouchableOpacity>
           </View>
 
@@ -288,7 +309,7 @@ export default function SearchScreen() {
             </Svg>
             <TextInput
               style={styles.searchInput}
-              placeholder={tab === 'events' ? t.search.searchBarPlaceholder : 'Search clubs...'}
+              placeholder={t.search.searchBarPlaceholder}
               placeholderTextColor="rgba(255,255,255,0.38)"
               value={query}
               onChangeText={onSearchChange}
@@ -312,7 +333,7 @@ export default function SearchScreen() {
             onPress={() => { setMode('map'); setSearched(false); setQuery(''); }}
             activeOpacity={0.8}
           >
-            <Text style={styles.backToMapText}>← Map</Text>
+            <Text style={styles.backToMapText}>← {t.search.discover}</Text>
           </TouchableOpacity>
           <ScrollView contentContainerStyle={[styles.results, { paddingBottom: insets.bottom + 80 }]}>
             {tab === 'events' && (
@@ -337,10 +358,10 @@ export default function SearchScreen() {
             {tab === 'clubs' && (
               clubResults.length === 0 ? (
                 <Animated.View entering={FadeInDown} style={styles.empty}>
-                  <Text style={styles.emptyTitle}>No clubs found</Text>
-                  <Text style={styles.emptyText}>Try a different search or create your own club.</Text>
+                  <Text style={styles.emptyTitle}>{t.search.nothingMatches}</Text>
+                  <Text style={styles.emptyText}>{t.search.nothingMatchesFor(query)}</Text>
                   <View style={styles.emptyActions}>
-                    <Button label="Create a club" onPress={() => router.push('/club/create')} variant="lime" />
+                    <Button label={t.search.startClub(query)} onPress={() => router.push('/club/create')} variant="lime" />
                   </View>
                 </Animated.View>
               ) : (
@@ -352,7 +373,7 @@ export default function SearchScreen() {
                         <Text style={styles.clubRowName}>{club.name}</Text>
                         {club.tagline ? <Text style={styles.clubRowTagline}>{club.tagline}</Text> : null}
                       </View>
-                      <Text style={styles.clubRowMembers}>{club.member_count} members</Text>
+                      <Text style={styles.clubRowMembers}>{club.member_count} členov</Text>
                     </TouchableOpacity>
                     {i < clubResults.length - 1 && <View style={styles.divider} />}
                   </Animated.View>
@@ -369,12 +390,12 @@ export default function SearchScreen() {
         <Animated.View entering={FadeIn.duration(180)} style={[styles.filterSheet, { paddingBottom: insets.bottom + 20 }]}>
           <View style={styles.filterHandle} />
 
-          <Text style={styles.filterTitle}>Filter</Text>
+          <Text style={styles.filterTitle}>{t.search.filter}</Text>
 
           {/* Paid/Free — only for events */}
           {tab === 'events' && (
             <View style={styles.filterSection}>
-              <Text style={styles.filterLabel}>Price</Text>
+              <Text style={styles.filterLabel}>{t.search.price}</Text>
               <View style={styles.filterRow}>
                 {(['all', 'free', 'paid'] as PriceFilter[]).map(opt => (
                   <TouchableOpacity
@@ -384,7 +405,7 @@ export default function SearchScreen() {
                     activeOpacity={0.7}
                   >
                     <Text style={[styles.filterChipText, priceFilter === opt && styles.filterChipTextActive]}>
-                      {opt === 'all' ? 'All' : opt === 'free' ? 'Free' : 'Paid'}
+                      {opt === 'all' ? t.search.priceAll : opt === 'free' ? t.search.priceFree : t.search.pricePaid}
                     </Text>
                   </TouchableOpacity>
                 ))}
@@ -394,10 +415,11 @@ export default function SearchScreen() {
 
           {/* Tags */}
           <View style={styles.filterSection}>
-            <Text style={styles.filterLabel}>Categories</Text>
+            <Text style={styles.filterLabel}>{t.search.categories}</Text>
             <View style={styles.filterChipsWrap}>
               {categories.map(cat => {
                 const active = selectedTags.includes(cat);
+                const displayName = lang === 'sk' ? (CATEGORY_SK[cat] ?? cat) : cat;
                 return (
                   <TouchableOpacity
                     key={cat}
@@ -405,7 +427,7 @@ export default function SearchScreen() {
                     onPress={() => toggleTag(cat)}
                     activeOpacity={0.7}
                   >
-                    <Text style={[styles.filterChipText, active && styles.filterChipTextActive]}>{cat}</Text>
+                    <Text style={[styles.filterChipText, active && styles.filterChipTextActive]}>{displayName}</Text>
                   </TouchableOpacity>
                 );
               })}
@@ -414,10 +436,10 @@ export default function SearchScreen() {
 
           <View style={styles.filterActions}>
             <TouchableOpacity onPress={clearFilter} style={styles.clearBtn} activeOpacity={0.7}>
-              <Text style={styles.clearBtnText}>Clear all</Text>
+              <Text style={styles.clearBtnText}>{t.search.clearAll}</Text>
             </TouchableOpacity>
             <TouchableOpacity onPress={() => setShowFilter(false)} style={styles.applyBtn} activeOpacity={0.8}>
-              <Text style={styles.applyBtnText}>Apply</Text>
+              <Text style={styles.applyBtnText}>{t.search.apply}</Text>
             </TouchableOpacity>
           </View>
         </Animated.View>
@@ -427,7 +449,7 @@ export default function SearchScreen() {
 }
 
 const mapStyle = [
-  { featureType: 'water', elementType: 'geometry', stylers: [{ color: '#C8FF00' }] },
+  { featureType: 'water', elementType: 'geometry', stylers: [{ color: '#B9FF00' }] },
   { featureType: 'landscape', elementType: 'geometry', stylers: [{ color: '#F0F0F0' }] },
   { featureType: 'road', elementType: 'geometry', stylers: [{ color: '#FFFFFF' }] },
   { featureType: 'poi', stylers: [{ visibility: 'off' }] },

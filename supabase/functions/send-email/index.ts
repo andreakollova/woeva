@@ -24,7 +24,7 @@ serve(async (req) => {
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({
-        from: from ?? 'Woeva <noreply@woeva.app>',
+        from: from ?? 'Woeva <noreply@woeva.com>',
         to: Array.isArray(to) ? to : [to],
         subject,
         html,

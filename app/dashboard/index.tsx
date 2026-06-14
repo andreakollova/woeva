@@ -1,7 +1,7 @@
 import React, { useState, useCallback, useMemo, useRef } from 'react';
 import {
   View, Text, StyleSheet, ScrollView, TouchableOpacity,
-  Image, Alert, ActivityIndicator, Modal, TextInput, Platform, FlatList, KeyboardAvoidingView, RefreshControl,
+  Image, Alert, ActivityIndicator, Modal, TextInput, Platform, FlatList, KeyboardAvoidingView, RefreshControl, Share,
 } from 'react-native';
 // expo-camera requires a native build - safe lazy import
 let _expoCamera: any = null;
@@ -105,11 +105,11 @@ type Member = {
 type EventRow = {
   id: string; title: string; date: string; time: string;
   going_count: number; cover_url: string | null; cover_urls?: string[] | null; club_id: string | null;
-  creator_id: string;
+  creator_id: string; capacity?: number | null;
   price: number; is_free: boolean; status: string;
   is_recurring?: boolean; recurring_end_date?: string | null;
   paid_count: number; online_count: number; door_count: number; scan_count: number;
-  gross: number; stripe_fee: number; woeva_fee: number; net: number;
+  gross: number; onlineGross: number; doorGross: number; stripe_fee: number; woeva_fee: number; onlineNet: number; net: number;
   _startDate?: string;
 };
 
@@ -138,19 +138,38 @@ function sanitize(s: string) {
   return s.replace(/[\u200B-\u200D\uFEFF\u00AD\u2060\u180E\u00A0]/g, ' ').replace(/\s+/g, ' ').trimStart();
 }
 
-// Real attendee count — excludes the creator's auto-join
-function realGoing(e: { going_count: number; creator_id: string }, userId: string) {
-  return Math.max(0, e.going_count - (e.creator_id === userId ? 1 : 0));
+// Real attendee count
+function realGoing(e: { going_count: number; creator_id: string; capacity?: number | null }, userId: string) {
+  return e.going_count;
+}
+
+function goingLabel(n: number, lang: string): string {
+  if (lang !== 'sk') return 'going';
+  if (n >= 2 && n <= 4) return 'idú';
+  return 'ide';
 }
 
 function calcRevenue(price: number, onlineCount: number, doorCount: number) {
-  const gross = price * (onlineCount + doorCount);
   const onlineGross = price * onlineCount;
-  // Stripe fee and Woeva fee only apply to online (Stripe-processed) tickets
-  const stripe_fee = onlineCount > 0 ? onlineGross * STRIPE_PCT + onlineCount * STRIPE_FIXED : 0;
-  const woeva_fee = onlineGross * WOEVA_FEE;
-  const net = Math.max(0, gross - stripe_fee - woeva_fee);
-  return { gross, stripe_fee, woeva_fee, net };
+  const doorGross = price * doorCount;
+  const gross = onlineGross + doorGross;
+
+  // Application fee per ticket — must match create-payment-intent edge function exactly:
+  // Math.max(Math.round(price_cents * 0.05), 50) converted back to euros
+  const woevaFeePerTicket = onlineCount > 0 ? Math.max(Math.round(price * 0.05 * 100) / 100, 0.50) : 0;
+  const woeva_fee = Math.round(woevaFeePerTicket * onlineCount * 100) / 100;
+
+  // Stripe fee is paid by the platform (Woeva), not deducted from vendor payout in destination charges
+  // Shown for transparency only
+  const stripe_fee = onlineCount > 0 ? Math.round((onlineGross * STRIPE_PCT + onlineCount * STRIPE_FIXED) * 100) / 100 : 0;
+
+  // Vendor's actual Stripe payout = what they receive per ticket after application fee
+  const onlineNet = Math.max(0, Math.round((onlineGross - woeva_fee) * 100) / 100);
+
+  // Total = Stripe payout + at-door cash (at-door has no fees)
+  const net = Math.round((onlineNet + doorGross) * 100) / 100;
+
+  return { gross, onlineGross, doorGross, stripe_fee, woeva_fee, onlineNet, net };
 }
 
 function isUpcoming(e: EventRow) {
@@ -291,6 +310,7 @@ export default function DashboardScreen() {
   const [connectingStripe, setConnectingStripe] = useState(false);
   const [checkingStatus, setCheckingStatus] = useState(false);
   const [showInvoicesSheet, setShowInvoicesSheet] = useState(false);
+  const [showAllMonths, setShowAllMonths] = useState(false);
   const [showFeeInfo, setShowFeeInfo] = useState(false);
   const [payoutFilter, setPayoutFilter] = useState<'all' | 'month'>('all');
   const [payoutPage, setPayoutPage] = useState(0);
@@ -508,11 +528,11 @@ export default function DashboardScreen() {
     ] = await Promise.all([
       clubIds.length > 0
         ? supabase.from('events')
-            .select('id, title, date, time, going_count, cover_url, cover_urls, club_id, creator_id, price, is_free, status, is_recurring, recurring_end_date')
+            .select('id, title, date, time, going_count, cover_url, cover_urls, club_id, creator_id, price, is_free, status, is_recurring, recurring_end_date, capacity')
             .or(`creator_id.eq.${user.id},club_id.in.(${clubIds.join(',')})`)
             .order('date', { ascending: false })
         : supabase.from('events')
-            .select('id, title, date, time, going_count, cover_url, cover_urls, club_id, creator_id, price, is_free, status, is_recurring, recurring_end_date')
+            .select('id, title, date, time, going_count, cover_url, cover_urls, club_id, creator_id, price, is_free, status, is_recurring, recurring_end_date, capacity')
             .eq('creator_id', user.id).order('date', { ascending: false }),
       supabase.from('creator_billing').select('*').eq('user_id', user.id).maybeSingle(),
       supabase.from('stripe_accounts')
@@ -716,7 +736,16 @@ export default function DashboardScreen() {
     if (!billing) return;
     const [year, month] = monthKey.split('-').map(Number);
     const invoiceNum = `W-${year}-${String(month).padStart(2, '0')}`;
-    const html = generateCreatorInvoice(billing, monthEvents, monthLabel, invoiceNum);
+    const invoiceEvents = monthEvents.map(e => ({
+      title: e.title,
+      date: e.date,
+      paid_count: e.paid_count,
+      gross: e.onlineGross,
+      stripe_fee: e.stripe_fee,
+      woeva_fee: e.woeva_fee,
+      net: e.onlineNet,
+    }));
+    const html = generateCreatorInvoice(billing, invoiceEvents, monthLabel, invoiceNum);
     try {
       const Print = require('expo-print');
       const Sharing = require('expo-sharing');
@@ -742,7 +771,7 @@ export default function DashboardScreen() {
   // ── Derived data ─────────────────────────────────────────────────────────────
   const now = new Date();
   const d7 = new Date(now); d7.setDate(d7.getDate() - 7);
-  const d30 = new Date(now); d30.setDate(d30.getDate() - 30);
+  const d30 = new Date(now.getFullYear(), now.getMonth(), 1); // začiatok aktuálneho mesiaca
   const d365 = new Date(now); d365.setFullYear(d365.getFullYear() - 1);
   const new7d = members.filter(m => new Date(m.created_at) >= d7).length;
   const new30d = members.filter(m => new Date(m.created_at) >= d30).length;
@@ -756,24 +785,27 @@ export default function DashboardScreen() {
       : events;
 
   const totalGross = viewEvents.reduce((s, e) => s + e.gross, 0);
+  const totalOnlineNet = viewEvents.reduce((s, e) => s + e.onlineNet, 0);
+  const totalDoorGross = viewEvents.reduce((s, e) => s + e.doorGross, 0);
   const totalNet = viewEvents.reduce((s, e) => s + e.net, 0);
   const weekGross = viewEvents.filter(e => new Date(e.date) >= d7).reduce((s, e) => s + e.gross, 0);
   const monthGross = viewEvents.filter(e => new Date(e.date) >= d30).reduce((s, e) => s + e.gross, 0);
+  const monthOnlineNet = viewEvents.filter(e => new Date(e.date) >= d30).reduce((s, e) => s + e.onlineNet, 0);
   const weekNet = viewEvents.filter(e => new Date(e.date) >= d7).reduce((s, e) => s + e.net, 0);
   const monthNet = viewEvents.filter(e => new Date(e.date) >= d30).reduce((s, e) => s + e.net, 0);
 
   const monthlyEarnings = useMemo(() => {
     const map: Record<string, { key: string; label: string; gross: number; net: number; events: EventRow[] }> = {};
-    viewEvents.filter(e => !e.is_free && e.paid_count > 0).forEach(e => {
+    viewEvents.filter(e => !e.is_free && e.onlineGross > 0).forEach(e => {
       const d = new Date(e.date + 'T00:00:00');
       const key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
-      if (!map[key]) map[key] = { key, label: d.toLocaleDateString('en-US', { month: 'long', year: 'numeric' }), gross: 0, net: 0, events: [] };
-      map[key].gross += e.gross;
-      map[key].net += e.net;
+      if (!map[key]) { const raw = d.toLocaleDateString(lang === 'sk' ? 'sk-SK' : 'en-US', { month: 'long', year: 'numeric' }); map[key] = { key, label: raw.charAt(0).toUpperCase() + raw.slice(1), gross: 0, net: 0, events: [] }; }
+      map[key].gross += e.onlineGross;
+      map[key].net += e.onlineNet;
       map[key].events.push(e);
     });
     return Object.values(map).sort((a, b) => b.key.localeCompare(a.key));
-  }, [viewEvents]);
+  }, [viewEvents, lang]);
 
   const rawUpcoming = viewEvents.filter(e => isUpcoming(e) && e.status !== 'cancelled');
   const upcomingEvents = expandDashboardRows(rawUpcoming);
@@ -944,9 +976,9 @@ export default function DashboardScreen() {
                 >
                   {/* Overview card */}
                   <View style={[s.clubCard, { width: CARD_WIDTH, backgroundColor: Colors.black, justifyContent: 'center', paddingHorizontal: 20 }]}>
-                    <Text style={{ fontSize: 11, fontWeight: '700', color: 'rgba(255,255,255,0.4)', letterSpacing: 0.5, marginBottom: 6 }}>OVERVIEW</Text>
-                    <Text style={{ fontSize: 28, fontWeight: '800', color: Colors.lime, fontFamily: Fonts.extrabold, letterSpacing: -0.5 }}>My clubs</Text>
-                    <Text style={{ fontSize: 13, color: 'rgba(255,255,255,0.55)', marginTop: 4 }}>{clubs.length} {clubs.length === 1 ? 'club' : 'clubs'} · all stats</Text>
+                    <Text style={{ fontSize: 11, fontWeight: '700', color: 'rgba(255,255,255,0.4)', letterSpacing: 0.5, marginBottom: 6 }}>{t.dashboard.overviewLabel}</Text>
+                    <Text style={{ fontSize: 28, fontWeight: '800', color: Colors.lime, fontFamily: Fonts.extrabold, letterSpacing: -0.5 }}>{t.dashboard.myClubsLabel}</Text>
+                    <Text style={{ fontSize: 13, color: 'rgba(255,255,255,0.55)', marginTop: 4 }}>{t.dashboard.clubsAllStats(clubs.length)}</Text>
                   </View>
 
                   {/* Individual club cards */}
@@ -998,9 +1030,9 @@ export default function DashboardScreen() {
                             </View>
                         }
                         <View style={{ flex: 1 }}>
-                          <Text style={{ fontSize: 11, fontWeight: '700', color: 'rgba(255,255,255,0.45)', letterSpacing: 0.5, marginBottom: 4 }}>INDIVIDUAL</Text>
+                          <Text style={{ fontSize: 11, fontWeight: '700', color: 'rgba(255,255,255,0.45)', letterSpacing: 0.5, marginBottom: 4 }}>{t.dashboard.individualLabel}</Text>
                           <Text style={{ fontSize: 20, fontWeight: '800', color: Colors.white, fontFamily: Fonts.extrabold, letterSpacing: -0.3 }} numberOfLines={1}>{profile?.name ?? 'Me'}</Text>
-                          <Text style={{ fontSize: 12, color: 'rgba(255,255,255,0.45)', marginTop: 3 }}>{individualCount} {individualCount === 1 ? 'event' : 'events'}</Text>
+                          <Text style={{ fontSize: 12, color: 'rgba(255,255,255,0.45)', marginTop: 3 }}>{t.dashboard.eventsCount(individualCount)}</Text>
                         </View>
                       </View>
                     );
@@ -1031,99 +1063,47 @@ export default function DashboardScreen() {
             )}
 
 
-            {/* Empty state */}
-            {viewEvents.length === 0 && (
-              <View style={s.emptyBox}>
-                <Text style={s.emptyTitle}>{t.dashboard.noEvents}</Text>
-                <Text style={s.emptySub}>
-                  {selectedClubId ? t.dashboard.noEventsForClub(selectedClub?.name ?? '') : t.dashboard.createFirst}
-                </Text>
-                <TouchableOpacity
-                  style={{ marginTop: 16, backgroundColor: Colors.lime, borderRadius: 50, paddingHorizontal: 24, paddingVertical: 12 }}
-                  onPress={() => router.push('/event/create/step2')}
-                  activeOpacity={0.85}
-                >
-                  <Text style={{ fontSize: 14, fontWeight: '700', color: Colors.black }}>+ Create Event</Text>
-                </TouchableOpacity>
-              </View>
-            )}
-
-            {/* Upcoming events */}
-            {upcomingEvents.length > 0 && (
-              <>
-                <Text style={[s.sectionTitle, { marginTop: 12 }]}>{t.dashboard.upcomingEvents}</Text>
-                <View style={{ gap: 10 }}>
-                  {upcomingEvents.slice(0, 5).map(e => (
-                    <TouchableOpacity key={e.id} style={s.upcomingCard}
-                      onPress={() => router.push(`/event/${e.id}` as any)} activeOpacity={0.85}>
-                      {getRotatingCover(e)
-                        ? <Image source={{ uri: getRotatingCover(e)! }} style={s.upcomingCover} />
-                        : <View style={[s.upcomingCover, s.upcomingCoverFallback]}>
-                            <Text style={s.upcomingCoverInitial}>{e.title.charAt(0).toUpperCase()}</Text>
-                          </View>
-                      }
-                      <View style={s.upcomingBody}>
-                        <Text style={s.upcomingTitle} numberOfLines={1}>{e.title}</Text>
-                        <Text style={s.upcomingDate}>
-                          {new Date(e.date + 'T00:00:00').toLocaleDateString('en-US', { weekday: 'short', day: 'numeric', month: 'short' })}
-                          {e.time ? `  ·  ${e.time.slice(0, 5)}` : ''}
-                        </Text>
-                        <View style={s.upcomingMeta}>
-                          <View style={s.upcomingAttendees}>
-                            <Text style={s.upcomingAttendeesNum}>{e.is_free ? realGoing(e, user!.id) : e.paid_count}</Text>
-                            <Text style={s.upcomingAttendeesLabel}> {t.dashboard.going}</Text>
-                          </View>
-                          {!e.is_free && e.gross > 0 && <Text style={s.upcomingRevenue}>{fmt(e.gross)}</Text>}
-                        </View>
-                      </View>
-                      <View style={s.upcomingActions}>
-                        <TouchableOpacity style={s.upcomingActionBtn}
-                          onPress={ev => { ev.stopPropagation(); router.push(`/event/${e.id.split('_')[0]}/edit` as any); }}
-                          hitSlop={{ top: 4, bottom: 4, left: 4, right: 4 }}>
-                          <Text style={s.upcomingActionEdit}>{t.dashboard.editBtn}</Text>
-                        </TouchableOpacity>
-                        <TouchableOpacity style={[s.upcomingActionBtn, s.upcomingActionPeopleBtn]}
-                          onPress={ev => { ev.stopPropagation(); openAttendees(e); }}
-                          hitSlop={{ top: 4, bottom: 4, left: 4, right: 4 }}>
-                          <Text style={s.upcomingActionPeople}>{t.dashboard.peopleBtn}</Text>
-                        </TouchableOpacity>
-                      </View>
-                    </TouchableOpacity>
-                  ))}
-                </View>
-              </>
-            )}
-          </>
-        )}
-
-        {/* ── EVENTS ────────────────────────────────────────────────────────── */}
-        {activeTab === 'events' && (
-          <>
+            {/* Event list with segment tabs */}
             <View style={s.segment}>
               {([
-                { key: 'upcoming', label: t.dashboard.upcomingCount(upcomingEvents.length) },
-                { key: 'past', label: t.dashboard.pastCount(pastEvents.length) },
-                { key: 'cancelled', label: t.dashboard.cancelledCount(cancelledEvents.length) },
+                { key: 'upcoming', label: t.dashboard.upcoming, count: upcomingEvents.length },
+                { key: 'past', label: t.dashboard.past, count: pastEvents.length },
+                { key: 'cancelled', label: t.dashboard.cancelledTab, count: cancelledEvents.length },
               ] as const).map(f => (
                 <TouchableOpacity key={f.key} style={[s.segmentItem, eventsFilter === f.key && s.segmentItemActive]}
                   onPress={() => setEventsFilter(f.key)} activeOpacity={0.8}>
-                  <Text style={[s.segmentText, eventsFilter === f.key && s.segmentTextActive]}>{f.label}</Text>
+                  <Text style={[s.segmentText, eventsFilter === f.key && s.segmentTextActive]}>
+                    {f.label}<Text style={s.segmentCount}> ({f.count})</Text>
+                  </Text>
                 </TouchableOpacity>
               ))}
             </View>
 
             {displayedEvents.length === 0 ? (
               <View style={s.emptyBox}>
-                <Text style={s.emptyTitle}>{t.dashboard.noEvents}</Text>
+                <Text style={s.emptyTitle}>{eventsFilter === 'upcoming' ? t.dashboard.noUpcomingEvents : t.dashboard.noEvents}</Text>
                 <Text style={s.emptySub}>
-                  {eventsFilter === 'upcoming' ? t.dashboard.createEventHere : eventsFilter === 'past' ? t.dashboard.pastEventsHere : t.dashboard.cancelledEventsHere}
+                  {eventsFilter === 'upcoming'
+                    ? (selectedClubId ? t.dashboard.noEventsForClub(selectedClub?.name ?? '') : t.dashboard.createEventHere)
+                    : eventsFilter === 'past' ? t.dashboard.pastEventsHere : t.dashboard.cancelledEventsHere}
                 </Text>
+                {eventsFilter === 'upcoming' && (
+                  <TouchableOpacity
+                    style={{ marginTop: 16, backgroundColor: Colors.lime, borderRadius: 50, paddingHorizontal: 24, paddingVertical: 12 }}
+                    onPress={() => router.push('/event/create/step2')}
+                    activeOpacity={0.85}
+                  >
+                    <Text style={{ fontSize: 14, fontWeight: '700', color: Colors.black }}>+ {lang === 'sk' ? 'Vytvoriť event' : 'Create Event'}</Text>
+                  </TouchableOpacity>
+                )}
               </View>
             ) : (
               <View style={s.listCard}>
                 {displayedEvents.map((e, i) => {
                   const d = new Date(e.date + 'T00:00:00');
-                  const dateStr = d.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' });
+                  const dateStr = d.toLocaleDateString(lang === 'sk' ? 'sk-SK' : 'en-US', { weekday: 'short', month: 'short', day: 'numeric' });
+                  const dateLine = e.time ? `${dateStr} · ${e.time.slice(0, 5)}` : dateStr;
+                  const going = e.is_free ? realGoing(e, user!.id) : e.paid_count;
                   return (
                     <TouchableOpacity key={e.id} style={[s.listRow, i < displayedEvents.length - 1 && s.listRowBorder]}
                       onPress={() => openAttendees(e)} activeOpacity={0.7}>
@@ -1133,15 +1113,101 @@ export default function DashboardScreen() {
                       }
                       <View style={{ flex: 1 }}>
                         <Text style={s.listName} numberOfLines={1}>{e.title}</Text>
-                        <Text style={s.listSub}>{dateStr}</Text>
-                        {(e.price ?? 0) > 0 && e.paid_count > 0 && <Text style={s.listRevenue}>Scanned {e.scan_count}/{e.paid_count} · {fmt(e.gross)}</Text>}
-                        {(e.price ?? 0) > 0 && e.paid_count === 0 && <Text style={s.listRevenue}>{fmt(e.gross)} gross</Text>}
+                        <Text style={s.listSub}>{dateLine}{e.capacity != null ? `  ·  ${going}/${e.capacity}` : ''}</Text>
+                        {e.paid_count > 0 && (
+                          <Text style={s.listRevenue}>{lang === 'sk' ? 'Naskenované' : 'Scanned'} {e.scan_count}/{e.paid_count}{(e.price ?? 0) > 0 ? `  ·  €${Number(e.price).toFixed(2)}` : ''}</Text>
+                        )}
+                        {e.paid_count === 0 && (e.price ?? 0) > 0 && <Text style={s.listRevenue}>€{Number(e.price).toFixed(2)}</Text>}
                       </View>
                       {e.status === 'cancelled' && <View style={s.cancelledBadge}><Text style={s.cancelledBadgeText}>{t.dashboard.cancelled}</Text></View>}
                       {e.status !== 'cancelled' && (
-                        <View style={s.goingBadge}>
-                          <Text style={s.goingNum}>{e.is_free ? realGoing(e, user!.id) : e.paid_count}</Text>
-                          <Text style={s.goingLabel}>{t.dashboard.going}</Text>
+                        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
+                          <View style={s.goingBadge}>
+                            <Text style={s.goingNum}>{going}</Text>
+                            <Text style={s.goingLabel}>{goingLabel(going, lang)}</Text>
+                          </View>
+                          <TouchableOpacity
+                            style={s.shareBtn}
+                            onPress={() => Share.share({ url: `https://ticket.woeva.com/event/${e.id}`, message: `${e.title}\nhttps://ticket.woeva.com/event/${e.id}` })}
+                            hitSlop={8}
+                          >
+                            <Svg width={15} height={15} viewBox="0 0 24 24" fill="none">
+                              <Path d="M10 13a5 5 0 007.54.54l3-3a5 5 0 00-7.07-7.07l-1.72 1.71M14 11a5 5 0 00-7.54-.54l-3 3a5 5 0 007.07 7.07l1.71-1.71" stroke={Colors.gray} strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" />
+                            </Svg>
+                          </TouchableOpacity>
+                        </View>
+                      )}
+                    </TouchableOpacity>
+                  );
+                })}
+              </View>
+            )}
+          </>
+        )}
+
+        {/* ── EVENTS ────────────────────────────────────────────────────────── */}
+        {activeTab === 'events' && (
+          <>
+            <View style={s.segment}>
+              {([
+                { key: 'upcoming', label: t.dashboard.upcoming, count: upcomingEvents.length },
+                { key: 'past', label: t.dashboard.past, count: pastEvents.length },
+                { key: 'cancelled', label: t.dashboard.cancelledTab, count: cancelledEvents.length },
+              ] as const).map(f => (
+                <TouchableOpacity key={f.key} style={[s.segmentItem, eventsFilter === f.key && s.segmentItemActive]}
+                  onPress={() => setEventsFilter(f.key)} activeOpacity={0.8}>
+                  <Text style={[s.segmentText, eventsFilter === f.key && s.segmentTextActive]}>
+                    {f.label}<Text style={s.segmentCount}> ({f.count})</Text>
+                  </Text>
+                </TouchableOpacity>
+              ))}
+            </View>
+
+            {displayedEvents.length === 0 ? (
+              <View style={s.emptyBox}>
+                <Text style={s.emptyTitle}>{eventsFilter === 'upcoming' ? t.dashboard.noUpcomingEvents : t.dashboard.noEvents}</Text>
+                <Text style={s.emptySub}>
+                  {eventsFilter === 'upcoming' ? t.dashboard.createEventHere : eventsFilter === 'past' ? t.dashboard.pastEventsHere : t.dashboard.cancelledEventsHere}
+                </Text>
+              </View>
+            ) : (
+              <View style={s.listCard}>
+                {displayedEvents.map((e, i) => {
+                  const d = new Date(e.date + 'T00:00:00');
+                  const dateStr = d.toLocaleDateString(lang === 'sk' ? 'sk-SK' : 'en-US', { weekday: 'short', month: 'short', day: 'numeric' });
+                  const dateLine = e.time ? `${dateStr} · ${e.time.slice(0, 5)}` : dateStr;
+                  const going = e.is_free ? realGoing(e, user!.id) : e.paid_count;
+                  return (
+                    <TouchableOpacity key={e.id} style={[s.listRow, i < displayedEvents.length - 1 && s.listRowBorder]}
+                      onPress={() => openAttendees(e)} activeOpacity={0.7}>
+                      {getRotatingCover(e)
+                        ? <Image source={{ uri: getRotatingCover(e)! }} style={s.listAvatar} />
+                        : <View style={[s.listAvatar, s.listAvatarFallback]}><Text style={s.listAvatarInitial}>{e.title.charAt(0).toUpperCase()}</Text></View>
+                      }
+                      <View style={{ flex: 1 }}>
+                        <Text style={s.listName} numberOfLines={1}>{e.title}</Text>
+                        <Text style={s.listSub}>{dateLine}{e.capacity != null ? `  ·  ${going}/${e.capacity}` : ''}</Text>
+                        {e.paid_count > 0 && (
+                          <Text style={s.listRevenue}>{lang === 'sk' ? 'Naskenované' : 'Scanned'} {e.scan_count}/{e.paid_count}{(e.price ?? 0) > 0 ? `  ·  €${Number(e.price).toFixed(2)}` : ''}</Text>
+                        )}
+                        {e.paid_count === 0 && (e.price ?? 0) > 0 && <Text style={s.listRevenue}>€{Number(e.price).toFixed(2)}</Text>}
+                      </View>
+                      {e.status === 'cancelled' && <View style={s.cancelledBadge}><Text style={s.cancelledBadgeText}>{t.dashboard.cancelled}</Text></View>}
+                      {e.status !== 'cancelled' && (
+                        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
+                          <View style={s.goingBadge}>
+                            <Text style={s.goingNum}>{going}</Text>
+                            <Text style={s.goingLabel}>{goingLabel(going, lang)}</Text>
+                          </View>
+                          <TouchableOpacity
+                            style={s.shareBtn}
+                            onPress={() => Share.share({ url: `https://ticket.woeva.com/event/${e.id}`, message: `${e.title}\nhttps://ticket.woeva.com/event/${e.id}` })}
+                            hitSlop={8}
+                          >
+                            <Svg width={15} height={15} viewBox="0 0 24 24" fill="none">
+                              <Path d="M10 13a5 5 0 007.54.54l3-3a5 5 0 00-7.07-7.07l-1.72 1.71M14 11a5 5 0 00-7.54-.54l-3 3a5 5 0 007.07 7.07l1.71-1.71" stroke={Colors.gray} strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" />
+                            </Svg>
+                          </TouchableOpacity>
                         </View>
                       )}
                     </TouchableOpacity>
@@ -1308,7 +1374,7 @@ export default function DashboardScreen() {
               const monthStart = new Date(now.getFullYear(), now.getMonth(), 1);
 
               const weekMap: Record<string, { net: number; isCurrent: boolean; monDate: Date; sunDate: Date }> = {};
-              viewEvents.filter(e => !e.is_free && e.net > 0).forEach(e => {
+              viewEvents.filter(e => !e.is_free && e.onlineNet > 0).forEach(e => {
                 const d = new Date(e.date + 'T00:00:00');
                 const day = d.getDay();
                 const offset = day === 0 ? 6 : day - 1;
@@ -1318,30 +1384,33 @@ export default function DashboardScreen() {
                 if (!weekMap[key]) weekMap[key] = {
                   net: 0, isCurrent: mon.getTime() === currentMonday.getTime(), monDate: mon, sunDate: sun,
                 };
-                weekMap[key].net += e.net;
+                weekMap[key].net += e.onlineNet;
               });
 
-              let allWeeks = Object.entries(weekMap).sort(([a],[b]) => b.localeCompare(a));
-              if (payoutFilter === 'month') allWeeks = allWeeks.filter(([,w]) => w.monDate >= monthStart);
-              if (allWeeks.length === 0) return null;
+              const allWeeksUnfiltered = Object.entries(weekMap).sort(([a],[b]) => b.localeCompare(a));
+              if (allWeeksUnfiltered.length === 0) return null;
+              let allWeeks = payoutFilter === 'month'
+                ? allWeeksUnfiltered.filter(([,w]) => w.monDate >= monthStart)
+                : allWeeksUnfiltered;
 
               const PAGE = 5;
               const totalPages = Math.ceil(allWeeks.length / PAGE);
               const page = Math.min(payoutPage, totalPages - 1);
               const pageWeeks = allWeeks.slice(page * PAGE, page * PAGE + PAGE);
-              const fmtDay = (d: Date) => d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+              const locale = lang === 'sk' ? 'sk-SK' : 'en-US';
+              const fmtDay = (d: Date) => d.toLocaleDateString(locale, { month: 'short', day: 'numeric' });
 
               return (
                 <>
                   <View style={s.payoutHeader}>
-                    <Text style={s.sectionTitle}>PAYOUTS</Text>
+                    <Text style={s.sectionTitle}>{t.dashboard.payoutsTab}</Text>
                     <View style={s.payoutFilterRow}>
                       {(['all', 'month'] as const).map(f => (
                         <TouchableOpacity key={f}
                           style={[s.payoutFilterChip, payoutFilter === f && s.payoutFilterChipActive]}
                           onPress={() => { setPayoutFilter(f); setPayoutPage(0); }} activeOpacity={0.7}>
                           <Text style={[s.payoutFilterText, payoutFilter === f && s.payoutFilterTextActive]}>
-                            {f === 'all' ? 'All time' : 'This month'}
+                            {f === 'all' ? t.dashboard.payoutAllTime : t.dashboard.payoutThisMonth}
                           </Text>
                         </TouchableOpacity>
                       ))}
@@ -1353,7 +1422,7 @@ export default function DashboardScreen() {
                         <View style={[s.payoutDot, w.isCurrent ? s.payoutDotPending : s.payoutDotDone]} />
                         <Text style={s.payoutRowDate} numberOfLines={1}>{fmtDay(w.monDate)} – {fmtDay(w.sunDate)}</Text>
                         <Text style={[s.payoutRowStatus, w.isCurrent ? s.payoutRowStatusPending : s.payoutRowStatusDone]}>
-                          {w.isCurrent ? 'Pending' : 'Processed'}
+                          {w.isCurrent ? t.dashboard.payoutPendingLabel : t.dashboard.payoutProcessed}
                         </Text>
                         <Text style={s.payoutRowAmount}>{fmt(w.net)}</Text>
                       </View>
@@ -1370,7 +1439,7 @@ export default function DashboardScreen() {
                       </TouchableOpacity>
                     </View>
                   )}
-                  <Text style={s.payoutNote}>Payouts are sent every Monday. Allow 2–5 business days to arrive in your bank account.</Text>
+                  <Text style={s.payoutNote}>{t.dashboard.payoutNote}</Text>
                 </>
               );
             })()}
@@ -1384,18 +1453,19 @@ export default function DashboardScreen() {
                 <View style={s.earningsCard}>
                   <View style={s.earningsCardTop}>
                     <View>
-                      <Text style={s.earningsCardLabel}>Net earnings</Text>
-                      <Text style={s.earningsCardAmount}>{fmt(totalNet)}</Text>
-                    </View>
-                    <View style={s.earningsCardRight}>
-                      <Text style={s.earningsCardGrossLabel}>Gross</Text>
-                      <Text style={s.earningsCardGross}>{fmt(totalGross)}</Text>
+                      <Text style={s.earningsCardLabel}>{t.dashboard.onlineEarnings}</Text>
+                      <Text style={s.earningsCardAmount}>{fmt(totalOnlineNet)}</Text>
                     </View>
                   </View>
+                  {totalDoorGross > 0 && (
+                    <View style={[s.earningsCardMonth, { borderTopWidth: 1, borderTopColor: 'rgba(255,255,255,0.08)', paddingTop: 10, marginTop: 10 }]}>
+                      <Text style={[s.earningsCardMonthText, { color: 'rgba(255,255,255,0.5)' }]}>{lang === 'sk' ? 'Celkovo vr. na mieste' : 'Total incl. at door'}: {fmt(totalNet)} · {t.dashboard.atDoor}: {fmt(totalDoorGross)}</Text>
+                    </View>
+                  )}
                   {monthGross > 0 && (
                     <View style={s.earningsCardMonth}>
                       <View style={s.earningsCardMonthDot} />
-                      <Text style={s.earningsCardMonthText}>This month: {fmt(monthNet)} net</Text>
+                      <Text style={s.earningsCardMonthText}>{t.dashboard.thisMonthNet(fmt(monthOnlineNet))}</Text>
                     </View>
                   )}
                 </View>
@@ -1412,7 +1482,7 @@ export default function DashboardScreen() {
                       <Path d="M14 2v6h6M16 13H8M16 17H8M10 9H8" stroke={Colors.black} strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" />
                     </Svg>
                   </View>
-                  <Text style={s.invoicesRowLabel}>Invoices</Text>
+                  <Text style={s.invoicesRowLabel}>{t.dashboard.invoicesLabel}</Text>
                   {monthlyEarnings.length > 0 && (
                     <View style={s.invoicesRowBadge}>
                       <Text style={s.invoicesRowBadgeText}>{monthlyEarnings.length}</Text>
@@ -1441,15 +1511,15 @@ export default function DashboardScreen() {
                           <View style={{ flex: 1 }}>
                             <Text style={s.listName} numberOfLines={1}>{e.title}</Text>
                             <Text style={s.listSub}>
-                              {e.online_count > 0 ? `Online: ${e.online_count}` : ''}
+                              {e.online_count > 0 ? `${t.dashboard.onlineTickets}: ${e.online_count}` : ''}
                               {e.online_count > 0 && e.door_count > 0 ? ' · ' : ''}
-                              {e.door_count > 0 ? `At door: ${e.door_count}` : ''}
-                              {e.online_count > 0 ? ` · Stripe ${fmt(e.stripe_fee)} · Woeva ${fmt(e.woeva_fee)}` : ''}
+                              {e.door_count > 0 ? `${t.dashboard.atDoor}: ${e.door_count}` : ''}
+                              {e.online_count > 0 ? ` · Woeva ${fmt(e.woeva_fee)}` : ''}
                             </Text>
                           </View>
                           <View style={{ alignItems: 'flex-end' }}>
-                            <Text style={s.breakdownGross}>{fmt(e.gross)}</Text>
-                            <Text style={s.breakdownNet}>{fmt(e.net)} {t.dashboard.netto}</Text>
+                            <Text style={s.breakdownGross}>{fmt(e.onlineGross > 0 ? e.onlineGross : e.gross)}</Text>
+                            <Text style={s.breakdownNet}>{fmt(e.onlineGross > 0 ? e.onlineNet : e.net)} {t.dashboard.netto}</Text>
                           </View>
                         </View>
                       ))}
@@ -1465,8 +1535,8 @@ export default function DashboardScreen() {
                       {/* Header */}
                       <View style={s.invoicesSheetHeader}>
                         <View style={{ flex: 1 }}>
-                          <Text style={s.invoicesSheetTitle}>Invoices</Text>
-                          <Text style={s.invoicesSheetSub}>{monthlyEarnings.length} {monthlyEarnings.length === 1 ? 'month' : 'months'}</Text>
+                          <Text style={s.invoicesSheetTitle}>{t.dashboard.invoicesLabel}</Text>
+                          <Text style={s.invoicesSheetSub}>{t.dashboard.invoiceMonths(monthlyEarnings.length)}</Text>
                         </View>
                         <TouchableOpacity onPress={() => setShowInvoicesSheet(false)} style={s.invoicesCloseBtn} hitSlop={8}>
                           <Text style={s.invoicesCloseBtnText}>✕</Text>
@@ -1474,9 +1544,10 @@ export default function DashboardScreen() {
                       </View>
                       <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingHorizontal: 20, paddingTop: 8, paddingBottom: 16, gap: 14 }}>
                         {monthlyEarnings.length === 0 ? (
-                          <Text style={[s.listSub, { textAlign: 'center', paddingVertical: 40 }]}>No invoices yet</Text>
+                          <Text style={[s.listSub, { textAlign: 'center', paddingVertical: 40 }]}>{lang === 'sk' ? 'Zatiaľ žiadne faktúry' : 'No invoices yet'}</Text>
                         ) : (
-                          monthlyEarnings.map(m => {
+                          <>
+                          {(showAllMonths ? monthlyEarnings : monthlyEarnings.slice(0, 3)).map(m => {
                             const available = canDownloadMonth(m.key);
                             return (
                               <View key={m.key} style={s.invoiceCard}>
@@ -1484,26 +1555,26 @@ export default function DashboardScreen() {
                                 <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 14 }}>
                                   <Text style={s.invoiceCardMonth}>{m.label}</Text>
                                   {available ? (
-                                    <View style={s.invoiceAvailBadge}><Text style={s.invoiceAvailBadgeText}>Ready</Text></View>
+                                    <View style={s.invoiceAvailBadge}><Text style={s.invoiceAvailBadgeText}>{t.dashboard.invoiceReady}</Text></View>
                                   ) : (
-                                    <View style={s.invoicePendingBadge}><Text style={s.invoicePendingText}>Pending</Text></View>
+                                    <View style={s.invoicePendingBadge}><Text style={s.invoicePendingText}>{t.dashboard.invoicePendingLabel}</Text></View>
                                   )}
                                 </View>
                                 {/* Stats row */}
                                 <View style={s.invoiceStatsRow}>
                                   <View style={s.invoiceStatBlock}>
-                                    <Text style={s.invoiceStatLabel}>Events</Text>
+                                    <Text style={s.invoiceStatLabel}>{t.dashboard.invoiceEventsLabel}</Text>
                                     <Text style={s.invoiceStatVal}>{m.events.length}</Text>
                                   </View>
                                   <View style={s.invoiceStatDivider} />
                                   <View style={s.invoiceStatBlock}>
-                                    <Text style={s.invoiceStatLabel}>Gross</Text>
+                                    <Text style={s.invoiceStatLabel}>{t.dashboard.invoiceGrossLabel}</Text>
                                     <Text style={s.invoiceStatVal}>{fmt(m.gross)}</Text>
                                   </View>
                                   <View style={s.invoiceStatDivider} />
                                   <View style={s.invoiceStatBlock}>
-                                    <Text style={s.invoiceStatLabel}>Net</Text>
-                                    <Text style={[s.invoiceStatVal, { color: Colors.lime }]}>{fmt(m.net)}</Text>
+                                    <Text style={s.invoiceStatLabel}>{t.dashboard.invoiceOnlineNet}</Text>
+                                    <Text style={[s.invoiceStatVal, { color: '#16A34A' }]}>{fmt(m.events.reduce((s, e) => s + e.onlineNet, 0))}</Text>
                                   </View>
                                 </View>
                                 {/* Download button */}
@@ -1516,15 +1587,27 @@ export default function DashboardScreen() {
                                     <Svg width={15} height={15} viewBox="0 0 24 24" fill="none">
                                       <Path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4M7 10l5 5 5-5M12 15V3" stroke={Colors.white} strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" />
                                     </Svg>
-                                    <Text style={s.invoiceDownloadText}>Download PDF</Text>
+                                    <Text style={s.invoiceDownloadText}>{t.dashboard.downloadPdf}</Text>
                                   </TouchableOpacity>
                                 )}
                                 {!available && (
-                                  <Text style={s.invoicePendingNote}>Available at the end of the month</Text>
+                                  <Text style={s.invoicePendingNote}>{lang === 'sk' ? 'Dostupné na konci mesiaca' : 'Available at the end of the month'}</Text>
                                 )}
                               </View>
                             );
-                          })
+                          })}
+                          {!showAllMonths && monthlyEarnings.length > 3 && (
+                            <TouchableOpacity
+                              onPress={() => setShowAllMonths(true)}
+                              style={{ alignItems: 'center', paddingVertical: 12 }}
+                              activeOpacity={0.7}
+                            >
+                              <Text style={{ fontSize: 14, fontWeight: '600', color: Colors.black }}>
+                                {lang === 'sk' ? `Zobraziť staršie (${monthlyEarnings.length - 3})` : `Show older (${monthlyEarnings.length - 3})`}
+                              </Text>
+                            </TouchableOpacity>
+                          )}
+                          </>
                         )}
                       </ScrollView>
                     </View>
@@ -1537,7 +1620,7 @@ export default function DashboardScreen() {
                     <Text style={[s.sectionTitle, { marginTop: 24 }]}>{t.dashboard.payoutHistory}</Text>
                     <View style={s.listCard}>
                       {payouts.map((p, i) => {
-                        const arrival = new Date(p.arrival_date).toLocaleDateString('en-US', { day: 'numeric', month: 'short', year: 'numeric' });
+                        const arrival = new Date(p.arrival_date).toLocaleDateString(lang === 'sk' ? 'sk-SK' : 'en-US', { day: 'numeric', month: 'short', year: 'numeric' });
                         const statusColor = p.status === 'paid' ? Colors.lime : p.status === 'in_transit' ? '#FF9500' : Colors.gray;
                         return (
                           <View key={p.id} style={[s.listRow, i < payouts.length - 1 && s.listRowBorder]}>
@@ -1597,8 +1680,8 @@ export default function DashboardScreen() {
                 {[
                   { label: t.dashboard.events, val: filtered.length },
                   { label: t.dashboard.ticketsSold, val: filtered.reduce((sum, e) => sum + e.paid_count, 0) },
-                  { label: 'Online tickets', val: filtered.reduce((sum, e) => sum + e.online_count, 0) },
-                  { label: 'At door', val: filtered.reduce((sum, e) => sum + e.door_count, 0) },
+                  { label: t.dashboard.onlineTickets, val: filtered.reduce((sum, e) => sum + e.online_count, 0) },
+                  { label: t.dashboard.atDoor, val: filtered.reduce((sum, e) => sum + e.door_count, 0) },
                   { label: t.dashboard.freeEvents, val: filtered.filter(e => e.is_free).length },
                   { label: t.dashboard.paidEvents, val: filtered.filter(e => !e.is_free).length },
                   { label: t.dashboard.attendees, val: filtered.reduce((sum, e) => sum + realGoing(e, user!.id), 0) },
@@ -1622,13 +1705,13 @@ export default function DashboardScreen() {
                         <>
                           {fOnline > 0 && (
                             <View style={s.revenueRow}>
-                              <Text style={s.revenueLabel}>Online tickets</Text>
+                              <Text style={s.revenueLabel}>{t.dashboard.onlineTickets}</Text>
                               <Text style={s.revenueVal}>{fmt(fOnline)}</Text>
                             </View>
                           )}
                           {fDoor > 0 && (
                             <View style={s.revenueRow}>
-                              <Text style={s.revenueLabel}>At door</Text>
+                              <Text style={s.revenueLabel}>{t.dashboard.atDoor}</Text>
                               <Text style={s.revenueVal}>{fmt(fDoor)}</Text>
                             </View>
                           )}
@@ -1862,9 +1945,7 @@ export default function DashboardScreen() {
             <View style={s.billingSheetHandle} />
             <Text style={s.billingSheetTitle}>{attendeesEvent?.title}</Text>
             <Text style={[s.listSub, { marginBottom: 12 }]}>
-              {attendeesEvent
-                ? (attendeesEvent.is_free ? realGoing(attendeesEvent, user!.id) : attendeesEvent.paid_count)
-                : 0} {t.dashboard.going}
+              {(() => { const n = attendeesEvent ? (attendeesEvent.is_free ? realGoing(attendeesEvent, user!.id) : attendeesEvent.paid_count) : 0; return `${n} ${goingLabel(n, lang)}`; })()}
             </Text>
             {loadingAttendees
               ? <ActivityIndicator color={Colors.black} />
@@ -2027,13 +2108,15 @@ const s = StyleSheet.create({
   segment: { flexDirection: 'row', backgroundColor: Colors.grayLight, borderRadius: 14, padding: 4, marginBottom: 16, gap: 4 },
   segmentItem: { flex: 1, paddingVertical: 8, borderRadius: 10, alignItems: 'center' },
   segmentItemActive: { backgroundColor: Colors.white },
-  segmentText: { fontSize: 13, fontWeight: '500', color: Colors.gray, fontFamily: Fonts.medium },
+  segmentText: { fontSize: 11, fontWeight: '500', color: Colors.gray, fontFamily: Fonts.medium },
   segmentTextActive: { color: Colors.black, fontWeight: '700', fontFamily: Fonts.bold },
+  segmentCount: { fontSize: 9, fontWeight: '400' },
   cancelledBadge: { backgroundColor: '#FFE5E5', borderRadius: 50, paddingHorizontal: 8, paddingVertical: 3 },
   cancelledBadgeText: { fontSize: 10, fontWeight: '700', color: '#CC3333' },
   goingBadge: { alignItems: 'center', minWidth: 34 },
   goingNum: { fontSize: 15, fontWeight: '700', color: Colors.black, fontFamily: Fonts.bold },
   goingLabel: { fontSize: 10, color: Colors.gray, fontFamily: Fonts.regular },
+  shareBtn: { width: 32, height: 32, borderRadius: 16, backgroundColor: Colors.grayLight, alignItems: 'center', justifyContent: 'center' },
   emptyBox: { paddingVertical: 60, alignItems: 'center', gap: 8 },
   emptyTitle: { fontSize: 17, fontWeight: '600', color: Colors.black, fontFamily: Fonts.semibold },
   emptySub: { fontSize: 13, color: Colors.gray, fontFamily: Fonts.regular, textAlign: 'center' },

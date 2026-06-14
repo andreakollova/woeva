@@ -14,22 +14,24 @@ export default function OtpScreen() {
   const { phone, email, name, type: otpType } = useLocalSearchParams<{ phone?: string; email?: string; name?: string; type?: string }>();
   const isEmail = otpType === 'email';
   const { t } = useTranslations();
-  const [otp, setOtp] = useState(['', '', '', '', '', '']);
+  const [otp, setOtp] = useState(['', '', '', '', '', '', '', '']);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
+  const [resendLoading, setResendLoading] = useState(false);
+  const [resendSent, setResendSent] = useState(false);
   const inputs = useRef<TextInput[]>([]);
 
   function handleChange(text: string, index: number) {
     const newOtp = [...otp];
     newOtp[index] = text;
     setOtp(newOtp);
-    if (text && index < 5) inputs.current[index + 1]?.focus();
+    if (text && index < 7) inputs.current[index + 1]?.focus();
     if (!text && index > 0) inputs.current[index - 1]?.focus();
   }
 
   async function handleVerify() {
     const code = otp.join('');
-    if (code.length < 6) { setError(t.auth.enter6Digit); return; }
+    if (code.length < 8) { setError(t.auth.enter6Digit); return; }
     setLoading(true);
 
     if (isEmail) {
@@ -49,12 +51,19 @@ export default function OtpScreen() {
     }
   }
 
-  function handleResend() {
+  async function handleResend() {
+    setResendLoading(true);
+    setResendSent(false);
+    setError('');
     if (isEmail) {
-      supabase.auth.signInWithOtp({ email: email!, options: { shouldCreateUser: false } });
+      await supabase.auth.signInWithOtp({ email: email!, options: { shouldCreateUser: true } });
     } else {
-      supabase.auth.signInWithOtp({ phone: phone! });
+      await supabase.auth.signInWithOtp({ phone: phone! });
     }
+    setResendLoading(false);
+    setResendSent(true);
+    setOtp(['', '', '', '', '', '']);
+    setTimeout(() => setResendSent(false), 8000);
   }
 
   const destination = isEmail ? email! : phone!;
@@ -66,6 +75,11 @@ export default function OtpScreen() {
       <View style={styles.header}>
         <Text style={styles.title}>{isEmail ? t.auth.checkEmail : t.auth.checkMessages}</Text>
         <Text style={styles.subtitle}>{t.auth.codeSentTo(destination)}</Text>
+        {resendSent && (
+          <View style={styles.resendSuccess}>
+            <Text style={styles.resendSuccessText}>✓ Nový kód odoslaný</Text>
+          </View>
+        )}
       </View>
 
       <View style={styles.otpRow}>
@@ -87,7 +101,7 @@ export default function OtpScreen() {
 
       <View style={styles.bottom}>
         <Button label={t.auth.verify} onPress={handleVerify} loading={loading} variant="black" />
-        <Button label={t.auth.resendCode} onPress={handleResend} variant="ghost" />
+        <Button label={resendLoading ? 'Odosielam...' : t.auth.resendCode} onPress={handleResend} variant="ghost" disabled={resendLoading} />
       </View>
     </View>
   );
@@ -97,7 +111,7 @@ const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: Colors.white, paddingHorizontal: 24 },
   backBtn: { marginBottom: 40 },
   backText: { fontSize: 22, color: Colors.black },
-  header: { marginBottom: 40, gap: 8 },
+  header: { marginTop: 36, marginBottom: 40, gap: 8 },
   title: { fontSize: 30, fontWeight: '700', color: Colors.black, letterSpacing: -0.5 },
   subtitle: { fontSize: 15, color: Colors.gray },
   otpRow: { flexDirection: 'row', gap: 10, marginBottom: 24 },
@@ -115,4 +129,6 @@ const styles = StyleSheet.create({
   otpBoxError: { borderColor: Colors.error },
   errorText: { color: Colors.error, fontSize: 13, marginBottom: 16 },
   bottom: { gap: 12 },
+  resendSuccess: { alignSelf: 'flex-start', backgroundColor: Colors.black, borderRadius: 20, paddingHorizontal: 14, paddingVertical: 8, marginTop: 10 },
+  resendSuccessText: { fontSize: 13, color: Colors.lime, fontWeight: '700' },
 });

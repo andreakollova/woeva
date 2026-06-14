@@ -88,6 +88,7 @@ export interface Event {
   created_at: string;
   source?: string | null;
   pay_at_door?: boolean | null;
+  capacity?: number | null;
   cancelled_dates?: string[] | null;
   status: 'active' | 'cancelled';
   cancelled_at: string | null;

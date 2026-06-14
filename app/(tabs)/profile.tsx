@@ -1,5 +1,6 @@
 import React, { useState, useCallback } from 'react';
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Image, Alert } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Image, Alert, Share } from 'react-native';
+import { StatusBar } from 'expo-status-bar';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useRouter, useFocusEffect } from 'expo-router';
 import Svg, { Path } from 'react-native-svg';
@@ -64,41 +65,45 @@ export default function ProfileScreen() {
   const city = profile?.city || '';
 
   return (
-    <View style={[styles.container, { paddingTop: insets.top }]}>
-      <ScrollView contentContainerStyle={{ paddingBottom: insets.bottom + 100 }} showsVerticalScrollIndicator={false}>
+    <View style={styles.container}>
+      <StatusBar style="light" />
+      <ScrollView contentContainerStyle={{ paddingBottom: insets.bottom + 100, backgroundColor: Colors.white }} showsVerticalScrollIndicator={false}>
 
-        {/* Dark hero */}
-        <View style={styles.hero}>
-          <View style={styles.heroTopBar}>
-            <TouchableOpacity onPress={() => router.push('/(tabs)')} activeOpacity={0.7}>
-              <WMark size={30} color={Colors.lime} />
-            </TouchableOpacity>
-            <TouchableOpacity onPress={() => router.push('/settings')} activeOpacity={0.7} style={styles.settingsBtn}>
+        {/* Black cover */}
+        <View style={[styles.cover, { paddingTop: insets.top }]}>
+          <View style={[styles.topBar, { marginTop: 8 }]}>
+            <View />
+            <TouchableOpacity onPress={() => router.push('/settings')} activeOpacity={0.7} style={styles.iconBtn}>
               <Svg width={18} height={18} viewBox="0 0 24 24" fill="none">
                 <Path d="M12 15a3 3 0 1 0 0-6 3 3 0 0 0 0 6z" stroke="rgba(255,255,255,0.8)" strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round"/>
                 <Path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z" stroke="rgba(255,255,255,0.8)" strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round"/>
               </Svg>
             </TouchableOpacity>
           </View>
+        </View>
 
-          {/* Avatar */}
-          <TouchableOpacity style={styles.avatarWrap} onPress={() => router.push('/settings/profile')} activeOpacity={0.85}>
-            <View style={styles.avatar}>
-              <Text style={styles.avatarText}>{initial}</Text>
-              {profile?.avatar_url ? (
-                <Image source={{ uri: profile.avatar_url }} style={StyleSheet.absoluteFill as any} borderRadius={48} />
-              ) : null}
-            </View>
-            <View style={styles.editBadge}>
-              <Svg width={11} height={11} viewBox="0 0 24 24" fill="none">
-                <Path d="M11 4H4a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2v-7" stroke={Colors.white} strokeWidth={2.5} strokeLinecap="round" strokeLinejoin="round"/>
-                <Path d="M18.5 2.5a2.121 2.121 0 013 3L12 15l-4 1 1-4 9.5-9.5z" stroke={Colors.white} strokeWidth={2.5} strokeLinecap="round" strokeLinejoin="round"/>
-              </Svg>
-            </View>
-          </TouchableOpacity>
+        {/* White card */}
+        <View style={styles.card}>
+          {/* Avatar floats up */}
+          <View style={styles.avatarFloatRow}>
+            <TouchableOpacity style={styles.avatarWrap} onPress={() => router.push('/settings/profile')} activeOpacity={0.85}>
+              <View style={styles.avatar}>
+                <Text style={styles.avatarText}>{initial}</Text>
+                {profile?.avatar_url ? (
+                  <Image source={{ uri: profile.avatar_url }} style={StyleSheet.absoluteFill as any} borderRadius={48} />
+                ) : null}
+              </View>
+              <View style={styles.editBadge}>
+                <Svg width={11} height={11} viewBox="0 0 24 24" fill="none">
+                  <Path d="M11 4H4a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2v-7" stroke={Colors.white} strokeWidth={2.5} strokeLinecap="round" strokeLinejoin="round"/>
+                  <Path d="M18.5 2.5a2.121 2.121 0 013 3L12 15l-4 1 1-4 9.5-9.5z" stroke={Colors.white} strokeWidth={2.5} strokeLinecap="round" strokeLinejoin="round"/>
+                </Svg>
+              </View>
+            </TouchableOpacity>
+          </View>
 
-          <Text style={styles.heroName}>{displayName || t.settings.yourName}</Text>
-          <Text style={styles.heroSub}>
+          <Text style={styles.profileName}>{displayName || t.settings.yourName}</Text>
+          <Text style={styles.profileSub}>
             {[city, joinedDate ? t.settings.joinedOn(joinedDate) : ''].filter(Boolean).join('  ·  ')}
           </Text>
 
@@ -106,7 +111,7 @@ export default function ProfileScreen() {
           <View style={styles.statsRow}>
             <View style={styles.statItem}>
               <Text style={styles.statNum}>{eventsCount}</Text>
-              <Text style={styles.statLabel}>{t.dashboard.events}</Text>
+              <Text style={styles.statLabel}>{lang === 'sk' ? 'Navštívených eventov' : 'Events attended'}</Text>
             </View>
             <View style={styles.statDivider} />
             <View style={styles.statItem}>
@@ -231,30 +236,39 @@ export default function ProfileScreen() {
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: Colors.black },
+  container: { flex: 1, backgroundColor: Colors.white },
 
-  // Hero
-  hero: {
+  cover: {
+    height: 180,
     backgroundColor: Colors.black,
-    paddingHorizontal: 24,
-    paddingBottom: 32,
+    paddingHorizontal: 16,
   },
-  heroTopBar: {
+  topBar: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    paddingVertical: 10,
-    marginBottom: 24,
   },
-  settingsBtn: {
-    width: 36,
-    height: 36,
-    borderRadius: 18,
-    backgroundColor: 'rgba(255,255,255,0.1)',
-    alignItems: 'center',
-    justifyContent: 'center',
+  iconBtn: {
+    width: 36, height: 36, borderRadius: 18,
+    backgroundColor: 'rgba(255,255,255,0.12)',
+    alignItems: 'center', justifyContent: 'center',
   },
-  avatarWrap: { alignSelf: 'flex-start', marginBottom: 20, position: 'relative' },
+  card: {
+    backgroundColor: Colors.white,
+    borderTopLeftRadius: 28,
+    borderTopRightRadius: 28,
+    marginTop: -28,
+    paddingHorizontal: 20,
+    paddingBottom: 16,
+  },
+  avatarFloatRow: {
+    flexDirection: 'row',
+    alignItems: 'flex-end',
+    justifyContent: 'space-between',
+    marginTop: -48,
+    marginBottom: 12,
+  },
+  avatarWrap: { position: 'relative' },
   avatar: {
     width: 96,
     height: 96,
@@ -263,54 +277,49 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     borderWidth: 3,
-    borderColor: 'rgba(255,255,255,0.08)',
+    borderColor: Colors.lime,
+    overflow: 'hidden',
   },
   avatarText: { fontSize: 42, fontWeight: '700', fontFamily: Fonts.bold, color: Colors.black },
   editBadge: {
     position: 'absolute',
-    bottom: 2,
-    right: 2,
-    width: 26,
-    height: 26,
-    borderRadius: 13,
-    backgroundColor: 'rgba(0,0,0,0.6)',
-    alignItems: 'center',
-    justifyContent: 'center',
-    borderWidth: 2,
-    borderColor: Colors.black,
+    bottom: 2, right: 2,
+    width: 26, height: 26, borderRadius: 13,
+    backgroundColor: Colors.black,
+    alignItems: 'center', justifyContent: 'center',
+    borderWidth: 2, borderColor: Colors.white,
   },
-  heroName: {
-    fontSize: 28,
-    fontWeight: '800',
-    fontFamily: Fonts.extrabold,
-    color: Colors.white,
-    letterSpacing: -0.5,
-    marginBottom: 6,
+  shareBtn: {
+    flexDirection: 'row', alignItems: 'center', gap: 4,
+    paddingHorizontal: 7, paddingVertical: 3,
+    borderRadius: 50, borderWidth: 1, borderColor: Colors.gray,
+    marginBottom: 4,
   },
-  heroSub: {
-    fontSize: 13,
-    color: 'rgba(255,255,255,0.4)',
-    fontFamily: Fonts.regular,
-    marginBottom: 28,
+  shareBtnText: { fontSize: 10, fontWeight: '600', color: Colors.gray, fontFamily: Fonts.semibold },
+  profileName: {
+    fontSize: 24, fontWeight: '700', fontFamily: Fonts.bold,
+    color: Colors.black, letterSpacing: -0.5, marginBottom: 4,
+  },
+  profileSub: {
+    fontSize: 13, color: Colors.gray, fontFamily: Fonts.regular, marginBottom: 16,
   },
   statsRow: {
     flexDirection: 'row',
-    backgroundColor: 'rgba(255,255,255,0.06)',
+    backgroundColor: '#F5F5F5',
     borderRadius: 16,
     paddingVertical: 16,
+    marginBottom: 4,
   },
   statItem: { flex: 1, alignItems: 'center', gap: 3 },
-  statDivider: { width: 1, backgroundColor: 'rgba(255,255,255,0.1)' },
-  statNum: { fontSize: 22, fontWeight: '700', fontFamily: Fonts.bold, color: Colors.white },
-  statLabel: { fontSize: 12, color: 'rgba(255,255,255,0.4)', fontFamily: Fonts.regular },
+  statDivider: { width: 1, backgroundColor: Colors.grayBorder },
+  statNum: { fontSize: 22, fontWeight: '700', fontFamily: Fonts.bold, color: Colors.black },
+  statLabel: { fontSize: 12, color: Colors.gray, fontFamily: Fonts.regular },
 
   // White content area
   content: {
     backgroundColor: Colors.white,
-    borderTopLeftRadius: 24,
-    borderTopRightRadius: 24,
     paddingHorizontal: 24,
-    paddingTop: 28,
+    paddingTop: 8,
     minHeight: 400,
   },
 
@@ -362,7 +371,7 @@ const styles = StyleSheet.create({
     borderBottomColor: '#EBEBEB',
   },
   rowLast: { borderBottomWidth: 0 },
-  rowImg: { width: 56, height: 56, borderRadius: 14 },
+  rowImg: { width: 48, height: 48, borderRadius: 12 },
   rowImgFallback: { backgroundColor: '#F2F2F2', alignItems: 'center', justifyContent: 'center' },
   rowImgInitial: { fontSize: 16, fontWeight: '700', fontFamily: Fonts.bold, color: Colors.black },
   rowTitle: { fontSize: 14, fontWeight: '600', fontFamily: Fonts.semibold, color: Colors.black },

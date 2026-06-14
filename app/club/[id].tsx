@@ -97,8 +97,8 @@ export default function ClubDetailScreen() {
       await supabase.from('notifications').insert({
         user_id: club.creator_id,
         type: 'join',
-        title: `New member in ${club.name}`,
-        body: `${firstName} joined your club.`,
+        title: `Nový člen: ${club.name}`,
+        body: `${firstName} sa pridal do tvojho klubu.`,
         data: { club_id: id },
       });
       const { data: creatorProfile } = await supabase.from('profiles').select('push_token').eq('id', club.creator_id).single();
@@ -106,8 +106,8 @@ export default function ClubDetailScreen() {
         supabase.functions.invoke('send-push', {
           body: {
             tokens: [creatorProfile.push_token],
-            title: `New member in ${club.name}`,
-            body: `${firstName} joined your club.`,
+            title: `Nový člen: ${club.name}`,
+            body: `${firstName} sa pridal do tvojho klubu.`,
             data: { club_id: id, type: 'club_join' },
           },
         }).then(() => {});
@@ -118,6 +118,23 @@ export default function ClubDetailScreen() {
     setShowJoinCelebration(true);
     setTimeout(() => setShowJoinCelebration(false), 2800);
     loadAll();
+  }
+
+  async function handleLeave() {
+    if (!user) return;
+    Alert.alert(
+      lang === 'sk' ? 'Odsledovať klub?' : 'Unfollow club?',
+      lang === 'sk' ? 'Prestaneš dostávať novinky z tohto klubu.' : 'You will stop receiving updates from this club.',
+      [
+        { text: lang === 'sk' ? 'Zrušiť' : 'Cancel', style: 'cancel' },
+        { text: lang === 'sk' ? 'Odsledovať' : 'Unfollow', style: 'destructive', onPress: async () => {
+          await supabase.from('club_members').delete().eq('club_id', id).eq('user_id', user.id);
+          await supabase.from('clubs').update({ member_count: Math.max((club?.member_count ?? 1) - 1, 0) }).eq('id', id);
+          setIsMember(false);
+          loadAll();
+        }},
+      ]
+    );
   }
 
   if (!club) return <View style={{ flex: 1, backgroundColor: Colors.white }} />;
@@ -209,15 +226,6 @@ export default function ClubDetailScreen() {
             <BackButton color={Colors.white} style={styles.backCircle} />
           </View>
 
-          <TouchableOpacity
-            style={[styles.shareBtn, { top: insets.top + 8 }]}
-            onPress={() => Share.share({ message: `${club.name} na Woeva`, url: `https://woeva.com/club/${id}` })}
-            activeOpacity={0.8}
-          >
-            <Svg width={16} height={16} viewBox="0 0 24 24" fill="none">
-              <Path d="M4 12v8a2 2 0 002 2h12a2 2 0 002-2v-8M16 6l-4-4-4 4M12 2v13" stroke={Colors.white} strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" />
-            </Svg>
-          </TouchableOpacity>
 
           {isAdmin && (
             <TouchableOpacity
@@ -247,7 +255,19 @@ export default function ClubDetailScreen() {
           </View>
 
           {/* Club name + tagline + tags */}
-          <Text style={styles.clubName}>{club.name}</Text>
+          <View style={styles.clubNameRow}>
+            <Text style={styles.clubName}>{club.name}</Text>
+            <TouchableOpacity
+              style={styles.clubShareBtn}
+              onPress={() => Share.share({ url: `https://woeva.com/club/${id}` })}
+              activeOpacity={0.8}
+            >
+              <Svg width={14} height={14} viewBox="0 0 24 24" fill="none">
+                <Path d="M4 12v8a2 2 0 002 2h12a2 2 0 002-2v-8M16 6l-4-4-4 4M12 2v13" stroke={Colors.gray} strokeWidth={2.2} strokeLinecap="round" strokeLinejoin="round" />
+              </Svg>
+              <Text style={styles.clubShareText}>Zdieľať</Text>
+            </TouchableOpacity>
+          </View>
           {club.tagline ? (
             <Text style={styles.clubTagline}>
               {(() => {
@@ -259,16 +279,6 @@ export default function ClubDetailScreen() {
                 return club.tagline;
               })()}
             </Text>
-          ) : null}
-          {((club.tags?.length ?? 0) > 0 || club.city) ? (
-            <View style={styles.tags}>
-              {(club.tags?.length ?? 0) > 0
-                ? club.tags.map((tag: string) => (
-                    <View key={tag} style={styles.tag}><Text style={styles.tagText}>{tag}</Text></View>
-                  ))
-                : club.category ? <View style={styles.tag}><Text style={styles.tagText}>{club.category}</Text></View> : null}
-              {club.city ? <View style={styles.tag}><Text style={styles.tagText}>{club.city}</Text></View> : null}
-            </View>
           ) : null}
 
           {/* Stats */}
@@ -304,27 +314,40 @@ export default function ClubDetailScreen() {
 
           {/* Members bubbles */}
           <View style={styles.divider} />
-          <TouchableOpacity style={styles.membersBubbleRow} onPress={() => setShowMembersModal(true)} activeOpacity={0.8}>
-            {members.slice(0, 6).map((m, i) => {
-              const prof = (m as any)?.profile;
-              const firstName = (prof?.name ?? '?').split(' ')[0];
-              const mi = firstName.charAt(0).toUpperCase();
-              return (
-                <View key={m.id} style={[styles.memberBubble, { marginLeft: i === 0 ? 0 : -10, zIndex: 6 - i }]}>
-                  {prof?.avatar_url
-                    ? <Image source={{ uri: prof.avatar_url }} style={styles.memberBubbleImg} />
-                    : <Text style={styles.memberBubbleInitial}>{mi}</Text>
-                  }
+          <View style={styles.membersBubbleRow}>
+            <TouchableOpacity style={{ flexDirection: 'row', alignItems: 'center', flex: 1 }} onPress={() => setShowMembersModal(true)} activeOpacity={0.8}>
+              {members.slice(0, 6).map((m, i) => {
+                const prof = (m as any)?.profile;
+                const firstName = (prof?.name ?? '?').split(' ')[0];
+                const mi = firstName.charAt(0).toUpperCase();
+                return (
+                  <View key={m.id} style={[styles.memberBubble, { marginLeft: i === 0 ? 0 : -10, zIndex: 6 - i }]}>
+                    {prof?.avatar_url
+                      ? <Image source={{ uri: prof.avatar_url }} style={styles.memberBubbleImg} />
+                      : <Text style={styles.memberBubbleInitial}>{mi}</Text>
+                    }
+                  </View>
+                );
+              })}
+              {memberCount > 6 && (
+                <View style={[styles.memberBubble, styles.memberBubbleMore, { marginLeft: -10, zIndex: 0 }]}>
+                  <Text style={styles.memberBubbleMoreText}>+{memberCount - 6}</Text>
                 </View>
-              );
-            })}
-            {memberCount > 6 && (
-              <View style={[styles.memberBubble, styles.memberBubbleMore, { marginLeft: -10, zIndex: 0 }]}>
-                <Text style={styles.memberBubbleMoreText}>+{memberCount - 6}</Text>
-              </View>
+              )}
+              <Text style={styles.membersClickLabel}>{t.club.memberCount(memberCount)}</Text>
+            </TouchableOpacity>
+            {!isAdmin && isMember && (
+              <TouchableOpacity style={styles.memberStatusBadge} onPress={handleLeave} activeOpacity={0.8}>
+                <Text style={[styles.memberStatusText, { color: Colors.lime }]}>✓ </Text>
+                <Text style={styles.memberStatusText}>{lang === 'sk' ? 'Sledované' : 'Following'}</Text>
+              </TouchableOpacity>
             )}
-            <Text style={styles.membersClickLabel}>{t.club.memberCount(memberCount)}</Text>
-          </TouchableOpacity>
+            {!isAdmin && !isMember && user && (
+              <TouchableOpacity style={styles.memberJoinBtn} onPress={handleJoin} activeOpacity={0.8}>
+                <Text style={styles.memberJoinText}>Pridať sa</Text>
+              </TouchableOpacity>
+            )}
+          </View>
 
           {/* Admin: create event */}
           {isAdmin && (
@@ -357,30 +380,6 @@ export default function ClubDetailScreen() {
         </Animated.View>
       </ScrollView>
 
-      {!isAdmin && !isMember && (
-        <View style={[styles.footer, { paddingBottom: insets.bottom + 16 }]}>
-          <Button label={t.club.joinClub} onPress={handleJoin} loading={loading} variant="lime" />
-        </View>
-      )}
-      {isMember && !isAdmin && (
-        <View style={[styles.footer, { paddingBottom: insets.bottom + 16 }]}>
-          <Button
-            label={t.club.joined}
-            variant="lime"
-            onPress={() => {
-              Alert.alert(t.club.leaveClub, t.club.leaveClubMsg(club?.name ?? ''), [
-                { text: t.common.cancel, style: 'cancel' },
-                { text: t.club.leaveBtn, style: 'destructive', onPress: async () => {
-                  await supabase.from('club_members').delete().eq('club_id', id).eq('user_id', user!.id);
-                  await supabase.from('clubs').update({ member_count: Math.max((club?.member_count ?? 1) - 1, 0) }).eq('id', id);
-                  setIsMember(false);
-                  router.back();
-                }},
-              ]);
-            }}
-          />
-        </View>
-      )}
     </View>
   );
 }
@@ -450,7 +449,7 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(0,0,0,0.38)',
   },
   backWrap: { position: 'absolute', left: 16 },
-  backCircle: { backgroundColor: 'rgba(0,0,0,0.4)', borderRadius: 20 },
+  backCircle: { backgroundColor: Colors.black, borderRadius: 20 },
   shareBtn: {
     position: 'absolute', right: 60,
     width: 36, height: 36, borderRadius: 18,
@@ -497,7 +496,11 @@ const styles = StyleSheet.create({
   logoInitial: { fontSize: 32, fontWeight: '800', color: Colors.white, fontFamily: Fonts.extrabold },
 
   // Members bubbles row
-  membersBubbleRow: { flexDirection: 'row', alignItems: 'center', marginBottom: 4 },
+  membersBubbleRow: { flexDirection: 'row', alignItems: 'center', marginBottom: 4, gap: 10 },
+  memberStatusBadge: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 12, paddingVertical: 6, borderRadius: 50, borderWidth: 1.5, borderColor: '#16A34A' },
+  memberStatusText: { fontSize: 13, fontWeight: '700', color: '#16A34A', fontFamily: Fonts.bold },
+  memberJoinBtn: { paddingHorizontal: 14, paddingVertical: 7, borderRadius: 50, backgroundColor: Colors.black },
+  memberJoinText: { fontSize: 13, fontWeight: '700', color: Colors.white, fontFamily: Fonts.bold },
   memberBubble: {
     width: 36, height: 36, borderRadius: 18,
     borderWidth: 2, borderColor: Colors.white,
@@ -510,7 +513,10 @@ const styles = StyleSheet.create({
   membersClickLabel: { fontSize: 14, fontWeight: '600', color: Colors.black, fontFamily: Fonts.semibold, marginLeft: 12 },
 
   // Name + tagline below logo
-  clubName: { fontSize: 24, fontWeight: '800', color: Colors.black, letterSpacing: -0.5, fontFamily: Fonts.extrabold, marginBottom: 4 },
+  clubNameRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 10 },
+  clubName: { fontSize: 24, fontWeight: '700', color: Colors.black, letterSpacing: -0.5, fontFamily: Fonts.bold, flex: 1 },
+  clubShareBtn: { flexDirection: 'row', alignItems: 'center', gap: 4, paddingHorizontal: 7, paddingVertical: 3, borderRadius: 50, borderWidth: 1, borderColor: Colors.gray },
+  clubShareText: { fontSize: 10, fontWeight: '600', color: Colors.gray, fontFamily: Fonts.semibold },
   clubTagline: { fontSize: 14, color: Colors.gray, fontFamily: Fonts.regular, lineHeight: 20, marginBottom: 10 },
 
   divider: { height: 1, backgroundColor: Colors.grayBorder, marginVertical: 18 },
@@ -521,6 +527,8 @@ const styles = StyleSheet.create({
   statDivider: { width: 1, height: 32, backgroundColor: Colors.grayBorder },
   statNum: { fontSize: 20, fontWeight: '800', color: Colors.black, fontFamily: Fonts.extrabold },
   statLabel: { fontSize: 11, color: Colors.gray, fontFamily: Fonts.regular },
+  memberBadge: { width: 20, height: 20, borderRadius: 10, backgroundColor: Colors.lime, alignItems: 'center', justifyContent: 'center' },
+  memberBadgeText: { fontSize: 10, fontWeight: '800', color: Colors.black },
 
   // Section
   sectionTitle: { fontSize: 12, fontWeight: '700', color: Colors.gray, letterSpacing: 0.8, textTransform: 'uppercase', marginBottom: 14 },
@@ -531,6 +539,9 @@ const styles = StyleSheet.create({
   tags: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginBottom: 2 },
   tag: { paddingHorizontal: 12, paddingVertical: 6, borderRadius: 50, backgroundColor: Colors.grayLight },
   tagText: { fontSize: 12, fontFamily: Fonts.medium, color: Colors.black, fontWeight: '500' },
+  coverTags: { position: 'absolute', bottom: 40, right: 16, flexDirection: 'row', flexWrap: 'wrap', gap: 7, justifyContent: 'flex-end' },
+  coverTag: { paddingHorizontal: 9, paddingVertical: 4, borderRadius: 50, backgroundColor: 'rgba(0,0,0,0.5)' },
+  coverTagText: { fontSize: 10, fontFamily: Fonts.medium, color: Colors.white, fontWeight: '600' },
 
   // Members modal
   modalOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.45)', justifyContent: 'flex-end' },

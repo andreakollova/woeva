@@ -151,7 +151,11 @@ export default function EditProfileScreen() {
                     onPress={() => { setCity(c); setShowCities(false); }}
                   >
                     <Text style={[styles.dropdownText, city === c && styles.dropdownTextActive]}>{c}</Text>
-                    {city === c && <Text style={styles.dropdownCheck}>✓</Text>}
+                    {city === c && (
+                      <View style={styles.dropdownCheck}>
+                        <Text style={styles.dropdownCheckText}>✓</Text>
+                      </View>
+                    )}
                   </TouchableOpacity>
                 ))}
               </View>
@@ -249,7 +253,8 @@ const styles = StyleSheet.create({
   },
   dropdownText: { fontSize: 15, fontFamily: Fonts.regular, color: Colors.black },
   dropdownTextActive: { fontWeight: '600', fontFamily: Fonts.semibold, color: Colors.black },
-  dropdownCheck: { fontSize: 15, color: Colors.lime, fontWeight: '700' },
+  dropdownCheck: { width: 24, height: 24, borderRadius: 12, backgroundColor: Colors.lime, alignItems: 'center', justifyContent: 'center' },
+  dropdownCheckText: { fontSize: 13, color: Colors.black, fontWeight: '700' },
   fieldHint: { fontSize: 12, color: Colors.gray, fontFamily: Fonts.regular, marginTop: -4 },
   chipsWrap: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginTop: 4 },
   chip: { paddingHorizontal: 14, paddingVertical: 8, borderRadius: 50, backgroundColor: Colors.grayLight, borderWidth: 1.5, borderColor: 'transparent' },

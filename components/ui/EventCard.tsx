@@ -31,7 +31,7 @@ export function EventCard({ event, featured, attending }: EventCardProps) {
   const { t } = useTranslations();
   const isPayAtDoor = !!(event as any).pay_at_door;
   const isFree = !isPayAtDoor && (event.is_free || event.price === 0);
-  const priceLabel = isPayAtDoor ? `€${event.price} at door` : (isFree ? t.event.freeLabel : `€${event.price}`);
+  const priceLabel = isPayAtDoor ? `€${event.price} ${lang === 'sk' ? 'na mieste' : 'at door'}` : (isFree ? t.event.freeLabel : `€${event.price}`);
   const clubName = event.club?.name ?? (event as any).creator?.name ?? null;
   // Use attendees length as fallback if going_count is stale/0
   const goingCount = Math.max(event.going_count ?? 0, event.attendees?.length ?? 0, attending ? 1 : 0);
@@ -78,6 +78,11 @@ export function EventCard({ event, featured, attending }: EventCardProps) {
               goingCount={goingCount}
               dark
             />
+            {attending && (
+              <View style={styles.featuredGoingBadge}>
+                <Text style={styles.goingBadgeText}>✓</Text>
+              </View>
+            )}
           </ImageBackground>
         ) : (
           <View style={[styles.featuredBg, { backgroundColor: Colors.black }]}>
@@ -93,12 +98,17 @@ export function EventCard({ event, featured, attending }: EventCardProps) {
               goingCount={goingCount}
               dark={false}
             />
+            {attending && (
+              <View style={styles.featuredGoingBadge}>
+                <Text style={styles.goingBadgeText}>✓</Text>
+              </View>
+            )}
           </View>
         )}
       </TouchableOpacity>
       {event.category ? (
         <View style={styles.featuredCategoryPill} pointerEvents="none">
-          <Text style={styles.categoryPillText}>{event.category.toUpperCase()}</Text>
+          <Text style={styles.categoryPillText}>{(({ 'Movement & Sport':'Pohyb & Šport', 'Wellness & Body':'Wellness & Telo', 'Food & Drinks':'Jedlo & Pitie', 'Art & Creation':'Umenie & Tvorba', 'Music & Nightlife':'Hudba & Nočný život', 'Learning & Mind':'Vzdelávanie', 'Community & Belonging':'Komunita' } as Record<string,string>)[(event.category.split(',').find((c: string) => c.trim().includes('&')) ?? event.category.split(',')[0]).trim()] ?? (event.category.split(',').find((c: string) => c.trim().includes('&')) ?? event.category.split(',')[0]).trim()).toUpperCase()}</Text>
         </View>
       ) : null}
       </View>
@@ -143,23 +153,30 @@ export function EventCard({ event, featured, attending }: EventCardProps) {
         <View style={styles.rowBottomRow}>
           {(goingCount > 0 || attending) && <GoingAvatars count={goingCount} attendees={event.attendees} attending={attending} userProfile={profile} userId={user?.id} />}
           {clubName ? <Text style={styles.rowClub} numberOfLines={1}>{clubName}</Text> : null}
+          {event.capacity != null && (
+            goingCount >= event.capacity
+              ? <View style={styles.capacityFullPill}><Text style={styles.capacityFullText}>{lang === 'sk' ? 'Plné' : 'Full'}</Text></View>
+              : <View style={styles.capacityPill}><Text style={styles.capacityText}>{goingCount}/{event.capacity}</Text></View>
+          )}
           <View style={[styles.pricePill, isFree && styles.pricePillFree]}>
             <Text style={[styles.pricePillText, isFree && styles.pricePillTextFree]}>{priceLabel}</Text>
           </View>
         </View>
       </View>
 
-      {/* Thumb */}
-      <View style={styles.rowThumbWrap}>
-        {coverUrl ? (
-          <Image
-            source={{ uri: coverUrl }}
-            style={event.venue?.toLowerCase().includes('freshmarket') ? styles.rowThumbRight : styles.rowThumb}
-            resizeMode="cover"
-          />
-        ) : (
-          <View style={[styles.rowThumb, { backgroundColor: Colors.grayLight }]} />
-        )}
+      {/* Thumb + going badge overlay */}
+      <View style={{ position: 'relative' }}>
+        <View style={styles.rowThumbWrap}>
+          {coverUrl ? (
+            <Image
+              source={{ uri: coverUrl }}
+              style={event.venue?.toLowerCase().includes('freshmarket') ? styles.rowThumbRight : styles.rowThumb}
+              resizeMode="cover"
+            />
+          ) : (
+            <View style={[styles.rowThumb, { backgroundColor: Colors.grayLight }]} />
+          )}
+        </View>
         {attending && (
           <View style={styles.goingBadge}>
             <Text style={styles.goingBadgeText}>✓</Text>
@@ -182,8 +199,9 @@ function GoingAvatars({ count, attendees, attending, userProfile, userId }: {
 }) {
   const isAttending = attending ?? false;
 
-  // Build ordered list: exclude current user, others fill remaining slots
-  const others = (attendees ?? []).filter((a: any) => a?.profile?.id !== userId);
+  // Build ordered list: exclude current user and bot, prioritise profiles with avatars
+  const BOT_ID = '00000000-0000-0000-0000-000000000001';
+  const others = (attendees ?? []).filter((a: any) => a?.profile?.id !== userId && a?.profile?.id !== BOT_ID);
   const sorted = [...others].sort((a, b) => (b.profile?.avatar_url ? 1 : 0) - (a.profile?.avatar_url ? 1 : 0));
 
   const effectiveCount = Math.max(count, isAttending ? 1 : 0);
@@ -237,13 +255,19 @@ const avStyles = StyleSheet.create({
 });
 
 function FeaturedContent({ event, isToday, dayName, dayNum, monthShort, priceLabel, isFree, clubName, goingCount, dark }: any) {
-  const { t } = useTranslations();
+  const { t, lang } = useTranslations();
   const textColor = dark ? Colors.white : Colors.white;
   const subColor = dark ? 'rgba(255,255,255,0.75)' : 'rgba(255,255,255,0.7)';
 
+  const capacityStr = event.capacity != null
+    ? (goingCount >= event.capacity
+        ? (lang === 'sk' ? `Plné ${goingCount}/${event.capacity}` : `Full ${goingCount}/${event.capacity}`)
+        : `${goingCount}/${event.capacity}`)
+    : null;
+
   return (
     <View style={styles.featuredContent}>
-      {/* Top row: price only (category pill rendered outside card) */}
+      {/* Top row: price */}
       <View style={styles.featuredTopRow}>
         <View />
         <View style={[styles.featuredPricePill, isFree && styles.featuredPricePillFree]}>
@@ -260,7 +284,7 @@ function FeaturedContent({ event, isToday, dayName, dayNum, monthShort, priceLab
         <View style={styles.featuredTextCol}>
           <Text style={[styles.featuredTitle, { color: textColor }]} numberOfLines={2}>{event.title}</Text>
           <Text style={[styles.featuredMeta, { color: subColor }]} numberOfLines={1}>
-            {clubName ? `${clubName}  ·  ` : ''}{formatTime(event.time)}{goingCount > 0 ? `  ·  ${t.event.going_count(goingCount)}` : ''}
+            {clubName ? `${clubName}  ·  ` : ''}{formatTime(event.time)}{event.capacity != null ? `  ·  ${goingCount}/${event.capacity}` : (goingCount > 0 ? `  ·  ${t.event.going_count(goingCount)}` : '')}
           </Text>
         </View>
       </View>
@@ -309,11 +333,11 @@ const styles = StyleSheet.create({
   featuredCategoryPill: {
     position: 'absolute',
     top: 16,
-    left: -24,
+    left: 0,
     backgroundColor: Colors.lime,
     borderTopRightRadius: 50,
     borderBottomRightRadius: 50,
-    paddingLeft: 32,
+    paddingLeft: 12,
     paddingRight: 12,
     paddingVertical: 5,
   },
@@ -326,7 +350,7 @@ const styles = StyleSheet.create({
   featuredPriceText: { fontSize: 12, fontWeight: '700', color: Colors.white },
   featuredPriceTextFree: { color: Colors.black },
 
-  featuredBottom: { flexDirection: 'row', alignItems: 'flex-end', gap: 12 },
+  featuredBottom: { flexDirection: 'row', alignItems: 'flex-end', gap: 12, height: 72 },
   featuredDateBadge: {
     backgroundColor: 'rgba(0,0,0,0.5)', borderRadius: 12, borderBottomLeftRadius: 0,
     paddingHorizontal: 10, paddingVertical: 6, alignItems: 'center', minWidth: 46,
@@ -376,8 +400,13 @@ const styles = StyleSheet.create({
   pricePillFree: { backgroundColor: Colors.lime },
   pricePillText: { fontSize: 10, fontWeight: '700', color: Colors.gray },
   pricePillTextFree: { color: Colors.black },
-  goingBadge: { position: 'absolute', bottom: 4, right: 4, width: 20, height: 20, borderRadius: 10, backgroundColor: Colors.lime, alignItems: 'center', justifyContent: 'center' },
-  goingBadgeText: { fontSize: 9, fontWeight: '800', color: Colors.black },
+  capacityPill: { backgroundColor: Colors.grayLight, borderRadius: 50, paddingHorizontal: 7, paddingVertical: 2 },
+  capacityText: { fontSize: 10, fontWeight: '700', color: Colors.gray },
+  capacityFullPill: { backgroundColor: '#FFE5E5', borderRadius: 50, paddingHorizontal: 7, paddingVertical: 2 },
+  capacityFullText: { fontSize: 10, fontWeight: '700', color: '#FF3B30' },
+  goingBadge: { position: 'absolute', top: 4, right: 4, width: 22, height: 22, borderRadius: 11, backgroundColor: Colors.lime, alignItems: 'center', justifyContent: 'center', zIndex: 10 },
+  goingBadgeText: { fontSize: 10, fontWeight: '800', color: Colors.black },
+  featuredGoingBadge: { position: 'absolute', top: 14, right: 14, width: 28, height: 28, borderRadius: 14, backgroundColor: Colors.lime, alignItems: 'center', justifyContent: 'center', zIndex: 10 },
 
   rowThumbWrap: { width: 64, height: 64, borderRadius: 12, borderTopRightRadius: 0, overflow: 'hidden' },
   rowThumb: { width: 64, height: 64 },

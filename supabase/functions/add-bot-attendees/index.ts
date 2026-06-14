@@ -10,6 +10,11 @@ serve(async (req) => {
   if (req.method === 'OPTIONS') return new Response('ok', { headers: corsHeaders });
 
   try {
+    const secret = req.headers.get('x-internal-secret');
+    if (secret !== Deno.env.get('INTERNAL_SECRET')) {
+      return new Response(JSON.stringify({ error: 'Unauthorized' }), { status: 401, headers: corsHeaders });
+    }
+
     const body = await req.json();
     // Support both direct call { event_id } and Supabase DB webhook { record: { id } }
     const event_id = body.event_id ?? body.record?.id;
@@ -21,8 +26,13 @@ serve(async (req) => {
     );
 
     // Get the event
-    const { data: event } = await db.from('events').select('id, city, creator_id').eq('id', event_id).single();
+    const { data: event } = await db.from('events').select('id, city, creator_id, source').eq('id', event_id).single();
     if (!event) return new Response(JSON.stringify({ error: 'Event not found' }), { status: 404, headers: corsHeaders });
+
+    // Only add bots to Woeva Picks events
+    if (event.source !== 'woeva_picks') {
+      return new Response(JSON.stringify({ ok: true, added: 0, message: 'Bots only for woeva_picks' }), { headers: corsHeaders });
+    }
 
     // Get bots from the same city (or any city if none found)
     let { data: bots } = await db

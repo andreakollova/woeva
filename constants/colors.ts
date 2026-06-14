@@ -1,5 +1,5 @@
 export const Colors = {
-  lime: '#C8FF00',
+  lime: '#B9FF00',
   limeDark: '#8FB800',
   black: '#0A0A0A',
   white: '#FFFFFF',

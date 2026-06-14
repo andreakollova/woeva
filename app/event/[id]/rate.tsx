@@ -106,6 +106,7 @@ export default function RateScreen() {
         multiline
         numberOfLines={4}
         textAlignVertical="top"
+        maxLength={500}
       />
 
       <Button

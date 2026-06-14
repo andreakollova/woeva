@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Image } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Image, Share } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Svg, { Path, Circle } from 'react-native-svg';
@@ -70,33 +70,50 @@ export default function PublicProfileScreen() {
   }
 
   return (
-    <View style={[styles.container, { paddingTop: insets.top }]}>
+    <View style={styles.container}>
       <ScrollView contentContainerStyle={{ paddingBottom: insets.bottom + 60 }} showsVerticalScrollIndicator={false}>
 
-        {/* Hero */}
-        <View style={styles.hero}>
-          <View style={styles.heroTopBar}>
-            <BackButton color={Colors.white} />
+        {/* Black cover */}
+        <View style={[styles.cover, { paddingTop: insets.top }]}>
+          <View style={[styles.topBar, { marginTop: 8 }]}>
+            <BackButton color={Colors.white} style={styles.backCircle} />
+            <TouchableOpacity
+              style={styles.shareBtn}
+              onPress={async () => {
+                const name = profile?.name ?? 'Profil';
+                const url = `https://woeva.com/profile/${id}`;
+                try { await Share.share({ title: name, message: `${name} na Woeva\n${url}`, url }); } catch {}
+              }}
+              activeOpacity={0.8}
+            >
+              <Svg width={14} height={14} viewBox="0 0 24 24" fill="none">
+                <Path d="M4 12v8a2 2 0 002 2h12a2 2 0 002-2v-8M16 6l-4-4-4 4M12 2v13" stroke={Colors.gray} strokeWidth={2.2} strokeLinecap="round" strokeLinejoin="round" />
+              </Svg>
+              <Text style={styles.shareBtnText}>Zdieľať</Text>
+            </TouchableOpacity>
           </View>
-
-          <View style={styles.avatar}>
-            <Text style={styles.avatarText}>{initial}</Text>
-            {profile?.avatar_url ? (
-              <Image source={{ uri: profile.avatar_url }} style={StyleSheet.absoluteFill as any} borderRadius={48} />
-            ) : null}
-          </View>
-
-          <Text style={styles.heroName}>{displayName}</Text>
-          {profile?.city ? (
-            <Text style={styles.heroSub}>{profile.city}</Text>
-          ) : null}
         </View>
 
-        {/* Content */}
-        <View style={styles.content}>
+        {/* White card */}
+        <View style={styles.card}>
+          {/* Avatar floats up */}
+          <View style={styles.avatarWrap}>
+            <View style={styles.avatar}>
+              <Text style={styles.avatarText}>{initial}</Text>
+              {profile?.avatar_url ? (
+                <Image source={{ uri: profile.avatar_url }} style={StyleSheet.absoluteFill as any} borderRadius={44} />
+              ) : null}
+            </View>
+          </View>
+
+          <Text style={styles.name}>{displayName}</Text>
+          {profile?.city ? <Text style={styles.city}>{profile.city}</Text> : null}
 
           {profile?.bio ? (
-            <Text style={styles.bio}>{profile.bio}</Text>
+            <>
+              <View style={styles.divider} />
+              <Text style={styles.bio}>{profile.bio}</Text>
+            </>
           ) : null}
 
           {(profile?.interests?.length ?? 0) > 0 && (
@@ -110,7 +127,8 @@ export default function PublicProfileScreen() {
           )}
 
           {events.length > 0 && (
-            <View style={styles.section}>
+            <>
+              <View style={styles.divider} />
               <Text style={styles.sectionTitle}>{lang === 'sk' ? 'Najbližšie eventy' : 'Upcoming events'}</Text>
               {events.map((event, idx, arr) => {
                 const d = new Date(event.date + 'T00:00:00');
@@ -138,9 +156,8 @@ export default function PublicProfileScreen() {
                   </TouchableOpacity>
                 );
               })}
-            </View>
+            </>
           )}
-
         </View>
       </ScrollView>
     </View>
@@ -148,57 +165,69 @@ export default function PublicProfileScreen() {
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: Colors.black },
+  container: { flex: 1, backgroundColor: Colors.white },
 
-  header: {
-    paddingHorizontal: 20,
-    paddingVertical: 12,
-  },
-
-  hero: {
+  cover: {
+    height: 180,
     backgroundColor: Colors.black,
-    paddingHorizontal: 24,
-    paddingBottom: 32,
+    paddingHorizontal: 16,
   },
-  heroTopBar: {
-    paddingVertical: 10,
-    marginBottom: 24,
+  topBar: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+  },
+  backCircle: { backgroundColor: Colors.black, borderRadius: 20 },
+  shareBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    paddingHorizontal: 7,
+    paddingVertical: 3,
+    borderRadius: 50,
+    borderWidth: 1,
+    borderColor: Colors.gray,
+  },
+  card: {
+    backgroundColor: Colors.white,
+    borderTopLeftRadius: 28,
+    borderTopRightRadius: 28,
+    marginTop: -28,
+    paddingHorizontal: 20,
+    paddingBottom: 16,
+  },
+  avatarWrap: {
+    marginTop: -44,
+    marginBottom: 14,
   },
   avatar: {
-    width: 80,
-    height: 80,
-    borderRadius: 40,
+    width: 88,
+    height: 88,
+    borderRadius: 44,
     backgroundColor: Colors.lime,
     alignItems: 'center',
     justifyContent: 'center',
-    marginBottom: 16,
     borderWidth: 3,
-    borderColor: 'rgba(255,255,255,0.08)',
+    borderColor: Colors.white,
+    overflow: 'hidden',
   },
-  avatarText: { fontSize: 34, fontWeight: '700', fontFamily: Fonts.bold, color: Colors.black },
-  heroName: {
-    fontSize: 26,
-    fontWeight: '800',
-    fontFamily: Fonts.extrabold,
-    color: Colors.white,
+  avatarText: { fontSize: 36, fontWeight: '700', fontFamily: Fonts.bold, color: Colors.black },
+  shareBtnText: { fontSize: 10, fontWeight: '600', color: Colors.gray, fontFamily: Fonts.semibold },
+  name: {
+    fontSize: 24,
+    fontWeight: '700',
+    fontFamily: Fonts.bold,
+    color: Colors.black,
     letterSpacing: -0.5,
     marginBottom: 4,
   },
-  heroSub: {
+  city: {
     fontSize: 13,
-    color: 'rgba(255,255,255,0.4)',
+    color: Colors.gray,
     fontFamily: Fonts.regular,
+    marginBottom: 4,
   },
-
-  content: {
-    backgroundColor: Colors.white,
-    borderTopLeftRadius: 24,
-    borderTopRightRadius: 24,
-    paddingHorizontal: 24,
-    paddingTop: 28,
-    minHeight: 300,
-  },
-
+  divider: { height: 1, backgroundColor: '#EBEBEB', marginVertical: 16 },
   bio: {
     fontSize: 15,
     color: Colors.black,
@@ -206,12 +235,12 @@ const styles = StyleSheet.create({
     lineHeight: 24,
     marginBottom: 16,
   },
-
   tagsWrap: {
     flexDirection: 'row',
     flexWrap: 'wrap',
     gap: 8,
-    marginBottom: 28,
+    marginTop: 8,
+    marginBottom: 4,
   },
   tag: {
     paddingHorizontal: 14,
@@ -220,8 +249,6 @@ const styles = StyleSheet.create({
     backgroundColor: '#F2F2F2',
   },
   tagText: { fontSize: 13, fontFamily: Fonts.medium, color: Colors.black },
-
-  section: { marginBottom: 28 },
   sectionTitle: {
     fontSize: 11,
     fontWeight: '600',

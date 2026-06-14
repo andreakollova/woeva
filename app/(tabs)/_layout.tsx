@@ -1,4 +1,5 @@
 import { Tabs } from 'expo-router';
+import { StatusBar } from 'expo-status-bar';
 import { View, Text, StyleSheet, TouchableOpacity, Modal, Pressable } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Svg, { Path, Circle, Rect } from 'react-native-svg';
@@ -112,7 +113,11 @@ function TabBar({ state, descriptors, navigation }: any) {
               onPress={() => { setShowMenu(false); router.push('/event/create/step2'); }}
               activeOpacity={0.88}
             >
-              <Text style={styles.menuItemHeroEmoji}>🎉</Text>
+              <View style={styles.menuItemHeroIconBox}>
+                <Svg width={28} height={28} viewBox="0 0 24 24" fill="none">
+                  <Path d="M12 5v14M5 12h14" stroke={Colors.black} strokeWidth={2.5} strokeLinecap="round" />
+                </Svg>
+              </View>
               <View>
                 <Text style={styles.menuItemHeroTitle}>{t.event.newEvent}</Text>
                 <Text style={styles.menuItemHeroSub}>{t.event.newEventSub}</Text>
@@ -149,7 +154,7 @@ function TabBar({ state, descriptors, navigation }: any) {
                     <Path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2" stroke={Colors.gray} strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round" />
                     <Circle cx={9} cy={7} r={4} stroke={Colors.gray} strokeWidth={1.8} />
                   </Svg>
-                  <Text style={styles.menuSecondaryTitle}>My clubs ({myClubs.length})</Text>
+                  <Text style={styles.menuSecondaryTitle}>{t.settings.myClubs} ({myClubs.length})</Text>
                 </TouchableOpacity>
               )}
 
@@ -224,6 +229,8 @@ export default function TabsLayout() {
   }, [profile?.is_admin]);
 
   return (
+    <>
+    <StatusBar style="dark" />
     <Tabs
       tabBar={props => <TabBar {...props} />}
       screenOptions={{ headerShown: false }}
@@ -234,6 +241,7 @@ export default function TabsLayout() {
       <Tabs.Screen name="booked" />
       <Tabs.Screen name="profile" />
     </Tabs>
+    </>
   );
 }
 
@@ -309,6 +317,7 @@ const styles = StyleSheet.create({
     borderRadius: 20,
   },
   menuItemHeroEmoji: { fontSize: 28 },
+  menuItemHeroIconBox: { width: 48, height: 48, borderRadius: 24, backgroundColor: Colors.lime, alignItems: 'center', justifyContent: 'center' },
   menuItemHeroTitle: {
     fontSize: 20,
     fontWeight: '700',

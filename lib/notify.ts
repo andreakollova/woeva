@@ -67,7 +67,7 @@ export const notify = {
   }) {
     const creator = await getProfile(params.creatorId);
     await Promise.all([
-      creator?.push_token && sendPush([creator.push_token], `New attendee for ${params.eventTitle}`, `${params.attendeeName} joined your event.`, { event_id: params.eventId }),
+      creator?.push_token && sendPush([creator.push_token], `Nový účastník: ${params.eventTitle}`, `${params.attendeeName} si kúpil/a lístok na tvoj event.`, { event_id: params.eventId }),
       creator?.email && sendEmail(creator.email, `New attendee — ${params.eventTitle}`,
         emailTemplates.joinedEvent({ attendeeName: params.attendeeName, eventTitle: params.eventTitle, eventDate: params.eventDate, eventTime: params.eventTime })
       ),
@@ -187,8 +187,11 @@ export const notify = {
     eventTitle: string;
     tags: string[];
     city: string;
+    excludeUserIds?: string[];
   }) {
     if (!params.tags.length && !params.city) return;
+
+    const excluded = new Set([params.creatorId, ...(params.excludeUserIds ?? [])]);
 
     // 1. Users who want ALL new events in their city
     const { data: allSubs } = await supabase
@@ -197,7 +200,6 @@ export const notify = {
       .eq('notifications_enabled', true)
       .eq('notif_new_event_all', true)
       .eq('city', params.city)
-      .neq('id', params.creatorId)
       .not('push_token', 'is', null);
 
     // 2. Users who want only events matching their interests
@@ -208,23 +210,22 @@ export const notify = {
           .eq('notifications_enabled', true)
           .eq('notif_new_event_my_tags', true)
           .eq('city', params.city)
-          .neq('id', params.creatorId)
           .overlaps('interests', params.tags)
           .not('push_token', 'is', null)
       : { data: [] };
 
-    // Deduplicate by id
+    // Deduplicate by id, exclude creator + club members already notified
     const seen = new Set<string>();
     const tokens: string[] = [];
     for (const row of [...(allSubs ?? []), ...(tagSubs ?? [])]) {
-      if (!seen.has(row.id) && row.push_token) {
+      if (!excluded.has(row.id) && !seen.has(row.id) && row.push_token) {
         seen.add(row.id);
         tokens.push(row.push_token);
       }
     }
 
     if (!tokens.length) return;
-    await sendPush(tokens, params.eventTitle, 'New event in your city', { event_id: params.eventId, type: 'new_event' });
+    await sendPush(tokens, params.eventTitle, 'Nový event v tvojom meste', { event_id: params.eventId, type: 'new_event' });
   },
 
   /** Welcome email on signup */

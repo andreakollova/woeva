@@ -18,7 +18,7 @@ export default function PaymentScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const insets = useSafeAreaInsets();
   const router = useRouter();
-  const { user } = useAuth();
+  const { user, profile } = useAuth();
   const { t } = useTranslations();
   const { initPaymentSheet, presentPaymentSheet } = useStripe();
   const [event, setEvent] = useState<Event | null>(null);
@@ -104,16 +104,17 @@ export default function PaymentScreen() {
       body: { eventId: id, paymentIntentId: data.paymentIntentId, qty },
     });
     if (event.creator_id && event.creator_id !== user.id) {
+      const firstName = profile?.name?.split(' ')[0] ?? 'Niekto';
       await supabase.from('notifications').insert({
         user_id: event.creator_id,
         type: 'join',
-        title: `New attendee for ${event.title}`,
-        body: `${user.email ?? 'Someone'} bought ${qty > 1 ? `${qty} tickets` : 'a ticket'}.`,
+        title: `Nový účastník: ${event.title}`,
+        body: `${firstName} si kúpil/a lístok na tvoj event.`,
         data: { event_id: id },
       });
       notify.joinedEvent({
         creatorId: event.creator_id,
-        attendeeName: user.email ?? 'Someone',
+        attendeeName: firstName,
         eventTitle: event.title,
         eventDate: event.date,
         eventId: id,
@@ -128,21 +129,20 @@ export default function PaymentScreen() {
   if (!event) return null;
 
   return (
-    <View style={[styles.container, { paddingTop: insets.top + 12 }]}>
-      <Toast visible={toast} title="You're in" subtitle="See you out there." />
+    <View style={[styles.container, { paddingTop: 28 }]}>
+      <Toast visible={toast} title={t.event.paySuccess} subtitle={t.event.paySuccessSub} />
 
-      <View style={styles.header}>
+      <View style={styles.handleRow}>
         <View style={styles.modalHandle} />
-        <Text style={styles.headerTitle}>Payment</Text>
-        <TouchableOpacity onPress={() => router.back()} style={styles.closeBtn} hitSlop={12}>
-          <Svg width={18} height={18} viewBox="0 0 24 24" fill="none">
-            <Path d="M18 6L6 18M6 6l12 12" stroke="#0A0A0A" strokeWidth={2.5} strokeLinecap="round" />
-          </Svg>
-        </TouchableOpacity>
       </View>
+      <TouchableOpacity onPress={() => router.back()} style={styles.closeBtn} hitSlop={12}>
+        <Svg width={18} height={18} viewBox="0 0 24 24" fill="none">
+          <Path d="M18 6L6 18M6 6l12 12" stroke="#0A0A0A" strokeWidth={2.5} strokeLinecap="round" />
+        </Svg>
+      </TouchableOpacity>
 
       <ScrollView contentContainerStyle={[styles.scroll, { paddingTop: 8, paddingBottom: insets.bottom + 100 }]}>
-        <Text style={styles.sectionLabel}>Order summary</Text>
+        <Text style={styles.sectionLabel}>{t.event.orderSummary}</Text>
 
         {/* Event card */}
         <View style={styles.eventCard}>
@@ -173,12 +173,12 @@ export default function PaymentScreen() {
         {/* Order card */}
         <View style={styles.orderCard}>
           <View style={styles.orderRow}>
-            <Text style={styles.orderLabel}>Ticket price</Text>
+            <Text style={styles.orderLabel}>{t.event.ticketPrice}</Text>
             <Text style={styles.orderValue}>€{event.price.toFixed(2)}</Text>
           </View>
           <View style={styles.orderDivider} />
           <View style={styles.orderRow}>
-            <Text style={styles.orderLabel}>Quantity</Text>
+            <Text style={styles.orderLabel}>{t.event.quantity}</Text>
             <View style={styles.stepper}>
               <TouchableOpacity onPress={() => setQty(q => Math.max(1, q - 1))} style={styles.stepBtn} hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}>
                 <Text style={styles.stepBtnText}>−</Text>
@@ -191,29 +191,29 @@ export default function PaymentScreen() {
           </View>
           <View style={styles.orderDivider} />
           <View style={styles.orderRow}>
-            <Text style={styles.totalLabel}>Total</Text>
+            <Text style={styles.totalLabel}>{t.event.total}</Text>
             <Text style={styles.totalValue}>€{(event.price * qty).toFixed(2)}</Text>
           </View>
         </View>
 
-        <Text style={styles.stripeNote}>🔒 Secured by Stripe · Visa, Mastercard, Apple Pay</Text>
+        <Text style={styles.stripeNote}>{t.event.securedByStripe}</Text>
       </ScrollView>
 
       <View style={[styles.footer, { paddingBottom: insets.bottom + 16 }]}>
-        <Button label={`Pay  €${(event.price * qty).toFixed(2)}`} onPress={handlePay} loading={loading} variant="lime" />
+        <Button label={t.event.payBtn(`€${(event.price * qty).toFixed(2)}`)} onPress={handlePay} loading={loading} variant="lime" />
       </View>
 
       {showSuccess && (
         <Animated.View entering={FadeIn.duration(200)} style={styles.successOverlay}>
           <Animated.View style={[styles.successCheck, checkStyle]}>
             <Svg width={40} height={40} viewBox="0 0 24 24" fill="none">
-              <Path d="M5 12l5 5L19 7" stroke={Colors.black} strokeWidth={2.8} strokeLinecap="round" strokeLinejoin="round" />
+              <Path d="M5 12l5 5L19 7" stroke={Colors.white} strokeWidth={2.8} strokeLinecap="round" strokeLinejoin="round" />
             </Svg>
           </Animated.View>
           <Animated.View style={textStyle}>
-            <Text style={styles.successTitle}>You're in! 🎉</Text>
+            <Text style={styles.successTitle}>{t.event.paySuccess}</Text>
             <Text style={styles.successEvent}>{event.title}</Text>
-            <Text style={styles.successSub}>See you out there.</Text>
+            <Text style={styles.successSub}>{t.event.paySuccessSub}</Text>
           </Animated.View>
         </Animated.View>
       )}
@@ -223,12 +223,12 @@ export default function PaymentScreen() {
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: Colors.white, borderTopLeftRadius: 20, borderTopRightRadius: 20 },
-  modalHandle: { position: 'absolute', top: -22, left: '50%', marginLeft: -20, width: 40, height: 4, borderRadius: 2, backgroundColor: 'rgba(255,255,255,0.5)' },
-  header: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', paddingHorizontal: 20, paddingBottom: 10, position: 'relative' },
+  handleRow: { alignItems: 'center', paddingBottom: 16 },
+  modalHandle: { width: 40, height: 4, borderRadius: 2, backgroundColor: '#D0D0D0' },
   headerTitle: { fontSize: 20, fontWeight: '700', color: Colors.black },
-  closeBtn: { position: 'absolute', right: 20, width: 32, height: 32, borderRadius: 16, backgroundColor: Colors.grayLight, alignItems: 'center', justifyContent: 'center' },
+  closeBtn: { position: 'absolute', top: 28, right: 28, width: 32, height: 32, borderRadius: 16, backgroundColor: Colors.grayLight, alignItems: 'center', justifyContent: 'center', zIndex: 10 },
   scroll: { paddingHorizontal: 20 },
-  sectionLabel: { fontSize: 22, color: Colors.black, fontWeight: '700', marginBottom: 16, letterSpacing: -0.3 },
+  sectionLabel: { fontSize: 22, color: Colors.black, fontWeight: '700', marginTop: 8, marginBottom: 16, letterSpacing: -0.3 },
   eventCard: { backgroundColor: Colors.grayLight, borderRadius: 16, overflow: 'hidden', marginBottom: 12 },
   eventImage: { width: '100%', height: 200 },
   eventInfo: { padding: 16, gap: 7 },
@@ -249,7 +249,7 @@ const styles = StyleSheet.create({
   stripeNote: { fontSize: 12, color: Colors.gray, textAlign: 'center', marginBottom: 4 },
   footer: { paddingHorizontal: 20, paddingTop: 12, borderTopWidth: 1, borderColor: Colors.grayBorder },
   successOverlay: { ...StyleSheet.absoluteFillObject, backgroundColor: Colors.lime, alignItems: 'center', justifyContent: 'center', gap: 28, zIndex: 100 },
-  successCheck: { width: 96, height: 96, borderRadius: 48, backgroundColor: Colors.white, alignItems: 'center', justifyContent: 'center' },
+  successCheck: { width: 96, height: 96, borderRadius: 48, backgroundColor: Colors.black, alignItems: 'center', justifyContent: 'center' },
   successTitle: { fontSize: 36, fontWeight: '800', color: Colors.black, textAlign: 'center', letterSpacing: -0.5 },
   successEvent: { fontSize: 17, fontWeight: '600', color: Colors.black, textAlign: 'center', marginTop: 6, opacity: 0.7 },
   successSub: { fontSize: 14, color: Colors.black, textAlign: 'center', marginTop: 4, opacity: 0.45 },

@@ -52,8 +52,8 @@ export default function PublishedScreen() {
   return (
     <View style={styles.container}>
       <View style={styles.content}>
-        <Animated.View style={logoStyle}>
-          <WMark size={48} color={Colors.black} />
+        <Animated.View style={[logoStyle, { marginBottom: -10 }]}>
+          <WMark size={80} color={Colors.black} />
         </Animated.View>
         <Animated.Text style={[styles.title, titleStyle]}>
           {t.event.youreOutThere}
@@ -76,7 +76,7 @@ const styles = StyleSheet.create({
   content: {
     alignItems: 'flex-start',
     paddingHorizontal: 36,
-    gap: 22,
+    gap: 14,
     width: '100%',
   },
   title: {

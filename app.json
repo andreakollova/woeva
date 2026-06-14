@@ -2,7 +2,7 @@
   "expo": {
     "name": "Woeva",
     "slug": "woeva",
-    "version": "1.0.0",
+    "version": "1.1.0",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
     "userInterfaceStyle": "light",
@@ -11,12 +11,15 @@
     "splash": {
       "image": "./assets/splash-icon.png",
       "resizeMode": "contain",
-      "backgroundColor": "#C8FF00"
+      "backgroundColor": "#B9FF00"
     },
     "ios": {
       "supportsTablet": false,
       "bundleIdentifier": "com.woeva.app",
-      "buildNumber": "36",
+      "config": {
+        "googleMapsApiKey": "AIzaSyDhtj5z-Us7Ic01tHuaJxC_mLTZPG3moj0"
+      },
+      "buildNumber": "39",
       "entitlements": {
         "com.apple.developer.in-app-payments": [
           "merchant.com.woeva.app"
@@ -26,15 +29,19 @@
         "NSLocationWhenInUseUsageDescription": "Woeva uses your location to show events near you.",
         "NSCameraUsageDescription": "Woeva uses your camera to upload event photos.",
         "NSPhotoLibraryUsageDescription": "Woeva uses your photo library to upload event photos.",
-        "NSUserTrackingUsageDescription": "Woeva uses this to personalise your event feed.",
-        "ITSAppUsesNonExemptEncryption": false
+"ITSAppUsesNonExemptEncryption": false
       },
       "appleTeamId": "J4YGZU25B2"
     },
     "android": {
+      "config": {
+        "googleMaps": {
+          "apiKey": "AIzaSyDhtj5z-Us7Ic01tHuaJxC_mLTZPG3moj0"
+        }
+      },
       "adaptiveIcon": {
         "foregroundImage": "./assets/adaptive-icon.png",
-        "backgroundColor": "#C8FF00"
+        "backgroundColor": "#B9FF00"
       },
       "package": "com.woeva.app",
       "edgeToEdgeEnabled": true,
@@ -59,7 +66,7 @@
       [
         "expo-notifications",
         {
-          "color": "#C8FF00"
+          "color": "#B9FF00"
         }
       ],
       [

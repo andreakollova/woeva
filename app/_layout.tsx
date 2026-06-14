@@ -8,6 +8,7 @@ import { AuthProvider } from '@/context/AuthContext';
 import { LanguageProvider } from '@/context/LanguageContext';
 import * as Notifications from 'expo-notifications';
 import { useEffect } from 'react';
+import { Platform } from 'react-native';
 import {
   useFonts,
   Inter_400Regular,
@@ -38,13 +39,11 @@ function NotificationHandler() {
 const STRIPE_KEY = process.env.EXPO_PUBLIC_STRIPE_PUBLISHABLE_KEY ?? '';
 
 export default function RootLayout() {
-  const [fontsLoaded] = useFonts({
-    Inter_400Regular,
-    Inter_500Medium,
-    Inter_600SemiBold,
-    Inter_700Bold,
-    Inter_800ExtraBold,
-  });
+  const [fontsLoaded] = useFonts(
+    Platform.OS === 'ios'
+      ? {}
+      : { Inter_400Regular, Inter_500Medium, Inter_600SemiBold, Inter_700Bold, Inter_800ExtraBold }
+  );
 
   if (!fontsLoaded) return null;
 
@@ -80,6 +79,7 @@ export default function RootLayout() {
             <Stack.Screen name="notifications/index" options={{ animation: 'slide_from_right' }} />
             <Stack.Screen name="dashboard/index" options={{ animation: 'slide_from_right' }} />
             <Stack.Screen name="club/[id]/edit" options={{ animation: 'slide_from_right' }} />
+            <Stack.Screen name="profile/[id]" options={{ animation: 'slide_from_right' }} />
             <Stack.Screen name="admin" options={{ animation: 'slide_from_right' }} />
           </Stack>
         </StripeProvider>

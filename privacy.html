@@ -1,9 +1,9 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="sk">
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Privacy Policy – Woeva</title>
+  <title>Zásady ochrany osobných údajov – Woeva</title>
   <style>
     * { box-sizing: border-box; margin: 0; padding: 0; }
     body {
@@ -25,7 +25,7 @@
     }
     .logo span {
       display: inline-block;
-      background: #C8FF00;
+      background: #B9FF00;
       border-radius: 6px;
       padding: 2px 8px;
     }
@@ -53,13 +53,24 @@
       font-size: 15px;
       color: #444;
     }
+    p { margin-bottom: 10px; }
     ul {
       padding-left: 20px;
       display: flex;
       flex-direction: column;
       gap: 6px;
+      margin-bottom: 10px;
     }
     a { color: #111; }
+    .company-box {
+      background: #f7f7f7;
+      border-radius: 10px;
+      padding: 16px 20px;
+      margin-top: 12px;
+      font-size: 14px;
+      color: #333;
+      line-height: 1.8;
+    }
     footer {
       margin-top: 60px;
       font-size: 13px;
@@ -72,51 +83,88 @@
 <body>
   <span class="logo"><span>Woeva</span></span>
 
-  <h1>Privacy Policy</h1>
-  <p class="updated">Last updated: May 2026</p>
+  <h1>Zásady ochrany osobných údajov</h1>
+  <p class="updated">Posledná aktualizácia: jún 2026</p>
 
-  <p>Woeva ("we", "us", "our") operates the Woeva mobile application. This policy explains what data we collect and how we use it.</p>
+  <p>Woeva je mobilná aplikácia prevádzkovaná spoločnosťou <strong>Sportqo s.r.o.</strong> („my", „nás", „naše"). Tieto zásady vysvetľujú, aké osobné údaje zbierame, prečo ich zbierame a aké máte práva podľa Nariadenia EÚ 2016/679 (GDPR) a platného slovenského práva.</p>
 
-  <h2>Data We Collect</h2>
+  <h2>1. Prevádzkovateľ osobných údajov</h2>
+  <div class="company-box">
+    <strong>Sportqo s.r.o.</strong><br>
+    Mudrochova 7480/15, 831 06 Bratislava – mestská časť Rača, Slovensko<br>
+    IČO: 56132433 &nbsp;|&nbsp; DIČ: 2122213775 &nbsp;|&nbsp; IČ DPH: SK2122213775<br>
+    E-mail: <a href="mailto:admin@woeva.com">admin@woeva.com</a><br>
+    Telefón: <a href="tel:+421915786829">+421 915 786 829</a>
+  </div>
+
+  <h2>2. Údaje, ktoré zbierame</h2>
   <ul>
-    <li><strong>Account data:</strong> name, email address, profile photo</li>
-    <li><strong>Location:</strong> city and approximate GPS location (only when you grant permission) to show nearby events</li>
-    <li><strong>Device token:</strong> push notification token to send you event updates</li>
-    <li><strong>Content:</strong> events you create, clubs you manage, messages you send in event chats</li>
-    <li><strong>Usage:</strong> events you join or leave, reviews you leave</li>
+    <li><strong>Účet:</strong> meno, e-mailová adresa, profilová fotografia pri registrácii e-mailom/heslom alebo cez Apple/Google Sign-In (dostaneme len údaje, ktoré pri prihlásení povolíte)</li>
+    <li><strong>Poloha:</strong> mesto (uložené v profile) a približné GPS súradnice (len ak udelíte povolenie) na zobrazovanie udalostí vo vašej blízkosti – GPS sa neukladá, používa sa iba počas relácie</li>
+    <li><strong>Zariadenie a notifikácie:</strong> push token na doručovanie upozornení</li>
+    <li><strong>Obsah:</strong> udalosti, kluby, fotografie, správy v chatoch</li>
+    <li><strong>Aktivita:</strong> udalosti, na ktoré ste sa prihlásili alebo odhlásili, lístky, členstvá v kluboch, recenzie</li>
+    <li><strong>Platby:</strong> platby kartou spracúva Stripe – my uchovávame iba Stripe customer ID, nie čísla kariet ani CVV</li>
+    <li><strong>Apple Wallet:</strong> vaše meno a detaily udalosti sú vložené do súboru priepustky a uložené výhradne v Apple Wallet na vašom zariadení</li>
+    <li><strong>Fotoaparát / fotogaléria:</strong> používané výlučne pri nahrávaní fotografií, ktoré vyberiete</li>
   </ul>
 
-  <h2>How We Use Your Data</h2>
+  <h2>3. Ako vaše údaje používame</h2>
   <ul>
-    <li>To provide and personalise the app experience</li>
-    <li>To send push and email notifications about events you are attending or managing</li>
-    <li>To process payments via Stripe (payment data is handled solely by Stripe and never stored by us)</li>
-    <li>To show your profile and content to other users in the context of events and clubs</li>
+    <li>Poskytovanie, prevádzka a personalizácia aplikácie Woeva</li>
+    <li>Zobrazovanie vašich udalostí a profilu ostatným používateľom v kontexte udalostí a klubov</li>
+    <li>Zasielanie push notifikácií a e-mailov o udalostiach, na ktoré ste prihlásení alebo ktoré spravujete</li>
+    <li>Spracovanie platby lístkov a vystavovanie refundácií cez Stripe</li>
+    <li>Generovanie priepustiek Apple Wallet na požiadanie</li>
+    <li>Zobrazovanie udalostí relevantných pre vašu polohu (GPS sa neukladá)</li>
   </ul>
 
-  <h2>Data Sharing</h2>
+  <h2>4. Právny základ (GDPR)</h2>
   <ul>
-    <li>We do not sell your personal data</li>
-    <li>Stripe processes payment data under their own privacy policy</li>
-    <li>Supabase provides our database and authentication infrastructure</li>
-    <li>Push notifications are delivered via Expo's push service</li>
+    <li><strong>Plnenie zmluvy:</strong> správa účtu, registrácia na udalosti, platby</li>
+    <li><strong>Oprávnený záujem:</strong> push notifikácie o udalostiach, na ktoré ste sa prihlásili, bezpečnostný monitoring</li>
+    <li><strong>Súhlas:</strong> prístup k GPS polohe, voliteľné marketingové komunikácie</li>
   </ul>
 
-  <h2>Your Rights</h2>
+  <h2>5. Zdieľanie údajov</h2>
   <ul>
-    <li>You may edit or delete your profile at any time in Settings → Profile</li>
-    <li>You may delete your account and all associated data in Settings → Delete account</li>
-    <li>You may revoke location and notification permissions in your device settings at any time</li>
+    <li>Vaše osobné údaje nepredávame žiadnej tretej strane</li>
+    <li><strong>Stripe</strong> (stripe.com) – spracovanie platieb podľa vlastných zásad ochrany súkromia Stripe</li>
+    <li><strong>Apple / Google</strong> – sociálne prihlásenie podľa ich vlastných zásad</li>
+    <li><strong>Supabase</strong> – databáza a autentifikačná infraštruktúra (dátová oblasť EÚ)</li>
+    <li><strong>Expo</strong> – doručovanie push notifikácií</li>
+    <li>Žiadne ďalšie tretie strany nemajú prístup k vašim osobným údajom</li>
   </ul>
 
-  <h2>Data Retention</h2>
-  <p>Deleting your account permanently removes your profile, events, clubs, messages, and all associated data within 30 days.</p>
+  <h2>6. Vaše práva (GDPR)</h2>
+  <p>Máte právo na:</p>
+  <ul>
+    <li><strong>Prístup</strong> – vyžiadať kópiu svojich osobných údajov</li>
+    <li><strong>Opravu</strong> – opraviť nepresné údaje cez Nastavenia → Profil</li>
+    <li><strong>Vymazanie</strong> – zmazať účet a všetky údaje cez Nastavenia → Zmazať účet</li>
+    <li><strong>Prenosnosť</strong> – vyžiadať údaje v strojovo čitateľnom formáte</li>
+    <li><strong>Námietku</strong> – odmietnuť spracovanie na základe oprávnených záujmov</li>
+    <li><strong>Odvolanie súhlasu</strong> – kedykoľvek odvolať povolenia na polohu alebo notifikácie v nastaveniach zariadenia</li>
+  </ul>
+  <p>Na uplatnenie ktoréhokoľvek práva nás kontaktujte na <a href="mailto:admin@woeva.com">admin@woeva.com</a>. Odpovieme do 30 dní.</p>
 
-  <h2>Contact</h2>
-  <p>For privacy questions contact us at: <a href="mailto:hello@woeva.app">hello@woeva.app</a></p>
+  <h2>7. Uchovávanie údajov</h2>
+  <p>Vaše údaje uchovávame po dobu aktivity vášho účtu. Zmazaním účtu sa natrvalo odstráni váš profil, udalosti, kluby, správy, lístky a všetky súvisiace údaje do 30 dní. Anonymizované agregátne štatistiky môžu byť uchované.</p>
+
+  <h2>8. Deti</h2>
+  <p>Woeva nie je určená deťom mladším ako 16 rokov. Vedome nezbierame údaje od osôb mladších ako 16 rokov.</p>
+
+  <h2>9. Kontakt a sťažnosti</h2>
+  <div class="company-box">
+    <strong>Sportqo s.r.o.</strong><br>
+    E-mail: <a href="mailto:admin@woeva.com">admin@woeva.com</a><br>
+    Telefón: <a href="tel:+421915786829">+421 915 786 829</a><br>
+    Mudrochova 7480/15, 831 06 Bratislava – mestská časť Rača, Slovensko
+  </div>
+  <p style="margin-top:12px;">Máte tiež právo podať sťažnosť na <strong>Úrad na ochranu osobných údajov SR</strong> (<a href="https://dataprotection.gov.sk" target="_blank">dataprotection.gov.sk</a>).</p>
 
   <footer>
-    &copy; 2026 Woeva. All rights reserved.
+    &copy; 2026 Sportqo s.r.o. – Woeva. Všetky práva vyhradené.
   </footer>
 </body>
 </html>

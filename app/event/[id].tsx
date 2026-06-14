@@ -21,6 +21,7 @@ import { Toast } from '@/components/ui/Toast';
 import { BackButton } from '@/components/ui/BackButton';
 import { useAuth } from '@/context/AuthContext';
 import { notify } from '@/lib/notify';
+import { scheduleEventReminders } from '@/lib/scheduleReminders';
 import { useTranslations } from '@/context/LanguageContext';
 import { formatVenue } from '@/lib/formatVenue';
 
@@ -163,7 +164,7 @@ export default function EventDetailScreen() {
     setLoadingWallet(true);
     try {
       const { data: { session } } = await supabase.auth.getSession();
-      const passUrl = `https://woeva-oscar.vercel.app/wallet?event_id=${id}&token=${session?.access_token}`;
+      const passUrl = `https://ticket.woeva.com/wallet?event_id=${id}&token=${session?.access_token}`;
       await Linking.openURL(passUrl);
     } catch (e: any) {
       Alert.alert('Error', e?.message || 'Could not generate pass. Try again.');
@@ -174,15 +175,27 @@ export default function EventDetailScreen() {
 
   async function handleJoin() {
     if (!user) { router.push('/(auth)/login'); return; }
+    if (event?.capacity != null && event.creator_id !== user.id) {
+      const { count } = await supabase.from('event_attendees').select('id', { count: 'exact', head: true }).eq('event_id', id);
+      if ((count ?? 0) >= event.capacity) {
+        Alert.alert('Kapacita je plná', 'Tento event je už obsadený.');
+        return;
+      }
+    }
     if (event?.is_free || event?.price === 0 || (event as any)?.pay_at_door) {
       setLoading(true);
       const occDate = (event?.is_recurring && occurrenceDate) ? occurrenceDate : null;
       await supabase.from('event_attendees').insert({ event_id: id, user_id: user.id, paid: true, ...(occDate ? { occurrence_date: occDate } : {}) });
+      await supabase.from('events').update({ going_count: (event?.going_count ?? 0) + 1 }).eq('id', id);
+      setEvent(prev => prev ? { ...prev, going_count: (prev.going_count ?? 0) + 1 } : prev);
+      if (event?.date && event?.time) {
+        scheduleEventReminders(id, event.date, event.time, event.title).catch(() => {});
+      }
       if (event?.creator_id && event.creator_id !== user.id) {
         await supabase.from('notifications').insert({
           user_id: event.creator_id, type: 'join',
-          title: `New attendee for ${event.title}`,
-          body: `${profile?.name?.split(' ')[0] ?? 'Someone'} joined your event.`,
+          title: `Nový účastník: ${event.title}`,
+          body: `${profile?.name?.split(' ')[0] ?? 'Niekto'} sa prihlásil/a na tvoj event.`,
           data: { event_id: id },
         });
         const d = new Date(event.date + 'T00:00:00');
@@ -223,15 +236,22 @@ export default function EventDetailScreen() {
 
     if (allAttendees && allAttendees.length > 0) {
       const hasPaidWithIntent = allAttendees.some(a => a.paid && a.payment_intent_id);
-      const notifications = allAttendees.map(a => ({
-        user_id: a.user_id,
-        type: 'event_cancelled',
-        title: `${event.title} was cancelled`,
-        body: refundEligible && a.paid && a.payment_intent_id
-          ? 'A full refund will be processed to your original payment method.'
-          : 'Unfortunately no refund is available for this cancellation.',
-        data: { event_id: id },
-      }));
+      const notifications = allAttendees.map(a => {
+        const isCreator = a.user_id === event.creator_id;
+        return {
+          user_id: a.user_id,
+          type: 'event_cancelled',
+          title: isCreator
+            ? `Zrušili ste event: ${event.title}`
+            : `Event bol zrušený: ${event.title}`,
+          body: isCreator
+            ? 'Event bol úspešne zrušený.'
+            : refundEligible && a.paid && a.payment_intent_id
+              ? 'Vrátenie platby bude spracované na váš pôvodný platobný prostriedok.'
+              : 'Ľutujeme, za toto zrušenie nie je možné vrátiť platbu.',
+          data: { event_id: id },
+        };
+      });
       await supabase.from('notifications').insert(notifications);
 
       // Push + email to all attendees
@@ -509,7 +529,11 @@ export default function EventDetailScreen() {
           <View style={s.coverBottom}>
             {event.category && (
               <View style={s.catPill}>
-                <Text style={s.catText}>{(({ 'Movement & Sport': 'Pohyb & Šport', 'Wellness & Body': 'Wellness & Telo', 'Food & Drinks': 'Jedlo & Pitie', 'Art & Creation': 'Umenie & Tvorba', 'Music & Nightlife': 'Hudba & Nočný život', 'Learning & Mind': 'Vzdelávanie', 'Community & Belonging': 'Komunita' } as Record<string,string>)[event.category] ?? event.category).toUpperCase()}</Text>
+                <Text style={s.catText}>{event.category.split(',').map((c: string) => {
+                  const key = c.trim();
+                  const sk: Record<string,string> = { 'Movement & Sport': 'Pohyb & Šport', 'Wellness & Body': 'Wellness & Telo', 'Food & Drinks': 'Jedlo & Pitie', 'Art & Creation': 'Umenie & Tvorba', 'Music & Nightlife': 'Hudba & Nočný život', 'Learning & Mind': 'Vzdelávanie', 'Community & Belonging': 'Komunita' };
+                  return (lang === 'sk' ? (sk[key] ?? key) : key);
+                }).join(' · ').toUpperCase()}</Text>
               </View>
             )}
             <View style={s.coverTitleRow}>
@@ -581,7 +605,7 @@ export default function EventDetailScreen() {
                   </View>
                   <View style={{ flex: 1 }}>
                     <Text style={s.infoText}>{isToday ? t.event.today : `${dayName}, ${dayNum} ${monthName}`}</Text>
-                    {event.time ? <Text style={s.infoSub}>{event.time.substring(0, 5)}{event.duration ? `  ·  ${event.duration}h` : ''}</Text> : null}
+                    {event.time ? <Text style={s.infoSub}>{event.time.substring(0, 5)}{event.duration ? `  ·  ${event.duration}h` : ''}{event.capacity != null ? `  ·  ${goingCount >= event.capacity ? (lang === 'sk' ? `Naplnená kapacita ${goingCount}/${event.capacity}` : `Full ${goingCount}/${event.capacity}`) : (lang === 'sk' ? `Prihlásení ${goingCount}/${event.capacity}` : `Registered ${goingCount}/${event.capacity}`)}` : ''}</Text> : null}
                   </View>
                 </View>
 
@@ -679,8 +703,8 @@ export default function EventDetailScreen() {
                 onPress={() => event.club ? router.push(`/club/${event.club!.id}`) : event.creator_id ? router.push(`/profile/${event.creator_id}` as any) : undefined}
                 activeOpacity={0.7}
               >
-                {(event.club?.logo_url ?? event.club?.cover_url ?? creator?.avatar_url)
-                  ? <Image source={{ uri: (event.club?.logo_url ?? event.club?.cover_url ?? creator?.avatar_url)! }} style={s.hostAvatar} />
+                {(event.club ? event.club.logo_url : creator?.avatar_url)
+                  ? <Image source={{ uri: (event.club ? event.club.logo_url : creator?.avatar_url)! }} style={s.hostAvatar} />
                   : <View style={[s.hostAvatar, s.hostAvatarFallback]}><Text style={s.hostAvatarInitial}>{hostInitial}</Text></View>
                 }
                 <View style={{ flex: 1 }}>
@@ -688,13 +712,13 @@ export default function EventDetailScreen() {
                   <Text style={s.hostName}>{hostName}</Text>
                 </View>
                 {isMember
-                  ? <View style={s.joinPill}><Text style={s.joinPillText}>✓ {t.event.memberLabel}</Text></View>
+                  ? <View style={s.joinPillMember}><Text style={s.joinPillMemberText}>✓ {t.event.memberLabel}</Text></View>
                   : event.club && user
-                    ? <TouchableOpacity style={s.joinPill} onPress={async (e) => {
+                    ? <TouchableOpacity style={s.joinPillFollow} onPress={async (e) => {
                         e.stopPropagation?.();
                         await supabase.from('club_members').insert({ club_id: event.club!.id, user_id: user.id, role: 'member', status: 'approved' });
                         setIsMember(true);
-                      }}><Text style={s.joinPillText}>+ {t.event.joinPlus}</Text></TouchableOpacity>
+                      }}><Text style={s.joinPillFollowText}>+ {t.event.joinPlus}</Text></TouchableOpacity>
                     : (event.club || event.creator_id)
                       ? <Svg width={16} height={16} viewBox="0 0 24 24" fill="none"><Path d="M9 18l6-6-6-6" stroke={Colors.gray} strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" /></Svg>
                       : null
@@ -781,7 +805,9 @@ export default function EventDetailScreen() {
                 </TouchableOpacity>
               </View>
             )
-            : <Button
+            : event.capacity != null && goingCount >= event.capacity
+              ? <Button label={lang === 'sk' ? 'Kapacita naplnená' : 'Event is full'} onPress={() => {}} variant="lime" disabled />
+              : <Button
                 label={user ? (isFree ? t.event.joinFree : isPayAtDoor ? (lang === 'sk' ? `Zaplatiť €${event.price} na mieste` : `Pay €${event.price} at the venue`) : t.event.buyTicket(priceLabel)) : t.event.getWoeva}
                 onPress={handleJoin}
                 loading={loading}
@@ -883,6 +909,10 @@ const s = StyleSheet.create({
   memberPillText: { fontSize: 11, fontWeight: '700', color: Colors.black },
   joinPill: { borderWidth: 1, borderColor: Colors.grayBorder, borderRadius: 50, paddingHorizontal: 12, paddingVertical: 5 },
   joinPillText: { fontSize: 12, fontWeight: '600', color: Colors.gray },
+  joinPillFollow: { borderWidth: 1.5, borderColor: Colors.black, borderRadius: 50, paddingHorizontal: 12, paddingVertical: 5 },
+  joinPillFollowText: { fontSize: 12, fontWeight: '600', color: Colors.black },
+  joinPillMember: { borderWidth: 1.5, borderColor: '#16A34A', borderRadius: 50, paddingHorizontal: 12, paddingVertical: 5 },
+  joinPillMemberText: { fontSize: 12, fontWeight: '600', color: '#16A34A' },
 
   // Chat
   chatRow: { flexDirection: 'row', alignItems: 'center', gap: 14, paddingHorizontal: 6, paddingVertical: 16 },

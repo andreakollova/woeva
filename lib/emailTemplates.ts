@@ -19,18 +19,18 @@ function wrap(content: string) {
 export const emailTemplates = {
   joinedEvent: (params: { attendeeName: string; eventTitle: string; eventDate: string; eventTime?: string; eventUrl?: string }) =>
     wrap(`
-      <h2 style="margin:0 0 8px;font-size:20px;color:#000;">New attendee 🎉</h2>
-      <p style="color:#555;margin:0 0 20px;"><strong>${params.attendeeName}</strong> just signed up for <strong>${params.eventTitle}</strong>.</p>
+      <h2 style="margin:0 0 8px;font-size:20px;color:#000;">Nový účastník 🎉</h2>
+      <p style="color:#555;margin:0 0 20px;"><strong>${params.attendeeName}</strong> si kúpil/a lístok na tvoj event <strong>${params.eventTitle}</strong>.</p>
       <table style="width:100%;border-collapse:collapse;background:#f8f8f8;border-radius:10px;overflow:hidden;">
         <tr><td style="padding:12px 16px;font-size:13px;color:#666;">Event</td><td style="padding:12px 16px;font-size:13px;font-weight:600;color:#000;">${params.eventTitle}</td></tr>
-        <tr><td style="padding:12px 16px;font-size:13px;color:#666;border-top:1px solid #eee;">Date</td><td style="padding:12px 16px;font-size:13px;color:#000;border-top:1px solid #eee;">${params.eventDate}${params.eventTime ? ' · ' + params.eventTime : ''}</td></tr>
+        <tr><td style="padding:12px 16px;font-size:13px;color:#666;border-top:1px solid #eee;">Dátum</td><td style="padding:12px 16px;font-size:13px;color:#000;border-top:1px solid #eee;">${params.eventDate}${params.eventTime ? ' · ' + params.eventTime : ''}</td></tr>
       </table>
     `),
 
   leftEvent: (params: { attendeeName: string; eventTitle: string }) =>
     wrap(`
-      <h2 style="margin:0 0 8px;font-size:20px;color:#000;">Attendee cancelled</h2>
-      <p style="color:#555;margin:0;"><strong>${params.attendeeName}</strong> cancelled their spot at <strong>${params.eventTitle}</strong>.</p>
+      <h2 style="margin:0 0 8px;font-size:20px;color:#000;">Účastník odhlásený</h2>
+      <p style="color:#555;margin:0;"><strong>${params.attendeeName}</strong> sa odhlásil/a z eventu <strong>${params.eventTitle}</strong>.</p>
     `),
 
   eventCancelled: (params: { eventTitle: string; reason?: string; creatorName: string }) =>

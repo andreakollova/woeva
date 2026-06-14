@@ -21,6 +21,7 @@ type EventRow = {
   going_count: number;
   price: number;
   is_free: boolean;
+  pay_at_door: boolean;
   status: string;
   city: string;
   created_at: string;
@@ -50,11 +51,14 @@ export default function AdminEventsScreen() {
   const [selected, setSelected] = useState<EventDetail | null>(null);
   const [cancelReason, setCancelReason] = useState('');
   const [actionLoading, setActionLoading] = useState(false);
+  const [editPrice, setEditPrice] = useState('');
+  const [editPayAtDoor, setEditPayAtDoor] = useState(false);
+  const [priceSaving, setPriceSaving] = useState(false);
 
   async function loadEvents() {
     const { data } = await supabase
       .from('events')
-      .select('id, title, date, time, cover_url, going_count, price, is_free, status, city, created_at, creator_id, creator:profiles!events_creator_id_fkey(name, email)')
+      .select('id, title, date, time, cover_url, going_count, price, is_free, pay_at_door, status, city, created_at, creator_id, creator:profiles!events_creator_id_fkey(name, email)')
       .order('created_at', { ascending: false })
       .limit(300);
 
@@ -88,6 +92,8 @@ export default function AdminEventsScreen() {
 
   async function openDetail(e: EventRow) {
     setSelected({ ...e, attendeeCount: 0, paidCount: 0, gross: 0, cancellationReason: null });
+    setEditPrice(e.price > 0 ? String(e.price) : '');
+    setEditPayAtDoor(e.pay_at_door ?? false);
 
     const [{ count: attendeeCount }, { data: paid }] = await Promise.all([
       supabase.from('event_attendees').select('id', { count: 'exact', head: true }).eq('event_id', e.id),
@@ -111,6 +117,21 @@ export default function AdminEventsScreen() {
       target_name: targetName,
       note: note ?? null,
     });
+  }
+
+  async function savePrice() {
+    if (!selected) return;
+    setPriceSaving(true);
+    const priceNum = parseFloat(editPrice) || 0;
+    await supabase.from('events').update({
+      price: priceNum,
+      is_free: priceNum === 0,
+      pay_at_door: editPayAtDoor,
+    }).eq('id', selected.id);
+    setSelected(s => s ? { ...s, price: priceNum, is_free: priceNum === 0, pay_at_door: editPayAtDoor } : null);
+    setEvents(prev => prev.map(e => e.id === selected.id ? { ...e, price: priceNum, is_free: priceNum === 0, pay_at_door: editPayAtDoor } : e));
+    setPriceSaving(false);
+    Alert.alert('Uložené', 'Cena a platba boli aktualizované.');
   }
 
   async function cancelEvent() {
@@ -340,6 +361,40 @@ export default function AdminEventsScreen() {
                   <Text style={styles.statNum}>€{selected.gross.toFixed(0)}</Text>
                   <Text style={styles.statLbl}>Gross</Text>
                 </View>
+              </View>
+
+              {/* Edit payment */}
+              <View style={styles.actionSection}>
+                <Text style={styles.actionSectionTitle}>CENA A PLATBA</Text>
+                <TouchableOpacity
+                  style={[styles.actionBtn, { backgroundColor: editPayAtDoor ? Colors.lime : Colors.grayLight, flexDirection: 'row', justifyContent: 'space-between', paddingHorizontal: 16 }]}
+                  onPress={() => setEditPayAtDoor(v => !v)}
+                  activeOpacity={0.8}
+                >
+                  <Text style={[styles.actionBtnText, { color: Colors.black }]}>Platba na mieste</Text>
+                  <Text style={{ fontSize: 18 }}>{editPayAtDoor ? '✓' : '○'}</Text>
+                </TouchableOpacity>
+                {editPayAtDoor && (
+                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
+                    <TextInput
+                      style={[styles.reasonInput, { flex: 1, minHeight: 0, paddingVertical: 10 }]}
+                      placeholder="Cena v €"
+                      placeholderTextColor={Colors.gray}
+                      value={editPrice}
+                      onChangeText={setEditPrice}
+                      keyboardType="decimal-pad"
+                      autoFocus
+                    />
+                    <Text style={{ fontSize: 18, color: Colors.gray }}>€</Text>
+                  </View>
+                )}
+                <TouchableOpacity
+                  style={[styles.actionBtn, { backgroundColor: Colors.black }]}
+                  onPress={savePrice}
+                  disabled={priceSaving}
+                >
+                  <Text style={[styles.actionBtnText, { color: Colors.lime }]}>{priceSaving ? 'Ukladám...' : 'Uložiť cenu'}</Text>
+                </TouchableOpacity>
               </View>
 
               {/* Cancel action */}

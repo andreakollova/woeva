@@ -1,5 +1,6 @@
 import React, { useEffect, useState, useCallback } from 'react';
 import { View, Text, StyleSheet, ScrollView, TouchableOpacity, RefreshControl, Image, ImageStyle, Modal, Alert, Share, Linking, Platform, ActivityIndicator } from 'react-native';
+import { StatusBar, setStatusBarStyle } from 'expo-status-bar';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useRouter, useFocusEffect } from 'expo-router';
 import Animated, { FadeInDown } from 'react-native-reanimated';
@@ -13,6 +14,7 @@ import { Button } from '@/components/ui/Button';
 import { WMark } from '@/components/ui/WMark';
 import { useAuth } from '@/context/AuthContext';
 import { notify } from '@/lib/notify';
+import { cancelEventReminders } from '@/lib/scheduleReminders';
 import { useTranslations } from '@/context/LanguageContext';
 
 type BookedEvent = Event & { attendee_id?: string };
@@ -28,7 +30,7 @@ export default function BookedScreen() {
   const [refreshing, setRefreshing] = useState(false);
   const [deletingId, setDeletingId] = useState<string | null>(null);
 
-  useFocusEffect(useCallback(() => { loadEvents(); }, [tab, user]));
+  useFocusEffect(useCallback(() => { setStatusBarStyle('dark'); loadEvents(); }, [tab, user]));
 
   async function loadEvents() {
     if (!user) return;
@@ -37,7 +39,7 @@ export default function BookedScreen() {
 
     const { data } = await supabase
       .from('event_attendees')
-      .select('id, event:events(*, club:clubs(id, name, cover_url), attendees:event_attendees(profile:profiles(id, name, avatar_url)))')
+      .select('id, event:events(*, club:clubs(id, name, cover_url), creator:profiles!creator_id(id, name), attendees:event_attendees(profile:profiles(id, name, avatar_url)))')
       .eq('user_id', user.id);
 
     const allEvents: BookedEvent[] = (data ?? [])
@@ -119,6 +121,7 @@ export default function BookedScreen() {
               style: 'destructive',
               onPress: async () => {
                 await supabase.from('event_attendees').delete().eq('id', event.attendee_id!);
+                cancelEventReminders(event.id).catch(() => {});
                 setEvents(prev => prev.filter(e => e.id !== event.id));
                 if (event.creator_id && user && event.creator_id !== user.id) {
                   supabase.from('notifications').insert({
@@ -164,6 +167,7 @@ export default function BookedScreen() {
                   onPress: async () => {
                     setDeletingId(event.id);
                     await supabase.from('event_attendees').delete().eq('id', event.attendee_id!);
+                    cancelEventReminders(event.id).catch(() => {});
                     setEvents(prev => prev.filter(e => e.id !== event.id));
                     setDeletingId(null);
                   },
@@ -180,9 +184,10 @@ export default function BookedScreen() {
 
   return (
     <View style={[styles.container, { paddingTop: insets.top }]}>
+      <StatusBar style="dark" />
       <View style={styles.topBar}>
         <TouchableOpacity onPress={() => router.push('/(tabs)')} activeOpacity={0.7}>
-          <WMark size={34} color={Colors.lime} />
+          <WMark size={90} color={Colors.lime} style={{ marginVertical: -10 }} />
         </TouchableOpacity>
       </View>
 
@@ -282,7 +287,8 @@ function TicketCard({ event, userId, userAvatar, userName, isPast, onPress, onDe
   const qrValue = `woeva:ticket:${event.attendee_id ?? event.id}:${userId}`;
   const isFree = event.is_free || event.price === 0;
   const priceLabel = isFree ? t.tickets.free : `€${event.price}`;
-  const isWoevaEvent = event.source === 'woeva_picks' || event.source === 'instagram';
+  const hostName: string | null = (event as any).club?.name ?? (event as any).creator?.name ?? null;
+  const isScrapedEvent = !!(event as any).source;
 
   function handleShare() {
     Share.share({ message: `Check out "${event.title}" on Woeva!` });
@@ -504,9 +510,9 @@ function TicketCard({ event, userId, userAvatar, userName, isPast, onPress, onDe
         <View style={styles.qrSection}>
           <View style={styles.qrLeft}>
             <TouchableOpacity
-              style={[styles.qrWrap, isFree && styles.qrWrapFree]}
+              style={[styles.qrWrap, isScrapedEvent && styles.qrWrapMuted]}
               onPress={() => {
-                if (isFree) {
+                if (isScrapedEvent) {
                   Alert.alert(t.tickets.freeEventQrTitle, t.tickets.freeEventQrMsg);
                 } else {
                   setQrModal(true);
@@ -517,11 +523,11 @@ function TicketCard({ event, userId, userAvatar, userName, isPast, onPress, onDe
               <QRCode
                 value={qrValue}
                 size={88}
-                color={isFree ? '#C0C0C0' : isPast ? Colors.gray : Colors.black}
+                color={isScrapedEvent ? '#C0C0C0' : isPast ? Colors.gray : Colors.black}
                 backgroundColor={Colors.white}
               />
             </TouchableOpacity>
-            {!isPast && !isFree && (
+            {!isPast && !isScrapedEvent && (
               <TouchableOpacity onPress={handleAddToWallet} activeOpacity={0.8} style={styles.walletBtn} disabled={loadingWallet}>
                 {loadingWallet
                   ? <ActivityIndicator color={Colors.white} size="small" />
@@ -531,18 +537,10 @@ function TicketCard({ event, userId, userAvatar, userName, isPast, onPress, onDe
             )}
           </View>
           <View style={styles.qrInfo}>
+            {hostName ? <Text style={styles.qrHost} numberOfLines={1}>{hostName}</Text> : null}
             <Text style={styles.qrAttendeeName} numberOfLines={1}>{userName}</Text>
             {!isPast && <Text style={styles.qrTitle}>{t.tickets.yourTicket}</Text>}
-            <Text style={styles.qrSub}>
-              {isPast
-                ? t.tickets.thanksForComing
-                : isWoevaEvent
-                  ? (lang === 'sk' ? 'Táto udalosť je zadarmo - QR kód pri vstupe nepotrebuješ.' : 'This event is free - no QR code needed at the door.')
-                  : t.tickets.showAtDoor}
-            </Text>
-            {event.club?.name ? (
-              <Text style={styles.qrClub}>{event.club.name}</Text>
-            ) : null}
+            <Text style={styles.qrSub}>{isPast ? t.tickets.thanksForComing : isScrapedEvent ? (lang === 'sk' ? 'Táto udalosť je zadarmo — QR kód nepotrebuješ.' : 'This event is free — no QR needed.') : t.tickets.showAtDoor}</Text>
           </View>
         </View>
       </View>
@@ -552,7 +550,7 @@ function TicketCard({ event, userId, userAvatar, userName, isPast, onPress, onDe
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: '#F5F5F5' },
-  topBar: { alignItems: 'center', paddingTop: 8, marginBottom: 4 },
+  topBar: { alignItems: 'center', paddingVertical: 0 },
   title: { fontSize: 28, fontWeight: '700', fontFamily: Fonts.bold, color: Colors.black, paddingHorizontal: 20, marginBottom: 16, letterSpacing: -0.5 },
   tabs: { flexDirection: 'row', paddingHorizontal: 20, gap: 8, marginBottom: 20 },
   tabBtn: { paddingHorizontal: 18, paddingVertical: 8, borderRadius: 50, backgroundColor: Colors.white },
@@ -626,8 +624,9 @@ const styles = StyleSheet.create({
   qrSection: { flexDirection: 'row', gap: 16, alignItems: 'flex-start' },
   qrLeft: { alignItems: 'flex-start', gap: 8 },
   qrWrap: { padding: 10, backgroundColor: Colors.white, borderRadius: 16 },
-  qrWrapFree: { opacity: 0.4 },
-  qrInfo: { flex: 1, gap: 5, justifyContent: 'center' },
+  qrWrapMuted: { opacity: 0.4 },
+  qrInfo: { flex: 1, gap: 4, justifyContent: 'center' },
+  qrHost: { fontSize: 10, fontWeight: '600', color: 'rgba(255,255,255,0.4)', fontFamily: Fonts.semibold, letterSpacing: 0.6, textTransform: 'uppercase' },
   qrAttendeeRow: { flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 4 },
   qrAvatar: { width: 28, height: 28, borderRadius: 14 },
   qrAvatarFallback: { backgroundColor: Colors.lime, alignItems: 'center', justifyContent: 'center' },

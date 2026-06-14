@@ -7,131 +7,152 @@ import { Fonts } from '@/constants/fonts';
 import { BackButton } from '@/components/ui/BackButton';
 import { useTranslations } from '@/context/LanguageContext';
 
-const PRIVACY_POLICY = `Last updated: May 2026
+const PRIVACY_POLICY = `Posledná aktualizácia: jún 2026
 
-Woeva ("we", "us", "our") operates the Woeva mobile application. This policy explains what personal data we collect, why we collect it, and your rights under the General Data Protection Regulation (GDPR) and applicable Slovak law.
+Woeva je mobilná aplikácia prevádzkovaná spoločnosťou Sportqo s.r.o. Tieto zásady vysvetľujú, aké osobné údaje zbierame, prečo ich zbierame a aké máte práva podľa Nariadenia EÚ 2016/679 (GDPR) a platného slovenského práva.
 
-1. DATA WE COLLECT
+PREVÁDZKOVATEĽ OSOBNÝCH ÚDAJOV
 
-Account data
-• Name, email address, and profile photo when you register with email/password or via Apple Sign-In / Google Sign-In. When using social login we receive only the data you authorise the provider to share.
+Sportqo s.r.o.
+Mudrochova 7480/15, 831 06 Bratislava – mestská časť Rača, Slovensko
+IČO: 56132433 | DIČ: 2122213775 | IČ DPH: SK2122213775
+E-mail: admin@woeva.com
+Telefón: +421 915 786 829
 
-Location
-• City (stored on your profile) and approximate GPS coordinates (only when you explicitly grant permission) to show events near you. GPS is never stored — it is used in-session only to rank nearby events.
+1. ÚDAJE, KTORÉ ZBIERAME
 
-Device & notifications
-• Push notification token to deliver event reminders, chat messages, and activity alerts.
+Účet
+• Meno, e-mailová adresa a profilová fotografia pri registrácii e-mailom/heslom alebo cez Apple/Google Sign-In (pri sociálnom prihlásení dostaneme len údaje, ktoré povolíte).
 
-Content you create
-• Events, club details, event cover photos, and chat messages you send in event rooms.
+Poloha
+• Mesto (uložené v profile) a približné GPS súradnice (len ak udelíte povolenie) na zobrazovanie udalostí vo vašej blízkosti. GPS sa neukladá – používa sa iba počas relácie.
 
-Usage
-• Events you join or leave, ticket records, club memberships, and any reviews you submit.
+Zariadenie a notifikácie
+• Push notification token na doručovanie upozornení.
 
-Payment data
-• Stripe processes all card payments. We store only the Stripe customer ID and connect account ID — no card numbers, CVVs, or full payment details are ever held by us.
+Obsah
+• Udalosti, kluby, fotografie udalostí a správy v chatoch udalostí.
+
+Aktivita
+• Udalosti, na ktoré ste sa prihlásili alebo odhlásili, lístky, členstvá v kluboch, recenzie.
+
+Platby
+• Platby kartou spracúva Stripe. My uchovávame iba Stripe customer ID – žiadne čísla kariet ani CVV.
 
 Apple Wallet
-• When you generate an Apple Wallet pass, your name and event details are embedded in the pass file, which is delivered directly to your device and stored only in Apple Wallet.
+• Vaše meno a detaily udalosti sú vložené do priepustky doručenej priamo do vášho zariadenia a uloženej výhradne v Apple Wallet.
 
-Camera & photo library
-• Used only when you choose to upload an event cover photo. Images are uploaded to our secure storage and never processed for any other purpose.
+Fotoaparát / fotogaléria
+• Používané výlučne pri nahrávaní fotografií, ktoré vyberiete.
 
-2. HOW WE USE YOUR DATA
-• To provide, operate, and personalise the Woeva experience
-• To display your events and profile to other users in the context of events and clubs
-• To send push notifications and emails about events you are attending or managing
-• To process ticket payments and issue refunds via Stripe
-• To generate Apple Wallet passes on request
-• To show events relevant to your location (GPS used in-session, never stored)
+2. AKO VAŠE ÚDAJE POUŽÍVAME
+• Poskytovanie, prevádzka a personalizácia aplikácie Woeva
+• Zobrazovanie vašich udalostí a profilu ostatným používateľom
+• Zasielanie push notifikácií a e-mailov o udalostiach, na ktoré ste prihlásení alebo ktoré spravujete
+• Spracovanie platby lístkov a vystavovanie refundácií cez Stripe
+• Generovanie priepustiek Apple Wallet na požiadanie
+• Zobrazovanie udalostí relevantných pre vašu polohu (GPS sa neukladá)
 
-3. LEGAL BASIS (GDPR)
-• Contract performance: account management, event registration, payments
-• Legitimate interests: push notifications for events you have joined, security monitoring
-• Consent: GPS location access, optional marketing communications
+3. PRÁVNY ZÁKLAD (GDPR)
+• Plnenie zmluvy: správa účtu, registrácia na udalosti, platby
+• Oprávnený záujem: push notifikácie o udalostiach, na ktoré ste sa prihlásili, bezpečnostný monitoring
+• Súhlas: prístup k GPS polohe, voliteľné marketingové komunikácie
 
-4. DATA SHARING
-• We do not sell your personal data to any third party
-• Stripe (stripe.com) — payment processing, governed by Stripe's Privacy Policy
-• Apple / Google — social sign-in, governed by their respective privacy policies
-• Supabase — database and authentication infrastructure (EU data region)
-• Expo — push notification delivery
-• No other third parties receive your personal data
+4. ZDIEĽANIE ÚDAJOV
+• Vaše osobné údaje nepredávame žiadnej tretej strane
+• Stripe (stripe.com) – spracovanie platieb podľa vlastných zásad Stripe
+• Apple / Google – sociálne prihlásenie podľa ich vlastných zásad
+• Supabase – databáza a autentifikačná infraštruktúra (dátová oblasť EÚ)
+• Expo – doručovanie push notifikácií
+• Žiadne ďalšie tretie strany nemajú prístup k vašim osobným údajom
 
-5. YOUR RIGHTS (GDPR)
-You have the right to:
-• Access: request a copy of your personal data
-• Rectification: correct inaccurate data via Settings → Profile
-• Erasure: delete your account and all data via Settings → Delete account
-• Portability: request your data in a machine-readable format
-• Objection: opt out of processing based on legitimate interests
-• Withdraw consent: revoke location or notification permissions at any time in your device settings
+5. VAŠE PRÁVA (GDPR)
+Máte právo na:
+• Prístup: vyžiadať kópiu svojich osobných údajov
+• Opravu: opraviť nepresné údaje cez Nastavenia → Profil
+• Vymazanie: zmazať účet a všetky údaje cez Nastavenia → Zmazať účet
+• Prenosnosť: vyžiadať údaje v strojovo čitateľnom formáte
+• Námietku: odmietnuť spracovanie na základe oprávnených záujmov
+• Odvolanie súhlasu: kedykoľvek odvolať povolenia na polohu alebo notifikácie v nastaveniach zariadenia
 
-To exercise any right, email us at hello@woeva.app. We will respond within 30 days.
+Na uplatnenie ktoréhokoľvek práva nás kontaktujte na admin@woeva.com. Odpovieme do 30 dní.
 
-6. DATA RETENTION
-Your data is retained for as long as your account is active. Deleting your account permanently removes your profile, events, clubs, messages, tickets, and all associated data within 30 days. Anonymised aggregate statistics may be retained.
+6. UCHOVÁVANIE ÚDAJOV
+Vaše údaje uchovávame po dobu aktivity vášho účtu. Zmazaním účtu sa natrvalo odstráni váš profil, udalosti, kluby, správy, lístky a všetky súvisiace údaje do 30 dní.
 
-7. CHILDREN
-Woeva is not directed at children under 16. We do not knowingly collect data from anyone under 16.
+7. DETI
+Woeva nie je určená deťom mladším ako 16 rokov. Vedome nezbierame údaje od osôb mladších ako 16 rokov.
 
-8. CONTACT & COMPLAINTS
-For privacy questions: hello@woeva.app
-You also have the right to lodge a complaint with the Slovak Data Protection Authority (dataprotection.gov.sk).`;
+8. KONTAKT A SŤAŽNOSTI
+Sportqo s.r.o.
+E-mail: admin@woeva.com
+Telefón: +421 915 786 829
+Mudrochova 7480/15, 831 06 Bratislava – mestská časť Rača, Slovensko
 
-const TERMS = `Last updated: May 2026
+Máte tiež právo podať sťažnosť na Úrad na ochranu osobných údajov SR (dataprotection.gov.sk).`;
 
-By downloading or using Woeva you agree to these Terms of Service. Please read them carefully.
+const TERMS = `Posledná aktualizácia: jún 2026
 
-1. ELIGIBILITY
-You must be at least 16 years old to use Woeva. By using the app you confirm that you meet this requirement.
+Stiahnutím alebo používaním aplikácie Woeva súhlasíte s týmito Podmienkami používania. Prečítajte si ich pozorne.
 
-2. ACCOUNT RESPONSIBILITY
-You are responsible for keeping your login credentials secure and for all activity that occurs under your account. Notify us immediately at hello@woeva.app if you suspect unauthorised access. You may sign in with email/password, Apple Sign-In, or Google Sign-In.
+Prevádzkovateľ:
+Sportqo s.r.o., Mudrochova 7480/15, 831 06 Bratislava – mestská časť Rača, Slovensko
+IČO: 56132433 | DIČ: 2122213775 | IČ DPH: SK2122213775
+E-mail: admin@woeva.com | Tel.: +421 915 786 829
 
-3. CONTENT
-You retain ownership of content you create (events, clubs, photos, messages). By posting content you grant Woeva a non-exclusive, royalty-free licence to display it within the app to other users. You must not post content that is illegal, harmful, misleading, discriminatory, or violates any third-party rights.
+1. VEKOVÉ OBMEDZENIE
+Woeva môžu používať osoby staršie ako 16 rokov. Používaním aplikácie potvrdzujete, že spĺňate túto podmienku.
 
-4. EVENTS
-Event creators are responsible for the accuracy of event details including date, time, location, and price. Woeva is a platform connecting organisers and attendees — we are not the organiser of any event listed in the app.
+2. ZODPOVEDNOSŤ ZA ÚČET
+Ste zodpovední za bezpečnosť svojich prihlasovacích údajov a za všetky aktivity uskutočnené pod vaším účtom. V prípade podozrenia na neoprávnený prístup nás ihneď kontaktujte na admin@woeva.com. Prihlásiť sa môžete e-mailom/heslom, Apple Sign-In alebo Google Sign-In.
 
-5. TICKETS & PAYMENTS
-Paid tickets are processed by Stripe. You may also purchase tickets payable at the door. Apple Wallet passes are available for your tickets.
+3. OBSAH
+Zostávate vlastníkom obsahu, ktorý vytvárate (udalosti, kluby, fotografie, správy). Zverejnením obsahu udeľujete Woeva nevýhradnú, bezplatnú licenciu na jeho zobrazenie v rámci aplikácie ostatným používateľom. Nesmie byť zverejnený obsah, ktorý je nezákonný, škodlivý, zavádzajúci, diskriminačný alebo porušuje práva tretích strán.
 
-Refund policy:
-• Full refund if the organiser cancels the event, regardless of timing
-• Full refund if you cancel your attendance 48+ hours before the event starts
-• No refund for cancellations made less than 48 hours before the event
+4. UDALOSTI
+Organizátori udalostí sú zodpovední za presnosť informácií vrátane dátumu, času, miesta a ceny. Woeva je platforma spájajúca organizátorov a účastníkov – nie sme organizátorom žiadnej udalosti uvedenej v aplikácii.
 
-Refunds are processed to your original payment method within 5–10 business days.
+5. LÍSTKY A PLATBY
+Platené lístky sú spracovávané cez Stripe. K dispozícii sú aj lístky s platbou na mieste. Pre vaše lístky sú dostupné priepustky Apple Wallet.
 
-6. CLUBS
-Club owners may invite admins. Admin invitations are sent in-app and must be accepted. Admins may manage events on behalf of the club. Club owners are responsible for ensuring all club activity complies with these terms.
+Refundačná politika:
+• Plná refundácia, ak organizátor udalosť zruší
+• Plná refundácia pri odhlásení 48 a viac hodín pred začiatkom udalosti
+• Žiadna refundácia pri odhlásení menej ako 48 hodín pred udalosťou
 
-7. PROHIBITED CONDUCT
-You may not:
-• Impersonate any person or entity
-• Harass, threaten, or abuse other users
-• Post spam or unsolicited promotional content
-• Use the app for any illegal purpose
-• Scrape, crawl, or systematically extract data from the platform
-• Attempt to compromise the security or integrity of the platform
-• Create fake events or mislead attendees about event details
+Refundácie sa spracujú na pôvodnú platobnú metódu do 5–10 pracovných dní.
 
-8. TERMINATION
-We reserve the right to suspend or permanently delete accounts that violate these terms, at our sole discretion, with or without notice.
+6. KLUBY
+Vlastníci klubov môžu pozvať adminov. Pozvánky sa zasielajú v aplikácii a musia byť prijaté. Admini môžu spravovať udalosti v mene klubu. Vlastníci klubov zodpovedajú za súlad všetkých aktivít klubu s týmito podmienkami.
 
-9. LIMITATION OF LIABILITY
-Woeva is provided "as is" without warranties of any kind. We are not liable for the accuracy of event information posted by third-party organisers, cancellations, or losses arising from your use of the platform, to the maximum extent permitted by applicable law.
+7. ZAKÁZANÉ KONANIE
+Je zakázané:
+• Vydávať sa za inú osobu alebo subjekt
+• Obťažovať, vyhrážať sa alebo zneužívať ostatných používateľov
+• Zverejňovať spam alebo nevyžiadaný propagačný obsah
+• Využívať aplikáciu na akýkoľvek nezákonný účel
+• Systematicky extrahovať dáta z platformy
+• Pokúšať sa narušiť bezpečnosť alebo integritu platformy
+• Vytvárať falošné udalosti alebo zavádzať účastníkov
 
-10. CHANGES TO TERMS
-We may update these terms from time to time. Continued use of the app after changes constitutes acceptance of the updated terms. Material changes will be notified in-app.
+8. UKONČENIE ÚČTU
+Vyhradzujeme si právo pozastaviť alebo natrvalo zmazať účty porušujúce tieto podmienky, podľa vlastného uváženia, s upozornením alebo bez neho.
 
-11. GOVERNING LAW
-These terms are governed by the laws of the Slovak Republic. Any disputes shall be subject to the jurisdiction of Slovak courts, without prejudice to your rights as a consumer under EU law.
+9. OBMEDZENIE ZODPOVEDNOSTI
+Woeva je poskytovaná „tak, ako je" bez akýchkoľvek záruk. Nezodpovedáme za presnosť informácií o udalostiach zverejnených tretími stranami, ich zrušenie ani za škody vzniknuté používaním platformy, v rozsahu povolenom platným právom.
 
-12. CONTACT
-Questions or complaints? Email us at: hello@woeva.app`;
+10. ZMENY PODMIENOK
+Podmienky môžeme čas od času aktualizovať. Pokračovaním v používaní aplikácie po zmenách vyjadrujete súhlas s aktualizovanými podmienkami. O podstatných zmenách budete informovaní v aplikácii.
+
+11. ROZHODNÉ PRÁVO
+Tieto podmienky sa riadia právom Slovenskej republiky. Akékoľvek spory podliehajú právomoci slovenských súdov, bez toho, aby boli dotknuté vaše práva spotrebiteľa podľa práva EÚ.
+
+12. KONTAKT
+Otázky alebo sťažnosti:
+Sportqo s.r.o.
+E-mail: admin@woeva.com
+Telefón: +421 915 786 829
+Mudrochova 7480/15, 831 06 Bratislava – mestská časť Rača, Slovensko`;
 
 export default function LegalScreen() {
   const insets = useSafeAreaInsets();

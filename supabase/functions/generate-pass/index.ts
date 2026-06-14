@@ -30,6 +30,8 @@ async function buildPass(supabase: any, userId: string, event_id: string): Promi
   const passTypeId = Deno.env.get('PASS_TYPE_ID')!;
   const teamId = Deno.env.get('TEAM_ID')!;
 
+  const venueLabel = [event.venue, event.city].filter(Boolean).join(', ');
+
   const passJson = {
     formatVersion: 1,
     passTypeIdentifier: passTypeId,
@@ -41,18 +43,20 @@ async function buildPass(supabase: any, userId: string, event_id: string): Promi
     backgroundColor: 'rgb(201, 255, 71)',
     labelColor: 'rgb(10, 10, 10)',
     eventTicket: {
-      primaryFields: [{ key: 'event', label: 'EVENT', value: event.title }],
+      headerFields: [
+        ...(venueLabel ? [{ key: 'venue', label: 'MIESTO', value: venueLabel }] : []),
+      ],
+      primaryFields: [{ key: 'event', label: 'PODUJATIE', value: event.title }],
       secondaryFields: [
-        ...(event.date ? [{ key: 'date', label: 'DATE', value: event.date }] : []),
-        ...(event.time ? [{ key: 'time', label: 'TIME', value: event.time }] : []),
+        ...(event.date ? [{ key: 'date', label: 'DÁTUM', value: event.date }] : []),
       ],
       auxiliaryFields: [
-        ...(event.venue ? [{ key: 'venue', label: 'VENUE', value: [event.venue, event.city].filter(Boolean).join(', ') }] : []),
+        ...(event.time ? [{ key: 'time', label: 'ČAS', value: event.time }] : []),
       ],
       backFields: [
-        { key: 'ticketId', label: 'TICKET ID', value: attendee.id },
-        { key: 'holder', label: 'TICKET HOLDER', value: '' },
-        ...(event.price > 0 ? [{ key: 'price', label: 'PRICE PAID', value: `€${Number(event.price).toFixed(2)}` }] : []),
+        { key: 'ticketId', label: 'ID LÍSTKA', value: attendee.id },
+        { key: 'holder', label: 'DRŽITEĽ LÍSTKA', value: '' },
+        ...(event.price > 0 ? [{ key: 'price', label: 'ZAPLATENÁ CENA', value: `€${Number(event.price).toFixed(2)}` }] : []),
       ],
     },
     barcodes: [{ message: attendee.id, format: 'PKBarcodeFormatQR', messageEncoding: 'iso-8859-1' }],
@@ -136,23 +140,13 @@ serve(async (req) => {
 
     const pkpass = await buildPass(supabase, user.id, event_id);
 
-    const serviceDb = createClient(
-      Deno.env.get('SUPABASE_URL')!,
-      Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!,
-    );
-    const filePath = `${user.id}/${event_id}.pkpass`;
-    const { error: uploadError } = await serviceDb.storage
-      .from('wallet-passes')
-      .upload(filePath, pkpass, { contentType: 'application/vnd.apple.pkpass', upsert: true });
-    if (uploadError) throw new Error(`Upload failed: ${uploadError.message}`);
-
-    const { data: signed, error: signError } = await serviceDb.storage
-      .from('wallet-passes')
-      .createSignedUrl(filePath, 600);
-    if (signError || !signed?.signedUrl) throw new Error(`Sign failed: ${signError?.message ?? 'no url'}`);
-
-    return new Response(JSON.stringify({ url: signed.signedUrl }), {
-      headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+    // Return binary directly — Vercel proxy will stream it to Safari as .pkpass
+    return new Response(pkpass, {
+      headers: {
+        ...corsHeaders,
+        'Content-Type': 'application/vnd.apple.pkpass',
+        'Content-Disposition': 'attachment; filename="woeva-ticket.pkpass"',
+      },
     });
 
   } catch (err) {
