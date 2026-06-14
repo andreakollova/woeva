@@ -34,7 +34,7 @@ export default function ClubDetailScreen() {
   const insets = useSafeAreaInsets();
   const router = useRouter();
   const { user, profile } = useAuth();
-  const { t } = useTranslations();
+  const { t, lang } = useTranslations();
   const [club, setClub] = useState<Club | null>(null);
   const [members, setMembers] = useState<ClubMember[]>([]);
   const [events, setEvents] = useState<Event[]>([]);
