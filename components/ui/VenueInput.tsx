@@ -91,44 +91,46 @@ export function VenueInput({ value, onChange, dark }: VenueInputProps) {
   return (
     <View style={styles.wrapper}>
       <Text style={[styles.label, { color: th.label }]}>{lang === 'sk' ? 'Miesto' : 'Address'}</Text>
-      <View style={[styles.inputWrap, { borderColor: th.border, backgroundColor: th.bg }, focused && { borderColor: th.focusBorder }, confirmed && styles.inputConfirmed]}>
-        <TextInput
-          style={[styles.input, { color: th.text }]}
-          value={value}
-          onChangeText={search}
-          placeholder={lang === 'sk' ? 'Začni písať adresu...' : 'Start typing an address...'}
-          placeholderTextColor={th.placeholder}
-          onFocus={() => setFocused(true)}
-          onBlur={() => setFocused(false)}
-          autoCorrect={false}
-          selectionColor={Colors.lime}
-          maxLength={200}
-        />
-        {loading && <ActivityIndicator size="small" color={Colors.gray} style={styles.spinner} />}
-        {confirmed && !loading && <Text style={styles.confirmedIcon}>✓</Text>}
+      <View style={styles.inputContainer}>
+        <View style={[styles.inputWrap, { borderColor: th.border, backgroundColor: th.bg }, focused && { borderColor: th.focusBorder }, confirmed && styles.inputConfirmed]}>
+          <TextInput
+            style={[styles.input, { color: th.text }]}
+            value={value}
+            onChangeText={search}
+            placeholder={lang === 'sk' ? 'Začni písať adresu...' : 'Start typing an address...'}
+            placeholderTextColor={th.placeholder}
+            onFocus={() => setFocused(true)}
+            onBlur={() => setFocused(false)}
+            autoCorrect={false}
+            selectionColor={Colors.lime}
+            maxLength={200}
+          />
+          {loading && <ActivityIndicator size="small" color={Colors.gray} style={styles.spinner} />}
+          {confirmed && !loading && <Text style={styles.confirmedIcon}>✓</Text>}
+        </View>
+        {results.length > 0 && (
+          <View style={[styles.dropdown, { backgroundColor: th.bg, borderColor: th.border }]}>
+            <ScrollView keyboardShouldPersistTaps="always" nestedScrollEnabled>
+              {results.map((r, i) => (
+                <TouchableOpacity
+                  key={i}
+                  style={[styles.item, i < results.length - 1 && styles.itemBorder]}
+                  onPress={() => select(r)}
+                  activeOpacity={0.7}
+                >
+                  <Text style={[styles.itemName, { color: th.text }]} numberOfLines={1}>{r.name}</Text>
+                  {r.city ? <Text style={styles.itemCity}>{r.city}</Text> : null}
+                </TouchableOpacity>
+              ))}
+            </ScrollView>
+          </View>
+        )}
       </View>
       {value.length > 0 && !confirmed && !loading && results.length === 0 && (
         <Text style={styles.hint}>{lang === 'sk' ? '↑ Vyber zo zoznamu pre pin na mape' : '↑ Select from the list to pin on map'}</Text>
       )}
       {confirmed && (
         <Text style={styles.confirmedHint}>{lang === 'sk' ? '📍 Miesto potvrdené — zobrazí sa na mape' : '📍 Location confirmed — will appear on map'}</Text>
-      )}
-      {results.length > 0 && (
-        <View style={[styles.dropdown, { backgroundColor: th.bg, borderColor: th.border }]}>
-          <ScrollView keyboardShouldPersistTaps="always" nestedScrollEnabled>
-            {results.map((r, i) => (
-              <TouchableOpacity
-                key={i}
-                style={[styles.item, i < results.length - 1 && styles.itemBorder]}
-                onPress={() => select(r)}
-                activeOpacity={0.7}
-              >
-                <Text style={[styles.itemName, { color: th.text }]} numberOfLines={1}>{r.name}</Text>
-                {r.city ? <Text style={styles.itemCity}>{r.city}</Text> : null}
-              </TouchableOpacity>
-            ))}
-          </ScrollView>
-        </View>
       )}
     </View>
   );
@@ -196,8 +198,12 @@ const styles = StyleSheet.create({
     marginLeft: 8,
   },
   wrapper: { zIndex: 999 },
+  inputContainer: { position: 'relative', zIndex: 999 },
   dropdown: {
     position: 'absolute',
+    top: 48,
+    left: 0,
+    right: 0,
     zIndex: 999,
     borderWidth: 1.5,
     borderColor: Colors.grayBorder,
