@@ -263,7 +263,7 @@ export default function ClubDetailScreen() {
               activeOpacity={0.8}
             >
               <Svg width={14} height={14} viewBox="0 0 24 24" fill="none">
-                <Path d="M4 12v8a2 2 0 002 2h12a2 2 0 002-2v-8M16 6l-4-4-4 4M12 2v13" stroke={Colors.gray} strokeWidth={2.2} strokeLinecap="round" strokeLinejoin="round" />
+                <Path d="M4 12v8a2 2 0 002 2h12a2 2 0 002-2v-8M16 6l-4-4-4 4M12 2v13" stroke={Colors.white} strokeWidth={2.2} strokeLinecap="round" strokeLinejoin="round" />
               </Svg>
               <Text style={styles.clubShareText}>Zdieľať</Text>
             </TouchableOpacity>
@@ -515,8 +515,8 @@ const styles = StyleSheet.create({
   // Name + tagline below logo
   clubNameRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 10 },
   clubName: { fontSize: 24, fontWeight: '700', color: Colors.black, letterSpacing: -0.5, fontFamily: Fonts.bold, flex: 1 },
-  clubShareBtn: { flexDirection: 'row', alignItems: 'center', gap: 4, paddingHorizontal: 7, paddingVertical: 3, borderRadius: 50, borderWidth: 1, borderColor: Colors.gray },
-  clubShareText: { fontSize: 10, fontWeight: '600', color: Colors.gray, fontFamily: Fonts.semibold },
+  clubShareBtn: { flexDirection: 'row', alignItems: 'center', gap: 6, paddingHorizontal: 14, paddingVertical: 8, borderRadius: 50, backgroundColor: Colors.black },
+  clubShareText: { fontSize: 13, fontWeight: '600', color: Colors.white, fontFamily: Fonts.semibold },
   clubTagline: { fontSize: 14, color: Colors.gray, fontFamily: Fonts.regular, lineHeight: 20, marginBottom: 10 },
 
   divider: { height: 1, backgroundColor: Colors.grayBorder, marginVertical: 18 },
