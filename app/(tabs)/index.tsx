@@ -709,7 +709,7 @@ export default function HomeScreen() {
         {/* ── Budúci týždeň ── */}
         {!loading && nextWeekEvents.length > 0 && (
           <View style={styles.section}>
-            <SectionHeader title="🔜 Budúci týždeň" />
+            <SectionHeader title="🗓️ Budúci týždeň" />
             <EventCarousel events={nextWeekEvents} attendingIds={attendingIds} onPress={goToEvent} lang={lang} userProfile={profile} sharpCorner="topLeft" />
           </View>
         )}
