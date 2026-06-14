@@ -18,7 +18,7 @@
       "autoIncrement": true,
       "node": "22.14.0",
       "ios": {
-        "image": "latest"
+        "image": "macos-14-xcode-16-0"
       }
     }
   },
