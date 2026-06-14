@@ -313,6 +313,7 @@ export default function HomeScreen() {
   const avatarInitial = (profile?.name || (user as any)?.user_metadata?.full_name || '?').charAt(0).toUpperCase();
 
   const [events, setEvents] = useState<any[]>([]);
+  const [nextWeekSeed, setNextWeekSeed] = useState(() => Math.random());
   const [trendingEvents, setTrendingEvents] = useState<any[]>([]);
   const [clubs, setClubs] = useState<any[]>([]);
   const [attendingIds, setAttendingIds] = useState<Set<string>>(new Set());
@@ -378,6 +379,7 @@ export default function HomeScreen() {
 
   useFocusEffect(useCallback(() => {
     setStatusBarStyle('dark');
+    setNextWeekSeed(Math.random());
     if (city === null) return;
     loadData();
     refetchProfile();
@@ -528,18 +530,27 @@ export default function HomeScreen() {
     .filter((e: any) => !shownIds.has(e.id))
     .slice(0, 10);
 
-  // Next week: Monday–Sunday of the upcoming week
+  // Next week: Monday–Sunday of the upcoming week, reshuffled on every focus
   const nextWeekEvents = (() => {
     const today = new Date(); today.setHours(0, 0, 0, 0);
-    const dayOfWeek = today.getDay(); // 0=Sun
+    const dayOfWeek = today.getDay();
     const daysUntilMonday = dayOfWeek === 0 ? 1 : 8 - dayOfWeek;
     const nextMonday = new Date(today); nextMonday.setDate(today.getDate() + daysUntilMonday);
     const nextSunday = new Date(nextMonday); nextSunday.setDate(nextMonday.getDate() + 6);
-    return events.filter((e: any) => {
+    const filtered = events.filter((e: any) => {
       if (!e.date) return false;
       const d = new Date(e.date + 'T00:00:00');
       return d >= nextMonday && d <= nextSunday;
-    }).slice(0, 12);
+    });
+    // Seeded shuffle so order changes on every focus
+    const arr = [...filtered];
+    let seed = nextWeekSeed;
+    for (let i = arr.length - 1; i > 0; i--) {
+      seed = (seed * 9301 + 49297) % 233280;
+      const j = Math.floor((seed / 233280) * (i + 1));
+      [arr[i], arr[j]] = [arr[j], arr[i]];
+    }
+    return arr.slice(0, 12);
   })();
 
   return (
