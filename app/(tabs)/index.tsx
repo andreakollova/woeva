@@ -528,6 +528,20 @@ export default function HomeScreen() {
     .filter((e: any) => !shownIds.has(e.id))
     .slice(0, 10);
 
+  // Next week: Monday–Sunday of the upcoming week
+  const nextWeekEvents = (() => {
+    const today = new Date(); today.setHours(0, 0, 0, 0);
+    const dayOfWeek = today.getDay(); // 0=Sun
+    const daysUntilMonday = dayOfWeek === 0 ? 1 : 8 - dayOfWeek;
+    const nextMonday = new Date(today); nextMonday.setDate(today.getDate() + daysUntilMonday);
+    const nextSunday = new Date(nextMonday); nextSunday.setDate(nextMonday.getDate() + 6);
+    return events.filter((e: any) => {
+      if (!e.date) return false;
+      const d = new Date(e.date + 'T00:00:00');
+      return d >= nextMonday && d <= nextSunday;
+    }).slice(0, 12);
+  })();
+
   return (
     <View style={[styles.container, { paddingTop: insets.top }]}>
       <StatusBar style="dark" />
@@ -662,6 +676,14 @@ export default function HomeScreen() {
           <View style={styles.section}>
             <SectionHeader title="🎬 Letné kino" />
             <EventCarousel events={kinoEvents} attendingIds={attendingIds} onPress={goToEvent} lang={lang} userProfile={profile} sharpCorner="topLeft" forcedTag="Letné kino" />
+          </View>
+        )}
+
+        {/* ── Budúci týždeň ── */}
+        {!loading && nextWeekEvents.length > 0 && (
+          <View style={styles.section}>
+            <SectionHeader title="📅 Budúci týždeň" />
+            <EventCarousel events={nextWeekEvents} attendingIds={attendingIds} onPress={goToEvent} lang={lang} userProfile={profile} sharpCorner="topLeft" />
           </View>
         )}
 
