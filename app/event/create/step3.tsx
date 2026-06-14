@@ -29,12 +29,17 @@ export default function CreateStep3Screen() {
   const locale = lang === 'sk' ? 'sk-SK' : 'en-US';
   const params = useLocalSearchParams<{ title: string; tagline: string; tags: string; cover: string; postAs: string }>();
 
-  const [date, setDate] = useState(draft3.date ?? new Date());
-  const [time, setTime] = useState(draft3.time ?? new Date());
+  const [date, setDate] = useState(() => {
+    if (draft3.date) return draft3.date;
+    const d = new Date(); d.setDate(d.getDate() + 1); d.setHours(18, 0, 0, 0); return d;
+  });
+  const [time, setTime] = useState(() => {
+    if (draft3.time) return draft3.time;
+    const d = new Date(); d.setDate(d.getDate() + 1); d.setHours(18, 0, 0, 0); return d;
+  });
   const [endTime, setEndTime] = useState(() => {
     if (draft3.endTime) return draft3.endTime;
-    const d = draft3.time ?? new Date();
-    const e = new Date(d); e.setHours(e.getHours() + 2); return e;
+    const d = new Date(); d.setDate(d.getDate() + 1); d.setHours(20, 0, 0, 0); return d;
   });
   const [venue, setVenue] = useState(draft3.venue);
   const [venueLat, setVenueLat] = useState<number | undefined>(draft3.venueLat);
@@ -84,6 +89,9 @@ export default function CreateStep3Screen() {
   async function handleShare() {
     if (!venue.trim()) { Alert.alert(t.event.missingVenue, t.event.missingVenueMsg); return; }
     if (!params.title) { Alert.alert(t.event.missingTitle, t.event.missingTitleMsg); return; }
+    // Validate date+time is in the future
+    const eventDateTime = new Date(`${date.getFullYear()}-${String(date.getMonth()+1).padStart(2,'0')}-${String(date.getDate()).padStart(2,'0')}T${time.getHours().toString().padStart(2,'0')}:${time.getMinutes().toString().padStart(2,'0')}:00`);
+    if (eventDateTime <= new Date()) { Alert.alert(lang === 'sk' ? 'Neplatný čas' : 'Invalid time', lang === 'sk' ? 'Čas začiatku musí byť v budúcnosti.' : 'Start time must be in the future.'); return; }
     setLoading(true);
 
     const currentUser = user;
@@ -169,7 +177,6 @@ export default function CreateStep3Screen() {
       ...(cover_urls.length > 1 ? { cover_urls } : {}),
       date: eventDate,
       time: eventTime,
-      end_time: eventEndTime,
       duration: durationHours,
       venue: venue.trim(),
       lat: safeLat,
