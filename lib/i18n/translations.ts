@@ -946,7 +946,7 @@ export const translations = {
       editBadge: 'UPRAVIŤ',
       ratingLabel: 'Hodnotenie',
       aboutTitle: 'O klube',
-      memberCount: (n: number) => `${n} ${n === 1 ? 'člen' : n < 5 ? 'členovia' : 'členov'}`,
+      memberCount: (n: number) => `${n} ${n === 1 ? 'člen' : (n >= 2 && n <= 4) ? 'členovia' : 'členov'}`,
       createEventForClub: 'Vytvoriť udalosť pre tento klub',
       upcomingEvents: 'Nadchádzajúce udalosti',
       leaveClub: 'Opustiť klub',

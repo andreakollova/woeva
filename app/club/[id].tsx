@@ -290,7 +290,7 @@ export default function ClubDetailScreen() {
             <View style={styles.statDivider} />
             <View style={styles.statItem}>
               <Text style={styles.statNum}>{memberCount}</Text>
-              <Text style={styles.statLabel}>{t.club.members}</Text>
+              <Text style={styles.statLabel}>{memberCount === 1 ? 'člen' : (memberCount >= 2 && memberCount <= 4) ? 'členovia' : 'členov'}</Text>
             </View>
           </View>
 
