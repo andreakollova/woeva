@@ -1,25 +1,20 @@
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useState, useRef } from 'react';
 import {
   View, Text, TextInput, TouchableOpacity, StyleSheet,
-  ActivityIndicator, ScrollView, Keyboard, Modal,
+  ActivityIndicator, ScrollView,
 } from 'react-native';
 import { Colors } from '@/constants/colors';
 import { Fonts } from '@/constants/fonts';
+import { useTranslations } from '@/context/LanguageContext';
 
-interface NominatimResult {
-  place_id: number;
-  display_name: string;
-  lat: string;
-  lon: string;
-  address: {
-    amenity?: string;
-    cafe?: string;
-    restaurant?: string;
-    road?: string;
-    city?: string;
-    town?: string;
-    village?: string;
-    country?: string;
+const GOOGLE_API_KEY = 'AIzaSyDhtj5z-Us7Ic01tHuaJxC_mLTZPG3moj0';
+
+interface PlacePrediction {
+  place_id: string;
+  description: string;
+  structured_formatting: {
+    main_text: string;
+    secondary_text: string;
   };
 }
 
@@ -37,37 +32,12 @@ interface VenueInputProps {
 }
 
 export function VenueInput({ value, onChange, dark }: VenueInputProps) {
+  const { lang } = useTranslations();
   const [results, setResults] = useState<VenueResult[]>([]);
   const [loading, setLoading] = useState(false);
   const [focused, setFocused] = useState(false);
   const [confirmed, setConfirmed] = useState(false);
-  const [dropdownTop, setDropdownTop] = useState(0);
-  const [dropdownLeft, setDropdownLeft] = useState(0);
-  const [dropdownWidth, setDropdownWidth] = useState(0);
-  const wrapperRef = useRef<View>(null);
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-
-  // Re-measure when results appear (keyboard may have shifted layout)
-  useEffect(() => {
-    if (results.length > 0) measureWrapper();
-  }, [results.length]);
-
-  function measureWrapper() {
-    wrapperRef.current?.measureInWindow((x, y, width, height) => {
-      setDropdownLeft(x);
-      setDropdownTop(y + height + 4);
-      setDropdownWidth(width);
-    });
-  }
-
-  function getLabel(r: NominatimResult): string {
-    const parts = r.display_name.split(', ');
-    return parts.slice(0, 3).join(', ');
-  }
-
-  function getCity(r: NominatimResult): string {
-    return r.address.city ?? r.address.town ?? r.address.village ?? '';
-  }
 
   async function search(query: string) {
     onChange(query);
@@ -79,15 +49,29 @@ export function VenueInput({ value, onChange, dark }: VenueInputProps) {
     debounceRef.current = setTimeout(async () => {
       setLoading(true);
       try {
-        const url = `https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(query)}&format=json&addressdetails=1&limit=6`;
-        const res = await fetch(url, { headers: { 'Accept-Language': 'sk,en' } });
-        const data: NominatimResult[] = await res.json();
-        setResults(data.map(r => ({
-          name: getLabel(r),
-          city: getCity(r),
-          lat: parseFloat(r.lat),
-          lng: parseFloat(r.lon),
-        })));
+        const acUrl = `https://maps.googleapis.com/maps/api/place/autocomplete/json?input=${encodeURIComponent(query)}&key=${GOOGLE_API_KEY}&language=sk&components=country:sk&types=geocode`;
+        const acRes = await fetch(acUrl);
+        const acData = await acRes.json();
+        const predictions: PlacePrediction[] = acData.predictions ?? [];
+
+        const details = await Promise.all(predictions.slice(0, 6).map(async (p) => {
+          const detUrl = `https://maps.googleapis.com/maps/api/place/details/json?place_id=${p.place_id}&fields=geometry,address_components&key=${GOOGLE_API_KEY}`;
+          const detRes = await fetch(detUrl);
+          const detData = await detRes.json();
+          const loc = detData.result?.geometry?.location;
+          const comps: any[] = detData.result?.address_components ?? [];
+          const city = comps.find((c: any) => c.types.includes('locality'))?.long_name
+            ?? comps.find((c: any) => c.types.includes('administrative_area_level_2'))?.long_name
+            ?? '';
+          return loc ? {
+            name: p.description,
+            city,
+            lat: loc.lat,
+            lng: loc.lng,
+          } : null;
+        }));
+
+        setResults(details.filter(Boolean) as VenueResult[]);
       } catch {
         setResults([]);
       } finally {
@@ -100,55 +84,52 @@ export function VenueInput({ value, onChange, dark }: VenueInputProps) {
     onChange(r.name, r.lat, r.lng);
     setConfirmed(true);
     setResults([]);
-    Keyboard.dismiss();
   }
 
   const th = dark ? darkTheme : lightTheme;
 
   return (
-    <View ref={wrapperRef} style={styles.wrapper}>
-      <Text style={[styles.label, { color: th.label }]}>Address</Text>
+    <View style={styles.wrapper}>
+      <Text style={[styles.label, { color: th.label }]}>{lang === 'sk' ? 'Miesto' : 'Address'}</Text>
       <View style={[styles.inputWrap, { borderColor: th.border, backgroundColor: th.bg }, focused && { borderColor: th.focusBorder }, confirmed && styles.inputConfirmed]}>
         <TextInput
           style={[styles.input, { color: th.text }]}
           value={value}
           onChangeText={search}
-          placeholder="Start typing an address..."
+          placeholder={lang === 'sk' ? 'Začni písať adresu...' : 'Start typing an address...'}
           placeholderTextColor={th.placeholder}
-          onFocus={() => { setFocused(true); measureWrapper(); }}
+          onFocus={() => setFocused(true)}
           onBlur={() => setFocused(false)}
           autoCorrect={false}
           selectionColor={Colors.lime}
+          maxLength={200}
         />
         {loading && <ActivityIndicator size="small" color={Colors.gray} style={styles.spinner} />}
         {confirmed && !loading && <Text style={styles.confirmedIcon}>✓</Text>}
       </View>
       {value.length > 0 && !confirmed && !loading && results.length === 0 && (
-        <Text style={styles.hint}>↑ Select from the list to pin on map</Text>
+        <Text style={styles.hint}>{lang === 'sk' ? '↑ Vyber zo zoznamu pre pin na mape' : '↑ Select from the list to pin on map'}</Text>
       )}
       {confirmed && (
-        <Text style={styles.confirmedHint}>📍 Location confirmed — will appear on map</Text>
+        <Text style={styles.confirmedHint}>{lang === 'sk' ? '📍 Miesto potvrdené — zobrazí sa na mape' : '📍 Location confirmed — will appear on map'}</Text>
       )}
-
-      <Modal visible={results.length > 0} transparent animationType="none" statusBarTranslucent onRequestClose={() => setResults([])}>
-        <TouchableOpacity style={StyleSheet.absoluteFill} activeOpacity={1} onPress={() => setResults([])}>
-          <View style={[styles.dropdown, { top: dropdownTop, left: dropdownLeft, width: dropdownWidth }]}>
-            <ScrollView keyboardShouldPersistTaps="handled" nestedScrollEnabled>
-              {results.map((r, i) => (
-                <TouchableOpacity
-                  key={i}
-                  style={[styles.item, i < results.length - 1 && styles.itemBorder]}
-                  onPress={() => select(r)}
-                  activeOpacity={0.7}
-                >
-                  <Text style={styles.itemName} numberOfLines={1}>{r.name}</Text>
-                  {r.city ? <Text style={styles.itemCity}>{r.city}</Text> : null}
-                </TouchableOpacity>
-              ))}
-            </ScrollView>
-          </View>
-        </TouchableOpacity>
-      </Modal>
+      {results.length > 0 && (
+        <View style={[styles.dropdown, { backgroundColor: th.bg, borderColor: th.border }]}>
+          <ScrollView keyboardShouldPersistTaps="always" nestedScrollEnabled>
+            {results.map((r, i) => (
+              <TouchableOpacity
+                key={i}
+                style={[styles.item, i < results.length - 1 && styles.itemBorder]}
+                onPress={() => select(r)}
+                activeOpacity={0.7}
+              >
+                <Text style={[styles.itemName, { color: th.text }]} numberOfLines={1}>{r.name}</Text>
+                {r.city ? <Text style={styles.itemCity}>{r.city}</Text> : null}
+              </TouchableOpacity>
+            ))}
+          </ScrollView>
+        </View>
+      )}
     </View>
   );
 }
@@ -214,7 +195,7 @@ const styles = StyleSheet.create({
   spinner: {
     marginLeft: 8,
   },
-  wrapper: {},
+  wrapper: { zIndex: 999 },
   dropdown: {
     position: 'absolute',
     zIndex: 999,
