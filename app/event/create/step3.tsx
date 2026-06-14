@@ -196,8 +196,6 @@ export default function CreateStep3Screen() {
         supabase.from('event_attendees').insert({ event_id: data.id, user_id: currentUser.id, paid: true }).then(() => {});
       }
 
-      // Trigger bot attendees (fire & forget)
-      supabase.functions.invoke('add-bot-attendees', { body: { event_id: data.id } }).then(() => {});
 
       // Send push + in-app notifications to club members
       let clubMemberUserIds: string[] = [];
