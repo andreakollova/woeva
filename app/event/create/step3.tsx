@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, ScrollView, KeyboardAvoidingView, Platform, Alert, Modal, Pressable, Image } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, ScrollView, KeyboardAvoidingView, Platform, Alert, Modal, Pressable, Image, TextInput } from 'react-native';
+import { StatusBar } from 'expo-status-bar';
 import * as FileSystem from 'expo-file-system/legacy';
 import * as ImagePicker from 'expo-image-picker';
 import { useRouter, useLocalSearchParams, useFocusEffect } from 'expo-router';
@@ -30,13 +31,19 @@ export default function CreateStep3Screen() {
 
   const [date, setDate] = useState(draft3.date ?? new Date());
   const [time, setTime] = useState(draft3.time ?? new Date());
-  const [duration, setDuration] = useState(draft3.duration);
+  const [endTime, setEndTime] = useState(() => {
+    if (draft3.endTime) return draft3.endTime;
+    const d = draft3.time ?? new Date();
+    const e = new Date(d); e.setHours(e.getHours() + 2); return e;
+  });
   const [venue, setVenue] = useState(draft3.venue);
   const [venueLat, setVenueLat] = useState<number | undefined>(draft3.venueLat);
   const [venueLng, setVenueLng] = useState<number | undefined>(draft3.venueLng);
   const [price, setPrice] = useState(draft3.price);
   const [payAtDoor, setPayAtDoor] = useState(draft3.payAtDoor);
   const [isRecurring, setIsRecurring] = useState(draft3.isRecurring);
+  const [hasCapacity, setHasCapacity] = useState(draft3.hasCapacity);
+  const [capacity, setCapacity] = useState(draft3.capacity);
   const [recurringEndDate, setRecurringEndDate] = useState(() => {
     if (draft3.recurringEndDate) return draft3.recurringEndDate;
     const d = new Date(); d.setDate(d.getDate() + 7); return d;
@@ -44,7 +51,7 @@ export default function CreateStep3Screen() {
   const [loading, setLoading] = useState(false);
   const [showDate, setShowDate] = useState(false);
   const [showTime, setShowTime] = useState(false);
-  const [showDuration, setShowDuration] = useState(false);
+  const [showEndTime, setShowEndTime] = useState(false);
   const [showRecurringEnd, setShowRecurringEnd] = useState(false);
   const [extraCovers, setExtraCovers] = useState<string[]>(draft3.extraCovers);
   const [toast, setToast] = useState(false);
@@ -66,12 +73,13 @@ export default function CreateStep3Screen() {
 
   // Keep draft in sync
   useEffect(() => {
-    draft3.date = date; draft3.time = time; draft3.duration = duration;
+    draft3.date = date; draft3.time = time; draft3.endTime = endTime;
     draft3.venue = venue; draft3.venueLat = venueLat; draft3.venueLng = venueLng;
     draft3.price = price; draft3.payAtDoor = payAtDoor;
     draft3.isRecurring = isRecurring; draft3.recurringEndDate = recurringEndDate;
     draft3.extraCovers = extraCovers;
-  }, [date, time, duration, venue, venueLat, venueLng, price, payAtDoor, isRecurring, recurringEndDate, extraCovers]);
+    draft3.hasCapacity = hasCapacity; draft3.capacity = capacity;
+  }, [date, time, endTime, venue, venueLat, venueLng, price, payAtDoor, isRecurring, recurringEndDate, extraCovers, hasCapacity, capacity]);
 
   async function handleShare() {
     if (!venue.trim()) { Alert.alert(t.event.missingVenue, t.event.missingVenueMsg); return; }
@@ -83,6 +91,9 @@ export default function CreateStep3Screen() {
 
     const eventDate = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
     const eventTime = `${time.getHours().toString().padStart(2, '0')}:${time.getMinutes().toString().padStart(2, '0')}`;
+    const eventEndTime = `${endTime.getHours().toString().padStart(2, '0')}:${endTime.getMinutes().toString().padStart(2, '0')}`;
+    const durationMs = endTime.getTime() - time.getTime();
+    const durationHours = durationMs > 0 ? durationMs / 3600000 : 2;
     const priceNum = parseFloat(price) || 0;
     const isPayAtDoor = payAtDoor && priceNum > 0;
     if (!isPayAtDoor && priceNum > 0 && priceNum < 0.5) {
@@ -114,49 +125,75 @@ export default function CreateStep3Screen() {
     }
 
     const parsedTags = (() => { try { return JSON.parse(params.tags || '[]'); } catch { return []; } })();
-    const VALID_CATS = ['Sport', 'Coffee', 'Sober party', 'Party', 'Music', 'Art', 'Film', 'Yoga', 'Tech', 'Gardening', 'Gaming', 'Running', 'Hockey', 'Dance', 'Food', 'Networking', 'Matches', 'Gastro', 'Free'];
+    const VALID_CATS = ['Movement & Sport', 'Wellness & Body', 'Food & Drinks', 'Art & Creation', 'Music & Nightlife', 'Learning & Mind', 'Community & Belonging'];
     const firstTag = parsedTags[0] || '';
-    const safeCategory = VALID_CATS.includes(firstTag) ? firstTag : (parsedTags.find((t: string) => VALID_CATS.includes(t)) ?? 'Sport');
+    const safeCategory = VALID_CATS.includes(firstTag) ? firstTag : (parsedTags.find((t: string) => VALID_CATS.includes(t)) ?? 'Community & Belonging');
+
+    const CITY_CENTERS: Record<string, { lat: number; lng: number }> = {
+      'Bratislava': { lat: 48.1486, lng: 17.1077 },
+      'Košice':     { lat: 48.7164, lng: 21.2611 },
+      'Žilina':     { lat: 49.2231, lng: 18.7394 },
+      'Prešov':     { lat: 49.0018, lng: 21.2396 },
+      'Nitra':      { lat: 48.3069, lng: 18.0873 },
+      'Banská Bystrica': { lat: 48.7395, lng: 19.1528 },
+      'Trnava':     { lat: 48.3774, lng: 17.5878 },
+      'Trenčín':    { lat: 48.8943, lng: 18.0438 },
+    };
+    const MAX_CITY_RADIUS_KM = 40;
+    function distKm(lat1: number, lng1: number, lat2: number, lng2: number) {
+      const R = 6371, dLat = (lat2 - lat1) * Math.PI / 180, dLng = (lng2 - lng1) * Math.PI / 180;
+      const a = Math.sin(dLat / 2) ** 2 + Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) * Math.sin(dLng / 2) ** 2;
+      return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+    }
+    const eventCity = profile?.city ?? 'Bratislava';
+    const cityCenter = CITY_CENTERS[eventCity];
+    let safeLat = venueLat ?? null;
+    let safeLng = venueLng ?? null;
+    if (safeLat != null && safeLng != null && cityCenter) {
+      if (distKm(safeLat, safeLng, cityCenter.lat, cityCenter.lng) > MAX_CITY_RADIUS_KM) {
+        safeLat = cityCenter.lat;
+        safeLng = cityCenter.lng;
+      }
+    } else if (cityCenter && (safeLat == null || safeLng == null)) {
+      safeLat = cityCenter.lat;
+      safeLng = cityCenter.lng;
+    }
 
     const { data, error } = await supabase.from('events').insert({
       creator_id: currentUser.id,
       club_id: clubData?.id ?? null,
-      title: String(params.title),
-      tagline: String(params.tagline || ''),
+      title: String(params.title).trim().slice(0, 120),
+      tagline: String(params.tagline || '').trim().slice(0, 300),
       category: safeCategory,
       cover_url,
       ...(cover_urls.length > 1 ? { cover_urls } : {}),
       date: eventDate,
       time: eventTime,
-      duration: parseFloat(String(duration)) || 2,
+      end_time: eventEndTime,
+      duration: durationHours,
       venue: venue.trim(),
-      lat: venueLat ?? null,
-      lng: venueLng ?? null,
+      lat: safeLat,
+      lng: safeLng,
       price: priceNum,
       is_free: priceNum === 0,
       pay_at_door: isPayAtDoor,
       is_recurring: isRecurring,
       recurring_end_date: isRecurring ? `${recurringEndDate.getFullYear()}-${String(recurringEndDate.getMonth() + 1).padStart(2, '0')}-${String(recurringEndDate.getDate()).padStart(2, '0')}` : null,
-      going_count: 1,
-      city: profile?.city ?? 'Bratislava',
+      capacity: hasCapacity && capacity ? parseInt(capacity, 10) : null,
+      going_count: hasCapacity && capacity ? 0 : 1,
+      city: eventCity,
     }).select().single();
 
     if (!error && data) {
-      supabase.from('event_attendees').insert({ event_id: data.id, user_id: currentUser.id, paid: true }).then(() => {});
+      if (!(hasCapacity && capacity)) {
+        supabase.from('event_attendees').insert({ event_id: data.id, user_id: currentUser.id, paid: true }).then(() => {});
+      }
 
       // Trigger bot attendees (fire & forget)
       supabase.functions.invoke('add-bot-attendees', { body: { event_id: data.id } }).then(() => {});
 
-      // Notify users interested in new events (my tags / all)
-      notify.newEvent({
-        creatorId: currentUser.id,
-        eventId: data.id,
-        eventTitle: String(params.title),
-        tags: parsedTags,
-        city: profile?.city ?? 'Bratislava',
-      });
-
       // Send push + in-app notifications to club members
+      let clubMemberUserIds: string[] = [];
       if (clubData?.id) {
         const { data: members } = await supabase
           .from('club_members')
@@ -165,17 +202,26 @@ export default function CreateStep3Screen() {
           .eq('status', 'approved')
           .neq('user_id', currentUser.id);
 
-        const memberTokens = (members ?? []).map((m: any) => m.profile?.push_token).filter(Boolean);
-        const memberUserIds = (members ?? []).map((m: any) => m.user_id);
+        // Deduplicate by user_id (user may appear multiple times as member+admin)
+        const seenIds = new Set<string>();
+        const dedupedMembers = (members ?? []).filter((m: any) => {
+          if (seenIds.has(m.user_id)) return false;
+          seenIds.add(m.user_id);
+          return true;
+        });
+
+        const memberTokens = dedupedMembers.map((m: any) => m.profile?.push_token).filter(Boolean);
+        const memberUserIds = dedupedMembers.map((m: any) => m.user_id);
+        clubMemberUserIds = memberUserIds;
 
         const { data: memberProfiles } = await supabase
           .from('profiles').select('email').in('id', memberUserIds);
         const memberEmails = (memberProfiles ?? []).map((p: any) => p.email).filter(Boolean);
 
-        // In-app notifications
-        const inAppNotifs = (members ?? []).map((m: any) => ({
+        // In-app notifications (deduplicated)
+        const inAppNotifs = dedupedMembers.map((m: any) => ({
           user_id: m.user_id, type: 'club_event',
-          title: `New event in ${clubData.name ?? 'your club'}`,
+          title: `Nový event v ${clubData.name ?? 'tvojom klube'}`,
           body: String(params.title),
           data: { event_id: data.id },
         }));
@@ -195,6 +241,16 @@ export default function CreateStep3Screen() {
           memberEmails,
         });
       }
+
+      // Notify city users — exclude club members who already got a notification
+      notify.newEvent({
+        creatorId: currentUser.id,
+        eventId: data.id,
+        eventTitle: String(params.title),
+        tags: parsedTags,
+        city: profile?.city ?? 'Bratislava',
+        excludeUserIds: clubMemberUserIds,
+      });
     }
 
     setLoading(false);
@@ -209,9 +265,10 @@ export default function CreateStep3Screen() {
 
   return (
     <KeyboardAvoidingView style={{ flex: 1, backgroundColor: Colors.white }} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
+      <StatusBar style="dark" />
       <ScrollView
         style={styles.container}
-        contentContainerStyle={[styles.scroll, { paddingTop: insets.top + 20, paddingBottom: 0 }]}
+        contentContainerStyle={[styles.scroll, { paddingTop: insets.top + 4, paddingBottom: 0 }]}
         keyboardShouldPersistTaps="always"
       >
         {/* Header */}
@@ -221,7 +278,7 @@ export default function CreateStep3Screen() {
               <Text style={styles.backArrow}>←</Text>
             </TouchableOpacity>
           </View>
-          <WMark size={30} color={Colors.lime} />
+          <WMark size={80} color={Colors.lime} />
           <View style={{ flex: 1, alignItems: 'flex-end' }}>
             <View style={styles.stepBadge}><Text style={styles.stepText}>{t.event.step(3, 3)}</Text></View>
           </View>
@@ -255,7 +312,7 @@ export default function CreateStep3Screen() {
             )}
           </View>
 
-          {/* Time + Duration row */}
+          {/* Time + End time row */}
           <View style={styles.halfRow}>
             <View style={styles.halfCol}>
               <Text style={styles.label}>{t.event.time}</Text>
@@ -267,40 +324,36 @@ export default function CreateStep3Screen() {
                   value={time}
                   mode="time"
                   display="spinner"
-                  onChange={(_, t) => { setShowTime(false); if (t) setTime(t); }}
+                  onChange={(_, t) => {
+                    setShowTime(false);
+                    if (t) {
+                      setTime(t);
+                      // Shift end time by the same offset to keep duration
+                      setEndTime(prev => {
+                        const diff = prev.getTime() - time.getTime();
+                        return new Date(t.getTime() + Math.max(diff, 3600000));
+                      });
+                    }
+                  }}
                 />
               )}
             </View>
 
             <View style={styles.halfCol}>
-              <Text style={styles.label}>{t.event.duration}</Text>
-              <TouchableOpacity style={styles.field} onPress={() => setShowDuration(true)}>
-                <Text style={styles.fieldValue}>{duration === '0.5' ? '30 min' : `${duration}h`}</Text>
+              <Text style={styles.label}>{lang === 'sk' ? 'Čas ukončenia' : 'End time'}</Text>
+              <TouchableOpacity style={styles.field} onPress={() => setShowEndTime(true)}>
+                <Text style={styles.fieldValue}>{`${endTime.getHours().toString().padStart(2, '0')}:${endTime.getMinutes().toString().padStart(2, '0')}`}</Text>
               </TouchableOpacity>
+              {showEndTime && (
+                <DateTimePicker
+                  value={endTime}
+                  mode="time"
+                  display="spinner"
+                  onChange={(_, t) => { setShowEndTime(false); if (t) setEndTime(t); }}
+                />
+              )}
             </View>
           </View>
-
-          {/* Duration picker modal */}
-          <Modal visible={showDuration} transparent animationType="fade" onRequestClose={() => setShowDuration(false)}>
-            <Pressable style={styles.modalOverlay} onPress={() => setShowDuration(false)}>
-              <View style={styles.durationSheet}>
-                <Text style={styles.durationSheetTitle}>{t.event.duration}</Text>
-                {(['0.5', '1', '1.5', '2', '3', '4', '5', '6', '8'] as const).map((h, i, arr) => (
-                  <TouchableOpacity
-                    key={h}
-                    style={[styles.durationOption, i < arr.length - 1 && styles.durationOptionBorder]}
-                    onPress={() => { setDuration(h); setShowDuration(false); }}
-                    activeOpacity={0.7}
-                  >
-                    <Text style={[styles.durationOptionText, duration === h && styles.durationOptionActive]}>
-                      {h === '0.5' ? '30 min' : `${h} hour${parseFloat(h) !== 1 ? 's' : ''}`}
-                    </Text>
-                    {duration === h && <Text style={styles.durationCheck}>✓</Text>}
-                  </TouchableOpacity>
-                ))}
-              </View>
-            </Pressable>
-          </Modal>
 
           {/* Price */}
           <Input
@@ -355,6 +408,30 @@ export default function CreateStep3Screen() {
               <View style={[styles.toggleThumb, isRecurring && styles.toggleThumbOn]} />
             </View>
           </TouchableOpacity>
+
+          {/* Capacity toggle */}
+          <TouchableOpacity style={styles.recurringRow} onPress={() => setHasCapacity(r => !r)} activeOpacity={0.7}>
+            <View style={styles.recurringText}>
+              <Text style={styles.recurringTitle}>{lang === 'sk' ? 'Obmedzená kapacita' : 'Limited capacity'}</Text>
+              <Text style={styles.recurringSub}>{lang === 'sk' ? 'Nastav maximálny počet účastníkov.' : 'Set a maximum number of attendees.'}</Text>
+            </View>
+            <View style={[styles.toggle, hasCapacity && styles.toggleOn]}>
+              <View style={[styles.toggleThumb, hasCapacity && styles.toggleThumbOn]} />
+            </View>
+          </TouchableOpacity>
+          {hasCapacity && (
+            <View>
+              <Text style={styles.label}>{lang === 'sk' ? 'Maximálny počet miest' : 'Max attendees'}</Text>
+              <TextInput
+                style={styles.field}
+                value={capacity}
+                onChangeText={v => setCapacity(v.replace(/[^0-9]/g, ''))}
+                placeholder={lang === 'sk' ? 'napr. 30' : 'e.g. 30'}
+                keyboardType="number-pad"
+                maxLength={5}
+              />
+            </View>
+          )}
 
           {/* Recurring end date — only when recurring is on */}
           {isRecurring && (() => {
@@ -464,10 +541,10 @@ export default function CreateStep3Screen() {
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: Colors.white },
   scroll: { paddingHorizontal: 24 },
-  stepRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 24 },
+  stepRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 },
   stepBadge: { backgroundColor: Colors.grayLight, borderRadius: 50, paddingHorizontal: 14, paddingVertical: 6 },
   stepText: { fontSize: 13, fontWeight: '600', color: Colors.black },
-  title: { fontSize: 28, fontWeight: '700', color: Colors.black, marginBottom: 28, letterSpacing: -0.5 },
+  title: { fontSize: 28, fontWeight: '700', color: Colors.black, marginBottom: 16, letterSpacing: -0.5 },
   form: { gap: 20 },
   label: { fontSize: 13, fontWeight: '500', color: Colors.black, marginBottom: 6 },
   field: { height: 44, borderWidth: 1.5, borderColor: Colors.grayBorder, borderRadius: 12, paddingHorizontal: 14, justifyContent: 'center' },

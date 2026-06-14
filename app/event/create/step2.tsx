@@ -1,7 +1,9 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, ScrollView, KeyboardAvoidingView, Platform, Image, Alert, Modal, Pressable, TextInput } from 'react-native';
+import { StatusBar } from 'expo-status-bar';
 import * as FileSystem from 'expo-file-system/legacy';
 import { useRouter } from 'expo-router';
+import { useFocusEffect } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import * as ImagePicker from 'expo-image-picker';
 import { Colors } from '@/constants/colors';
@@ -33,6 +35,15 @@ export default function CreateStep2Screen() {
   const [catRequestName, setCatRequestName] = useState('');
   const [catRequestClub, setCatRequestClub] = useState('');
   const [catRequestSent, setCatRequestSent] = useState(false);
+
+  // Re-read draft every time screen gets focus — so cleared draft (after publish) shows blank fields
+  useFocusEffect(useCallback(() => {
+    setTitle(draft2.title);
+    setTagline(draft2.tagline);
+    setTags([...draft2.tags]);
+    setCover(draft2.cover);
+    setPostAs(draft2.postAs);
+  }, []));
 
   useEffect(() => {
     if (!user) return;
@@ -103,9 +114,10 @@ export default function CreateStep2Screen() {
 
   return (
     <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : undefined} keyboardVerticalOffset={0}>
+      <StatusBar style="dark" />
       <ScrollView
         style={styles.container}
-        contentContainerStyle={[styles.scroll, { paddingTop: insets.top + 20, paddingBottom: 16 }]}
+        contentContainerStyle={[styles.scroll, { paddingTop: insets.top + 4, paddingBottom: 16 }]}
         keyboardShouldPersistTaps="handled"
       >
         {/* Top bar */}
@@ -115,7 +127,7 @@ export default function CreateStep2Screen() {
               <Text style={styles.backArrow}>←</Text>
             </TouchableOpacity>
           </View>
-          <WMark size={30} color={Colors.lime} />
+          <WMark size={80} color={Colors.lime} />
           <View style={{ flex: 1, alignItems: 'flex-end' }}>
             <View style={styles.stepBadge}><Text style={styles.stepText}>{t.event.step(2, 3)}</Text></View>
           </View>
@@ -204,6 +216,10 @@ export default function CreateStep2Screen() {
               }}
               placeholder={t.event.descriptionPlaceholder}
               maxLength={300}
+              multiline
+              numberOfLines={2}
+              textAlignVertical="top"
+              style={{ height: undefined, minHeight: 80, paddingTop: 12 }}
             />
             {wordCount > 28 && wordCount <= 30 && (
               <Text style={styles.hint}>{t.event.wordsLeft(30 - wordCount)}</Text>
@@ -218,7 +234,6 @@ export default function CreateStep2Screen() {
             <View style={styles.labelRow}>
               <View style={{ gap: 2 }}>
                 <Text style={[styles.label, { marginBottom: 0 }]}>{t.event.category}</Text>
-                <Text style={[styles.labelRequired, { fontSize: 10 }]}>Vyber všetky ktoré sa hodia</Text>
               </View>
               <TouchableOpacity onPress={() => { setShowCatRequest(true); setCatRequestSent(false); setCatRequestName(''); setCatRequestClub(''); }} activeOpacity={0.7}>
                 <Text style={styles.catMissingLink}>Chýba ti kategória?</Text>
@@ -332,12 +347,12 @@ const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: Colors.white },
   scroll: { paddingHorizontal: 24 },
   stepRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 24 },
-  topBar: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 24 },
+  topBar: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 },
   backBtn: { width: 36, height: 36, borderRadius: 18, backgroundColor: Colors.grayLight, alignItems: 'center', justifyContent: 'center' },
   backArrow: { fontSize: 18, color: Colors.black, marginTop: -1 },
   stepBadge: { backgroundColor: Colors.grayLight, borderRadius: 50, paddingHorizontal: 14, paddingVertical: 6 },
   stepText: { fontSize: 13, fontWeight: '600', color: Colors.black },
-  title: { fontSize: 28, fontWeight: '700', color: Colors.black, marginBottom: 28, letterSpacing: -0.5 },
+  title: { fontSize: 28, fontWeight: '700', color: Colors.black, marginBottom: 16, letterSpacing: -0.5 },
   form: { gap: 20 },
   label: { fontSize: 13, fontWeight: '500', color: Colors.black, marginBottom: 6 },
   chipsWrap: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginTop: 8 },

@@ -6,24 +6,27 @@ export const draft2: {
 } = { title: '', tagline: '', tags: [], cover: null, postAs: 'individual' };
 
 export const draft3: {
-  date: Date | null; time: Date | null; duration: string;
+  date: Date | null; time: Date | null; endTime: Date | null;
   venue: string; venueLat?: number; venueLng?: number;
   price: string; payAtDoor: boolean;
   isRecurring: boolean; recurringEndDate: Date | null;
   extraCovers: string[];
+  hasCapacity: boolean; capacity: string;
 } = {
-  date: null, time: null, duration: '2',
+  date: null, time: null, endTime: null,
   venue: '', price: '0', payAtDoor: false,
   isRecurring: false, recurringEndDate: null,
   extraCovers: [],
+  hasCapacity: false, capacity: '',
 };
 
 export function clearDrafts() {
   draft2.title = ''; draft2.tagline = ''; draft2.tags = [];
   draft2.cover = null; draft2.postAs = 'individual';
-  draft3.date = null; draft3.time = null; draft3.duration = '2';
+  draft3.date = null; draft3.time = null; draft3.endTime = null;
   draft3.venue = ''; draft3.venueLat = undefined; draft3.venueLng = undefined;
   draft3.price = '0'; draft3.payAtDoor = false;
   draft3.isRecurring = false; draft3.recurringEndDate = null;
   draft3.extraCovers = [];
+  draft3.hasCapacity = false; draft3.capacity = '';
 }
