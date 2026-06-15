@@ -1,0 +1,22 @@
+appId: com.woeva.app
+name: "09 - Kluby"
+---
+- launchApp
+
+# Nájdeme klub sekciu vo feede alebo v search
+- tapOn:
+    id: "tab-search"
+- assertVisible:
+    text: ".*"
+    timeout: 3000
+
+# Tap na prvý klub
+- tapOn:
+    index: 0
+    id: "club-card"
+    optional: true
+- takeScreenshot: "09_club_detail"
+- assertVisible:
+    text: ".*"
+    timeout: 5000
+- back

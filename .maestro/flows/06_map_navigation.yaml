@@ -1,0 +1,30 @@
+appId: com.woeva.app
+name: "06 - Mapa a navigácia"
+---
+- launchApp
+
+# Otvoríme event s venue
+- tapOn:
+    index: 0
+    id: "event-card"
+    timeout: 5000
+- assertVisible:
+    text: ".*"
+    timeout: 5000
+- takeScreenshot: "06_event_with_venue"
+
+# Skontrolujeme venue button (navigácia)
+- tapOn:
+    text: ".*"
+    id: "venue-row"
+    optional: true
+
+- takeScreenshot: "06_venue_tapped"
+
+# Back a check mapy na feede (full map view)
+- back
+- tapOn:
+    text: ".*"
+    id: "map-btn"
+    optional: true
+- takeScreenshot: "06_map_view"

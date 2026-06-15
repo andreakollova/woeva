@@ -81,7 +81,7 @@ export default function PublicProfileScreen() {
               style={styles.shareBtn}
               onPress={async () => {
                 const name = profile?.name ?? 'Profil';
-                const url = `https://woeva.com/profile/${id}`;
+                const url = `https://woeva.com/share-profile?id=${id}`;
                 try { await Share.share({ title: name, message: `${name} na Woeva\n${url}`, url }); } catch {}
               }}
               activeOpacity={0.8}

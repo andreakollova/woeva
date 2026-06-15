@@ -1,0 +1,23 @@
+appId: com.woeva.app
+name: "01 - Prihlásenie"
+---
+- launchApp:
+    clearState: true
+
+# Login screen
+- assertVisible: "Woeva"
+- tapOn: "Pokračovať s emailom"
+
+- tapOn:
+    id: "email-input"
+- inputText: "test@woeva.com"
+- tapOn:
+    id: "password-input"
+- inputText: "testpassword123"
+- tapOn: "Prihlásiť sa"
+
+# Should land on feed
+- assertVisible:
+    text: ".*"
+    id: "feed-screen"
+    timeout: 8000

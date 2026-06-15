@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from 'react';
+import { setStatusBarStyle } from 'expo-status-bar';
 import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Image, Alert, Modal, FlatList, Pressable, Share } from 'react-native';
 import { useLocalSearchParams, useRouter, useFocusEffect } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -46,7 +47,7 @@ export default function ClubDetailScreen() {
   const [showJoinCelebration, setShowJoinCelebration] = useState(false);
 
   useFocusEffect(
-    React.useCallback(() => { loadAll(); }, [id, user, profile?.city])
+    React.useCallback(() => { setStatusBarStyle('light'); loadAll(); }, [id, user, profile?.city])
   );
 
   async function loadAll() {
@@ -91,26 +92,40 @@ export default function ClubDetailScreen() {
     setLoading(true);
     await supabase.from('club_members').insert({ club_id: id, user_id: user.id, role: 'member', status: 'approved' });
     await supabase.from('clubs').update({ member_count: (club?.member_count ?? 0) + 1 }).eq('id', id);
-    // Notify the club creator (in-app + push)
-    if (club?.creator_id && club.creator_id !== user.id) {
-      const firstName = profile?.name?.split(' ')[0] ?? 'Someone';
-      await supabase.from('notifications').insert({
-        user_id: club.creator_id,
-        type: 'join',
-        title: `Nový člen: ${club.name}`,
-        body: `${firstName} sa pridal do tvojho klubu.`,
-        data: { club_id: id },
-      });
-      const { data: creatorProfile } = await supabase.from('profiles').select('push_token').eq('id', club.creator_id).single();
-      if (creatorProfile?.push_token) {
-        supabase.functions.invoke('send-push', {
-          body: {
-            tokens: [creatorProfile.push_token],
-            title: `Nový člen: ${club.name}`,
-            body: `${firstName} sa pridal do tvojho klubu.`,
-            data: { club_id: id, type: 'club_join' },
-          },
-        }).then(() => {});
+    // Notify all club admins (creator + members with role='admin') except the joiner
+    {
+      const firstName = profile?.name?.split(' ')[0] ?? 'Niekto';
+      const notifTitle = `Nový člen: ${club?.name ?? ''}`;
+      const notifBody = `${firstName} začal/a sledovať tvoj klub.`;
+
+      // Collect admin user IDs: creator + approved admins
+      const adminIds = new Set<string>();
+      if (club?.creator_id && club.creator_id !== user.id) adminIds.add(club.creator_id);
+      const { data: adminMembers } = await supabase
+        .from('club_members')
+        .select('user_id')
+        .eq('club_id', id)
+        .eq('role', 'admin')
+        .eq('status', 'approved')
+        .neq('user_id', user.id);
+      (adminMembers ?? []).forEach((m: any) => adminIds.add(m.user_id));
+
+      if (adminIds.size > 0) {
+        const ids = [...adminIds];
+        // In-app notifications
+        await supabase.from('notifications').insert(
+          ids.map(uid => ({ user_id: uid, type: 'join', title: notifTitle, body: notifBody, data: { club_id: id } }))
+        );
+        // Push
+        const { data: adminProfiles } = await supabase
+          .from('profiles').select('push_token').in('id', ids)
+          .neq('notifications_enabled', false).not('push_token', 'is', null);
+        const tokens = (adminProfiles ?? []).map((p: any) => p.push_token).filter(Boolean);
+        if (tokens.length > 0) {
+          supabase.functions.invoke('send-push', {
+            body: { tokens, title: notifTitle, body: notifBody, data: { club_id: id, type: 'club_join' } },
+          }).then(() => {});
+        }
       }
     }
     setIsMember(true);
@@ -259,7 +274,7 @@ export default function ClubDetailScreen() {
             <Text style={styles.clubName}>{club.name}</Text>
             <TouchableOpacity
               style={styles.clubShareBtn}
-              onPress={() => Share.share({ url: `https://woeva.com/club/${id}` })}
+              onPress={() => Share.share({ url: `https://woeva.com/share-club?id=${id}` })}
               activeOpacity={0.8}
             >
               <Svg width={14} height={14} viewBox="0 0 24 24" fill="none">

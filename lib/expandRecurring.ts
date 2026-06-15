@@ -31,7 +31,21 @@ export function expandRecurringEvents(events: Event[]): Event[] {
     while (current <= cap) {
       const dateStr = `${current.getFullYear()}-${String(current.getMonth() + 1).padStart(2, '0')}-${String(current.getDate()).padStart(2, '0')}`;
       if (!cancelledDates.has(dateStr)) {
-        result.push({ ...event, id: `${event.id}_${dateStr}`, date: dateStr, _recurringStartDate: event.date } as any);
+        // Compute per-occurrence publish_at if recurring open weekday/time is set
+        let occurrencePublishAt: string | null = event.publish_at ?? null;
+        if (event.recurring_open_weekday != null && event.recurring_open_time) {
+          const d = new Date(current);
+          d.setHours(0, 0, 0, 0);
+          let attempts = 0;
+          while (d.getDay() !== event.recurring_open_weekday && attempts < 7) {
+            d.setDate(d.getDate() - 1);
+            attempts++;
+          }
+          const [h, m] = event.recurring_open_time.split(':').map(Number);
+          d.setHours(h, m, 0, 0);
+          occurrencePublishAt = d.toISOString();
+        }
+        result.push({ ...event, id: `${event.id}_${dateStr}`, date: dateStr, publish_at: occurrencePublishAt, _recurringStartDate: event.date } as any);
       }
       current = new Date(current);
       current.setDate(current.getDate() + 7);

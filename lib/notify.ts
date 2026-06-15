@@ -129,7 +129,7 @@ export const notify = {
     await Promise.all([
       params.memberTokens.length && sendPush(
         params.memberTokens,
-        `New event in ${params.clubName}`,
+        `Nový event od ${params.clubName}`,
         params.eventTitle,
         { event_id: params.eventId }
       ),

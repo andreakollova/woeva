@@ -1,0 +1,31 @@
+appId: com.woeva.app
+name: "05 - Vyhľadávanie"
+---
+- launchApp
+
+# Tab Hľadať
+- tapOn:
+    id: "tab-search"
+- assertVisible:
+    text: ".*"
+    timeout: 3000
+- takeScreenshot: "05_search_screen"
+
+# Napíšeme query
+- tapOn:
+    text: "Hľadaj"
+- inputText: "beh"
+- hideKeyboard
+- assertVisible:
+    text: ".*"
+    timeout: 4000
+- takeScreenshot: "05_search_results"
+
+# Vyčistíme a skúsime kategóriu
+- clearText
+- inputText: "joga"
+- hideKeyboard
+- assertVisible:
+    text: ".*"
+    timeout: 4000
+- takeScreenshot: "05_search_joga"

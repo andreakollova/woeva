@@ -83,11 +83,13 @@ serve(async (req) => {
     const receiptNumber = `WOE-R-${Date.now().toString(36).toUpperCase()}`;
     const attendeeName = profile?.name ?? user.email ?? 'Účastník';
 
+    const totalAmount = (event.price ?? 0) * qty;
+
     const finalHtml = generateReceiptHtml(
       event.title,
       event.date,
       event.venue ?? null,
-      event.price ?? 0,
+      totalAmount,
       attendeeName,
       receiptNumber
     );
@@ -95,28 +97,16 @@ serve(async (req) => {
     // Increment going_count using service role (buyer may not have RLS permission to update events)
     await admin.from('events').update({ going_count: (event.going_count ?? 0) + qty }).eq('id', eventId);
 
-    // In-app notification for creator
-    const attendeeName = profile?.name ?? user.email ?? 'Someone';
-    if (event.creator_id && event.creator_id !== user.id) {
-      await admin.from('notifications').insert({
-        user_id: event.creator_id,
-        type: 'join',
-        title: `New attendee for ${event.title}`,
-        body: `${attendeeName} joined your event.`,
-        data: { event_id: eventId },
-      });
-    }
-
-    // Log revenue
-    const stripeFee = parseFloat(((event.price ?? 0) * 0.015 + 0.25).toFixed(2));
-    const woeva_fee = parseFloat(((event.price ?? 0) * 0.035).toFixed(2));
-    const net = parseFloat(((event.price ?? 0) - stripeFee - woeva_fee).toFixed(2));
+    // Log revenue — matches create-payment-intent: 5% platform fee, minimum €0.50 per transaction
+    const woeva_fee = parseFloat(Math.max(Math.round(totalAmount * 0.05 * 100) / 100, 0.50).toFixed(2));
+    const stripe_fee = parseFloat((totalAmount * 0.015 + 0.25).toFixed(2));
+    const net = parseFloat((woeva_fee - stripe_fee).toFixed(2)); // Woeva's profit after paying Stripe
     await admin.from('platform_revenue').insert({
       event_id: eventId,
       user_id: user.id,
       payment_intent_id: paymentIntentId,
-      gross: event.price ?? 0,
-      stripe_fee: stripeFee,
+      gross: totalAmount,
+      stripe_fee,
       woeva_fee,
       net,
     });
@@ -129,7 +119,7 @@ serve(async (req) => {
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({
-        from: 'Woeva <admin@woeva.com>',
+        from: 'Woeva <noreply@woeva.com>',
         to: [user.email!],
         subject: `Potvrdenie — ${event.title}`,
         html: finalHtml,

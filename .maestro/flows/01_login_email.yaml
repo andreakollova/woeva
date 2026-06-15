@@ -1,0 +1,23 @@
+appId: com.woeva.app
+name: "01 - Prihlásenie emailom"
+---
+- launchApp:
+    clearState: true
+
+# Čakáme na login screen
+- assertVisible: "Vitaj späť!"
+- assertVisible: "Pokračovať cez Google"
+
+# Zadáme email + heslo
+- tapOn: "E-mail"
+- inputText: "test@woeva.com"
+- tapOn: "Heslo"
+- inputText: "testpassword123"
+- hideKeyboard
+- tapOn: "Prihlásiť sa"
+
+# Mali by sme vidieť feed
+- assertVisible:
+    text: ".*"
+    timeout: 8000
+- takeScreenshot: "01_login_success"

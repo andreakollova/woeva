@@ -13,6 +13,7 @@ import { Toast } from '@/components/ui/Toast';
 import { useAuth } from '@/context/AuthContext';
 import { notify } from '@/lib/notify';
 import { useTranslations } from '@/context/LanguageContext';
+import { scheduleEventReminders } from '@/lib/scheduleReminders';
 
 export default function PaymentScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
@@ -120,6 +121,7 @@ export default function PaymentScreen() {
         eventId: id,
       });
     }
+    scheduleEventReminders(id, event.date, event.time, event.title);
     setShowSuccess(true);
     checkScale.value = withSpring(1, { damping: 12, stiffness: 180 });
     textOpacity.value = withDelay(300, withTiming(1, { duration: 400 }));

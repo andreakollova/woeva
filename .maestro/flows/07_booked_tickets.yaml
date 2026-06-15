@@ -1,0 +1,28 @@
+appId: com.woeva.app
+name: "07 - Moje lístky"
+---
+- launchApp
+
+# Tab Lístky / Booked
+- tapOn:
+    id: "tab-booked"
+- assertVisible:
+    text: ".*"
+    timeout: 5000
+- takeScreenshot: "07_booked_screen"
+
+# Ak máme lístkky, tap na prvý
+- tapOn:
+    index: 0
+    id: "ticket-card"
+    optional: true
+- takeScreenshot: "07_ticket_detail"
+
+# Tri bodky menu
+- tapOn:
+    id: "ticket-options-btn"
+    optional: true
+- takeScreenshot: "07_ticket_options"
+- assertVisible: "Odhlásiť sa"
+    optional: true
+- back

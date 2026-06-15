@@ -1,0 +1,25 @@
+appId: com.woeva.app
+name: "04 - Prihlásenie na free event"
+---
+- launchApp
+
+# Otvoríme prvý event vo feede
+- tapOn:
+    index: 0
+    id: "event-card"
+    timeout: 5000
+
+- assertVisible:
+    text: ".*"
+    timeout: 5000
+- takeScreenshot: "04_event_detail"
+
+# Skontrolujeme CTA tlačidlo
+- assertVisible: "Prihlásiť zadarmo"
+
+# Prihlásime sa
+- tapOn: "Prihlásiť zadarmo"
+- assertVisible:
+    text: ".*"
+    timeout: 5000
+- takeScreenshot: "04_joined_event"

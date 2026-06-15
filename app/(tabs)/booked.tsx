@@ -350,20 +350,6 @@ function TicketCard({ event, userId, userAvatar, userName, isPast, onPress, onDe
               </TouchableOpacity>
             )}
 
-            <TouchableOpacity style={styles.optionsRow} onPress={() => { setOptionsModal(false); handleShare(); }} activeOpacity={0.7}>
-              <View style={styles.optionsIconBox}>
-                <Svg width={18} height={18} viewBox="0 0 24 24" fill="none">
-                  <Path d="M4 12v8a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-8" stroke={Colors.black} strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" />
-                  <Path d="M16 6l-4-4-4 4" stroke={Colors.black} strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" />
-                  <Path d="M12 2v13" stroke={Colors.black} strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" />
-                </Svg>
-              </View>
-              <View style={styles.optionsRowBody}>
-                <Text style={styles.optionsRowLabel}>{t.tickets.shareTicket}</Text>
-                <Text style={styles.optionsRowSub}>{t.tickets.shareTicketSub}</Text>
-              </View>
-            </TouchableOpacity>
-
             {event.venue ? (
               <TouchableOpacity style={styles.optionsRow} onPress={() => { setOptionsModal(false); handleDirections(); }} activeOpacity={0.7}>
                 <View style={styles.optionsIconBox}>
@@ -379,18 +365,6 @@ function TicketCard({ event, userId, userAvatar, userName, isPast, onPress, onDe
               </TouchableOpacity>
             ) : null}
 
-            <TouchableOpacity style={styles.optionsRow} onPress={() => { setOptionsModal(false); handleCalendar(); }} activeOpacity={0.7}>
-              <View style={styles.optionsIconBox}>
-                <Svg width={18} height={18} viewBox="0 0 24 24" fill="none">
-                  <Path d="M3 9h18M16 2v4M8 2v4" stroke={Colors.black} strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" />
-                  <Path d="M5 4h14a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2z" stroke={Colors.black} strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" />
-                </Svg>
-              </View>
-              <View style={styles.optionsRowBody}>
-                <Text style={styles.optionsRowLabel}>{t.tickets.eventDetails}</Text>
-                <Text style={styles.optionsRowSub}>{event.date}{event.time ? ' · ' + event.time : ''}</Text>
-              </View>
-            </TouchableOpacity>
           </View>
         </TouchableOpacity>
       </Modal>
@@ -582,9 +556,9 @@ const styles = StyleSheet.create({
   ticketCoverContent: { position: 'absolute', bottom: 0, left: 0, right: 0, padding: 18, gap: 6 },
   ticketDeleteBtn: { position: 'absolute', top: 12, right: 12, width: 28, height: 28, borderRadius: 14, backgroundColor: 'rgba(0,0,0,0.5)', alignItems: 'center', justifyContent: 'center' },
   ticketDeleteIcon: { fontSize: 18, color: Colors.white, lineHeight: 18, fontWeight: '300', marginTop: -2 },
-  ticketOptionsBtn: { position: 'absolute', top: 12, right: 12, width: 32, height: 28, borderRadius: 14, backgroundColor: 'rgba(0,0,0,0.4)', alignItems: 'center', justifyContent: 'center' },
+  ticketOptionsBtn: { position: 'absolute', top: 12, right: 12, width: 32, height: 28, borderRadius: 14, backgroundColor: 'rgba(0,0,0,0.65)', alignItems: 'center', justifyContent: 'center' },
   ticketOptionsIcon: { fontSize: 16, color: Colors.white, lineHeight: 20, letterSpacing: 1 },
-  ticketStatusPill: { flexDirection: 'row', alignItems: 'center', gap: 6, alignSelf: 'flex-start', backgroundColor: 'rgba(255,255,255,0.15)', borderRadius: 50, paddingHorizontal: 10, paddingVertical: 5 },
+  ticketStatusPill: { flexDirection: 'row', alignItems: 'center', gap: 6, alignSelf: 'flex-start', backgroundColor: 'rgba(255,255,255,0.28)', borderRadius: 50, paddingHorizontal: 10, paddingVertical: 5 },
   ticketStatusText: { fontSize: 9, fontWeight: '800', color: Colors.white, letterSpacing: 1.2 },
   ticketStatusDot: { width: 6, height: 6, borderRadius: 3 },
   ticketEventTitle: { fontSize: 22, fontWeight: '800', color: Colors.white, letterSpacing: -0.5, lineHeight: 28, fontFamily: Fonts.extrabold },

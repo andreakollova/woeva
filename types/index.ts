@@ -90,6 +90,9 @@ export interface Event {
   pay_at_door?: boolean | null;
   capacity?: number | null;
   cancelled_dates?: string[] | null;
+  publish_at?: string | null;
+  recurring_open_weekday?: number | null;
+  recurring_open_time?: string | null;
   status: 'active' | 'cancelled';
   cancelled_at: string | null;
   cancellation_reason: string | null;

@@ -17,6 +17,7 @@ function useSafeCameraPermissions(): [{ granted: boolean } | null, () => Promise
 import { useFocusEffect, useRouter, useLocalSearchParams } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import * as WebBrowser from 'expo-web-browser';
+import * as Clipboard from 'expo-clipboard';
 import Svg, { Path, Circle, Defs, LinearGradient as SvgGrad, Stop, Rect, Polyline, Polygon, Text as SvgText, G } from 'react-native-svg';
 import { useWindowDimensions } from 'react-native';
 import { Colors } from '@/constants/colors';
@@ -550,6 +551,19 @@ export default function DashboardScreen() {
       setBCountry(billingData.country ?? 'Slovakia');
     }
     setStripeAccount(stripeData ?? null);
+    if (stripeData) setShowPayoutsSetup(true);
+
+    // Auto-sync Stripe status if account exists but not yet marked complete
+    if (stripeData?.stripe_account_id && !stripeData.onboarding_complete) {
+      supabase.functions.invoke('check-connect-status', {}).then(res => {
+        if (res.data?.connected) {
+          supabase.from('stripe_accounts')
+            .select('stripe_account_id, onboarding_complete, payouts_enabled')
+            .eq('user_id', user.id).maybeSingle()
+            .then(({ data }) => { if (data) setStripeAccount(data); });
+        }
+      });
+    }
 
     const firstClubId = allClubs[0]?.id;
     if (firstClubId) await loadMembers(firstClubId);
@@ -568,7 +582,7 @@ export default function DashboardScreen() {
       const doorCounts: Record<string, number> = {};
       (paidAtts ?? []).forEach((a: any) => {
         // Exclude creator auto-join: creator row with no payment = free/manual join
-        if (a.user_id === creatorMap[a.event_id] && !a.payment_intent_id) return;
+        if (a.user_id === creatorMap[a.event_id]) return;
         if (a.payment_intent_id) {
           onlineCounts[a.event_id] = (onlineCounts[a.event_id] ?? 0) + 1;
         } else {
@@ -679,14 +693,17 @@ export default function DashboardScreen() {
     setAttendeesEvent(event);
     setLoadingAttendees(true);
     const [{ data: attData }, { data: ciData }] = await Promise.all([
-      supabase.from('event_attendees')
-        .select('profile:profiles(id, name, avatar_url)')
-        .eq('event_id', event.id),
-      supabase.from('check_ins')
-        .select('user_id')
-        .eq('event_id', event.id),
+      supabase.from('event_attendees').select('user_id').eq('event_id', event.id),
+      supabase.from('check_ins').select('user_id').eq('event_id', event.id),
     ]);
-    setAttendees(((attData ?? []) as any).map((a: any) => a.profile).filter(Boolean));
+    const userIds = (attData ?? []).map((a: any) => a.user_id).filter(Boolean);
+    if (userIds.length > 0) {
+      const { data: profileData } = await supabase
+        .from('profiles').select('id, name, avatar_url').in('id', userIds);
+      setAttendees((profileData ?? []) as any);
+    } else {
+      setAttendees([]);
+    }
     // Merge DB check-ins into local state
     const dbCheckedIn = new Set((ciData ?? []).map((c: any) => c.user_id));
     if (dbCheckedIn.size > 0) {
@@ -1128,11 +1145,22 @@ export default function DashboardScreen() {
                           </View>
                           <TouchableOpacity
                             style={s.shareBtn}
-                            onPress={() => Share.share({ url: `https://woeva.com/event/${e.id}`, message: `${e.title}\nhttps://woeva.com/event/${e.id}` })}
+                            onPress={() => Clipboard.setStringAsync(`https://woeva.com/share-event?id=${e.id}`)}
                             hitSlop={8}
                           >
                             <Svg width={15} height={15} viewBox="0 0 24 24" fill="none">
-                              <Path d="M10 13a5 5 0 007.54.54l3-3a5 5 0 00-7.07-7.07l-1.72 1.71M14 11a5 5 0 00-7.54-.54l-3 3a5 5 0 007.07 7.07l1.71-1.71" stroke={Colors.gray} strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" />
+                              <Path d="M10 13a5 5 0 007.54.54l3-3a5 5 0 00-7.07-7.07l-1.72 1.71" stroke={Colors.gray} strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" />
+                              <Path d="M14 11a5 5 0 00-7.54-.54l-3 3a5 5 0 007.07 7.07l1.71-1.71" stroke={Colors.gray} strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" />
+                            </Svg>
+                          </TouchableOpacity>
+                          <TouchableOpacity
+                            style={s.shareBtn}
+                            onPress={() => router.push(`/event/${e.id}/edit`)}
+                            hitSlop={8}
+                          >
+                            <Svg width={15} height={15} viewBox="0 0 24 24" fill="none">
+                              <Path d="M11 4H4a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2v-7" stroke={Colors.gray} strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" />
+                              <Path d="M18.5 2.5a2.121 2.121 0 013 3L12 15l-4 1 1-4 9.5-9.5z" stroke={Colors.gray} strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" />
                             </Svg>
                           </TouchableOpacity>
                         </View>
@@ -1201,11 +1229,22 @@ export default function DashboardScreen() {
                           </View>
                           <TouchableOpacity
                             style={s.shareBtn}
-                            onPress={() => Share.share({ url: `https://woeva.com/event/${e.id}`, message: `${e.title}\nhttps://woeva.com/event/${e.id}` })}
+                            onPress={() => Clipboard.setStringAsync(`https://woeva.com/share-event?id=${e.id}`)}
                             hitSlop={8}
                           >
                             <Svg width={15} height={15} viewBox="0 0 24 24" fill="none">
-                              <Path d="M10 13a5 5 0 007.54.54l3-3a5 5 0 00-7.07-7.07l-1.72 1.71M14 11a5 5 0 00-7.54-.54l-3 3a5 5 0 007.07 7.07l1.71-1.71" stroke={Colors.gray} strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" />
+                              <Path d="M10 13a5 5 0 007.54.54l3-3a5 5 0 00-7.07-7.07l-1.72 1.71" stroke={Colors.gray} strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" />
+                              <Path d="M14 11a5 5 0 00-7.54-.54l-3 3a5 5 0 007.07 7.07l1.71-1.71" stroke={Colors.gray} strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" />
+                            </Svg>
+                          </TouchableOpacity>
+                          <TouchableOpacity
+                            style={s.shareBtn}
+                            onPress={() => router.push(`/event/${e.id}/edit`)}
+                            hitSlop={8}
+                          >
+                            <Svg width={15} height={15} viewBox="0 0 24 24" fill="none">
+                              <Path d="M11 4H4a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2v-7" stroke={Colors.gray} strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" />
+                              <Path d="M18.5 2.5a2.121 2.121 0 013 3L12 15l-4 1 1-4 9.5-9.5z" stroke={Colors.gray} strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" />
                             </Svg>
                           </TouchableOpacity>
                         </View>
@@ -1719,14 +1758,8 @@ export default function DashboardScreen() {
                             <Text style={s.revenueLabel}>{t.dashboard.grossRevenue}</Text>
                             <Text style={s.revenueVal}>{fmt(fGross)}</Text>
                           </View>
-                          {fStripe > 0 && (
-                            <View style={s.revenueRow}>
-                              <Text style={s.revenueLabel}>{t.dashboard.stripeFees}</Text>
-                              <Text style={[s.revenueVal, { color: Colors.gray }]}>- {fmt(fStripe)}</Text>
-                            </View>
-                          )}
                           <View style={s.revenueRow}>
-                            <Text style={s.revenueLabel}>{t.dashboard.woevaFee} (5% online)</Text>
+                            <Text style={s.revenueLabel}>{t.dashboard.woevaFee}</Text>
                             <Text style={[s.revenueVal, { color: Colors.gray }]}>- {fmt(fWoeva)}</Text>
                           </View>
                           <View style={[s.revenueRow, { borderTopWidth: 1.5, borderTopColor: Colors.black, marginTop: 8, paddingTop: 12 }]}>

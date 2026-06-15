@@ -1,0 +1,10 @@
+flows:
+  - flows/01_login_email.yaml
+  - flows/02_feed_browse.yaml
+  - flows/03_create_event.yaml
+  - flows/04_event_join_free.yaml
+  - flows/05_search.yaml
+  - flows/06_map_navigation.yaml
+  - flows/07_booked_tickets.yaml
+  - flows/08_profile.yaml
+  - flows/09_club_browse.yaml

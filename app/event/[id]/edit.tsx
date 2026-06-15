@@ -12,15 +12,30 @@ import { Toast } from '@/components/ui/Toast';
 import { supabase } from '@/lib/supabase';
 import { useTranslations } from '@/context/LanguageContext';
 import { useCategories } from '@/hooks/useCategories';
+import { useAuth } from '@/context/AuthContext';
+import { notify } from '@/lib/notify';
 
 export default function EditEventScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const { id } = useLocalSearchParams<{ id: string }>();
-  const { t } = useTranslations();
+  const { t, lang } = useTranslations();
 
+  const catLabels: Record<string, string> = {
+    'Movement & Sport': lang === 'sk' ? 'Pohyb & Šport' : 'Movement & Sport',
+    'Wellness & Body': lang === 'sk' ? 'Wellness & Telo' : 'Wellness & Body',
+    'Food & Drinks': lang === 'sk' ? 'Jedlo & Pitie' : 'Food & Drinks',
+    'Art & Creation': lang === 'sk' ? 'Umenie & Tvorba' : 'Art & Creation',
+    'Music & Nightlife': lang === 'sk' ? 'Hudba & Nočný život' : 'Music & Nightlife',
+    'Learning & Mind': lang === 'sk' ? 'Vzdelávanie & Myseľ' : 'Learning & Mind',
+    'Community & Belonging': lang === 'sk' ? 'Komunita & Spolupatričnosť' : 'Community & Belonging',
+  };
+
+  const { profile } = useAuth();
   const { categories } = useCategories();
   const [title, setTitle] = useState('');
+  const [eventTitle, setEventTitle] = useState('');
+  const [deleting, setDeleting] = useState(false);
   const [tagline, setTagline] = useState('');
   const [tags, setTags] = useState<string[]>([]);
   const [date, setDate] = useState(new Date());
@@ -29,7 +44,6 @@ export default function EditEventScreen() {
   const [venueLat, setVenueLat] = useState<number | undefined>();
   const [venueLng, setVenueLng] = useState<number | undefined>();
   const [price, setPrice] = useState('0');
-  const [isRecurring, setIsRecurring] = useState(false);
   const [showDate, setShowDate] = useState(false);
   const [showTime, setShowTime] = useState(false);
   const [loading, setLoading] = useState(false);
@@ -43,14 +57,13 @@ export default function EditEventScreen() {
     const { data } = await supabase.from('events').select('*').eq('id', id).single();
     if (!data) return;
     setTitle(data.title);
+    setEventTitle(data.title);
     setTagline(data.tagline ?? '');
     setTags(data.tags?.length ? data.tags : (data.category ? [data.category] : []));
     setPrice(String(data.price ?? 0));
     setVenue(data.venue ?? '');
     setVenueLat(data.lat ?? undefined);
     setVenueLng(data.lng ?? undefined);
-    setIsRecurring(data.is_recurring ?? false);
-
     const eventDate = new Date(data.date + 'T00:00:00');
     setDate(eventDate);
 
@@ -82,13 +95,73 @@ export default function EditEventScreen() {
       lng: venueLng ?? null,
       price: priceNum,
       is_free: priceNum === 0,
-      is_recurring: isRecurring,
     }).eq('id', id);
 
     setLoading(false);
     if (error) { Alert.alert(t.event.couldNotCreate, error.message); return; }
     setToast(true);
     setTimeout(() => router.back(), 1200);
+  }
+
+  function confirmDelete() {
+    Alert.alert(
+      'Zrušiť udalosť',
+      `Naozaj chceš zrušiť event "${eventTitle}"?`,
+      [
+        { text: 'Nie', style: 'cancel' },
+        { text: 'Áno, zrušiť', style: 'destructive', onPress: confirmDeleteFinal },
+      ]
+    );
+  }
+
+  function confirmDeleteFinal() {
+    Alert.alert(
+      'Potvrď zrušenie',
+      'Toto sa nedá vrátiť. Všetkým prihlásením príde notifikácia o zrušení eventu.',
+      [
+        { text: 'Späť', style: 'cancel' },
+        { text: 'Zrušiť event', style: 'destructive', onPress: handleDelete },
+      ]
+    );
+  }
+
+  async function handleDelete() {
+    setDeleting(true);
+    await supabase.from('events').update({
+      status: 'cancelled',
+      cancelled_at: new Date().toISOString(),
+      cancellation_reason: 'Organizátor zrušil event.',
+    }).eq('id', id);
+
+    const { data: allAttendees } = await supabase
+      .from('event_attendees')
+      .select('user_id')
+      .eq('event_id', id);
+
+    if (allAttendees && allAttendees.length > 0) {
+      const userIds = allAttendees.map((a: any) => a.user_id);
+      await supabase.from('notifications').insert(
+        userIds.map((uid: string) => ({
+          user_id: uid,
+          type: 'event_cancelled',
+          title: `Event bol zrušený: ${eventTitle}`,
+          body: 'Organizátor zrušil tento event.',
+          data: { event_id: id },
+        }))
+      );
+      const { data: profiles } = await supabase.from('profiles').select('push_token').in('id', userIds);
+      const tokens = (profiles ?? []).map((p: any) => p.push_token).filter(Boolean);
+      notify.eventCancelled({
+        eventId: String(id),
+        eventTitle,
+        creatorName: profile?.name ?? 'Organizátor',
+        attendeeTokens: tokens,
+        attendeeEmails: [],
+      });
+    }
+
+    setDeleting(false);
+    router.replace('/(tabs)/');
   }
 
   const dateStr = date.toLocaleDateString(undefined, { weekday: 'short', month: 'short', day: 'numeric' });
@@ -194,28 +267,21 @@ export default function EditEventScreen() {
                     }}
                     activeOpacity={0.7}
                   >
-                    <Text style={[styles.chipText, active && styles.chipTextActive]}>{cat}</Text>
+                    <Text style={[styles.chipText, active && styles.chipTextActive]}>{catLabels[cat] ?? cat}</Text>
                   </TouchableOpacity>
                 );
               })}
             </View>
           </View>
 
-          {/* Recurring toggle */}
-          <TouchableOpacity style={styles.recurringRow} onPress={() => setIsRecurring(r => !r)} activeOpacity={0.7}>
-            <View style={styles.recurringText}>
-              <Text style={styles.recurringTitle}>{t.event.repeatWeekly}</Text>
-              <Text style={styles.recurringSub}>{t.event.repeatSub}</Text>
-            </View>
-            <View style={[styles.toggle, isRecurring && styles.toggleOn]}>
-              <View style={[styles.toggleThumb, isRecurring && styles.toggleThumbOn]} />
-            </View>
-          </TouchableOpacity>
         </View>
       </ScrollView>
 
       <View style={[styles.footer, { paddingBottom: insets.bottom + 16 }]}>
         <Button label={t.club.saveChanges} onPress={handleSave} loading={loading} variant="black" />
+        <TouchableOpacity onPress={confirmDelete} disabled={deleting} style={styles.deleteBtn}>
+          <Text style={styles.deleteBtnText}>{deleting ? 'Zrušujem...' : 'Zrušiť udalosť'}</Text>
+        </TouchableOpacity>
       </View>
 
       <Toast visible={toast} title={t.event.savedTitle} subtitle={t.event.savedSub} onHide={() => setToast(false)} />
@@ -224,6 +290,8 @@ export default function EditEventScreen() {
 }
 
 const styles = StyleSheet.create({
+  deleteBtn: { alignItems: 'center', paddingVertical: 14 },
+  deleteBtnText: { fontSize: 15, fontWeight: '600', color: '#EF4444' },
   container: { flex: 1, backgroundColor: Colors.white },
   scroll: { paddingHorizontal: 24 },
   header: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 28 },

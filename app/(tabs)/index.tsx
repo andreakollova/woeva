@@ -510,12 +510,20 @@ export default function HomeScreen() {
   const activeKeywords = attendedKeywords.length > 0
     ? attendedKeywords
     : (profile?.interests ?? []).flatMap((i: string) => CATEGORY_KEYWORDS[i] ?? []);
-  const similarEvents = activeKeywords.length > 0
+  const MIN_SIMILAR = 4;
+  const similarEventsMatched = activeKeywords.length > 0
     ? nonKinoEvents
         .filter((e: any) => !attendingIds.has(e.id) && !heroIds.has(e.id))
         .filter((e: any) => activeKeywords.some((k: string) => e.category?.toLowerCase().includes(k.toLowerCase())))
         .slice(0, 10)
     : [];
+  const similarMatchedIds = new Set(similarEventsMatched.map((e: any) => e.id));
+  const similarPadding = similarEventsMatched.length < MIN_SIMILAR
+    ? nonKinoEvents
+        .filter((e: any) => !attendingIds.has(e.id) && !heroIds.has(e.id) && !similarMatchedIds.has(e.id))
+        .slice(0, MIN_SIMILAR - similarEventsMatched.length)
+    : [];
+  const similarEvents = [...similarEventsMatched, ...similarPadding];
   const shownIds = new Set([
     ...heroEvents.map((e: any) => e.id),
     ...trendingEvents.map((e: any) => e.id),

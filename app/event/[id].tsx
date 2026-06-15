@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { StatusBar } from 'expo-status-bar';
+import { StatusBar, setStatusBarStyle } from 'expo-status-bar';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { View, Text, StyleSheet, TouchableOpacity, Image, Alert, Dimensions, Modal, Share, Platform, TextInput, ScrollView as RNScrollView, Linking } from 'react-native';
 import QRCode from 'react-native-qrcode-svg';
@@ -100,7 +100,7 @@ export default function EventDetailScreen() {
   }));
 
   useFocusEffect(
-    React.useCallback(() => { load(); }, [id, user])
+    React.useCallback(() => { setStatusBarStyle('light'); load(); }, [id, user])
   );
 
   async function load() {
@@ -218,7 +218,7 @@ export default function EventDetailScreen() {
     if (!cancelReason || !event) return;
     setCancelling(true);
 
-    const eventStart = new Date(`${event.date}T${event.time}`);
+    const eventStart = new Date(`${occurrenceDate ?? event.date}T${event.time}`);
     const hoursUntil = (eventStart.getTime() - Date.now()) / 3600000;
     const refundEligible = hoursUntil >= 48;
 
@@ -295,7 +295,7 @@ export default function EventDetailScreen() {
     const d = new Date(event.date + 'T00:00:00');
     const dateStr = d.toLocaleDateString('sk-SK', { weekday: 'short', day: 'numeric', month: 'short' });
     const venueStr = event.venue ? ` · ${event.venue}` : '';
-    const webLink = `https://woeva.com/event/${id}`;
+    const webLink = `https://woeva.com/share-event?id=${id}`;
     const message = `${event.title} 🎉\n${dateStr}${venueStr}\n\n${webLink}`;
     try {
       await Share.share(
@@ -311,10 +311,26 @@ export default function EventDetailScreen() {
   const isPayAtDoor = !!(event as any).pay_at_door;
   const isFree = !isPayAtDoor && (event.is_free || event.price === 0);
   const isWoevaEvent = !!(event as any).source;
-  const publishAt = (event as any).publish_at ? new Date((event as any).publish_at) : null;
+  const publishAt = (() => {
+    const ev = event as any;
+    if (ev.is_recurring && ev.recurring_open_weekday != null && ev.recurring_open_time) {
+      // Compute per-occurrence publish_at: go back from occurrence date to the configured weekday
+      const base = new Date((occurrenceDate ?? event.date) + 'T00:00:00');
+      let attempts = 0;
+      while (base.getDay() !== ev.recurring_open_weekday && attempts < 7) {
+        base.setDate(base.getDate() - 1);
+        attempts++;
+      }
+      const [h, m] = ev.recurring_open_time.split(':').map(Number);
+      base.setHours(h, m, 0, 0);
+      return base;
+    }
+    return ev.publish_at ? new Date(ev.publish_at) : null;
+  })();
   const isNotYetPublished = !!publishAt && publishAt > new Date();
   const priceLabel = isPayAtDoor ? `€${event.price}` : (isFree ? t.event.freeLabel : `€${event.price}`);
-  const eventStart = new Date(`${event.date}T${event.time || '00:00'}`);
+  const displayDate = occurrenceDate ?? event.date;
+  const eventStart = new Date(`${displayDate}T${event.time || '00:00'}`);
   const eventDurationH = event.duration ?? 3;
   const eventEnd = new Date(eventStart.getTime() + eventDurationH * 60 * 60 * 1000);
   const eventPast = eventStart < new Date();
@@ -326,7 +342,7 @@ export default function EventDetailScreen() {
   const otherAtts = attendees.filter(a => a.user_id !== user?.id && (a?.profile?.avatar_url || (a?.profile?.name ?? '').trim()));
   const overflow = Math.max(0, goingCount - 4);
 
-  const d = new Date(event.date + 'T00:00:00');
+  const d = new Date(displayDate + 'T00:00:00');
   const dayName = d.toLocaleDateString(locale, { weekday: 'short' }).toUpperCase();
   const dayNum = d.getDate();
   const monthName = d.toLocaleDateString(locale, { month: 'short' }).toUpperCase();

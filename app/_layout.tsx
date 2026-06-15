@@ -4,7 +4,7 @@ import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { StripeProvider } from '@stripe/stripe-react-native';
 import { StyleSheet } from 'react-native';
-import { AuthProvider } from '@/context/AuthContext';
+import { AuthProvider, useAuth } from '@/context/AuthContext';
 import { LanguageProvider } from '@/context/LanguageContext';
 import * as Notifications from 'expo-notifications';
 import { useEffect } from 'react';
@@ -21,9 +21,10 @@ import {
 function NotificationHandler() {
   const router = useRouter();
   const response = Notifications.useLastNotificationResponse();
+  const { loading } = useAuth();
 
   useEffect(() => {
-    if (!response) return;
+    if (!response || loading) return;
     const data = response.notification.request.content.data as any;
     if (!data) return;
     if (data.type === 'chat' && data.event_id) {
@@ -31,7 +32,7 @@ function NotificationHandler() {
     } else if (data.event_id) {
       router.push(`/event/${data.event_id}`);
     }
-  }, [response]);
+  }, [response, loading]);
 
   return null;
 }

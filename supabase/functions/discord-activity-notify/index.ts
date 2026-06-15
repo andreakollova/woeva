@@ -48,6 +48,21 @@ serve(async (req) => {
     // Supabase DB webhook payload
     const { type, table, record, old_record } = body;
 
+    // ── New user registered ──────────────────────────────────────────────────
+    if (table === 'profiles' && type === 'INSERT') {
+      await sendEmbed({
+        title: '👤 Nový používateľ',
+        color: 0xA855F7,
+        fields: [
+          { name: 'Meno', value: record.name ?? '—', inline: true },
+          { name: 'Email', value: record.email ?? '—', inline: true },
+          { name: 'Mesto', value: record.city ?? '—', inline: true },
+        ],
+        timestamp: new Date().toISOString(),
+      });
+      return new Response('ok');
+    }
+
     // ── New event created ────────────────────────────────────────────────────
     if (table === 'events' && type === 'INSERT') {
       const { data: creator } = await supabase
@@ -63,14 +78,31 @@ serve(async (req) => {
       await sendEmbed({
         title: '🎉 Nový event',
         color: 0x3B82F6,
+        ...(record.cover_url ? { image: { url: record.cover_url } } : {}),
         fields: [
           { name: 'Názov', value: record.title, inline: false },
           { name: 'Organizátor', value: creator?.name ?? record.creator_id, inline: true },
-          { name: 'Email', value: creator?.email ?? '—', inline: true },
           { name: 'Dátum', value: fmtDate(record.date), inline: true },
           { name: 'Mesto', value: record.city ?? '—', inline: true },
           { name: 'Cena', value: price, inline: true },
-          { name: 'Kapacita', value: record.max_attendees ? String(record.max_attendees) : 'Neobmedzená', inline: true },
+          { name: 'Kapacita', value: record.capacity ? String(record.capacity) : 'Neobmedzená', inline: true },
+          { name: 'Opakovanie', value: record.is_recurring ? `🔁 Každý týždeň (do ${record.recurring_end_date ?? '—'})` : '📅 Jednorazový', inline: false },
+          { name: 'Link', value: `https://woeva.com/share-event?id=${record.id}`, inline: false },
+        ],
+        timestamp: new Date().toISOString(),
+      });
+      return new Response('ok');
+    }
+
+    // ── Event deleted ────────────────────────────────────────────────────────
+    if (table === 'events' && type === 'DELETE') {
+      await sendEmbed({
+        title: '🗑️ Event vymazaný',
+        color: 0xEF4444,
+        fields: [
+          { name: 'Názov', value: old_record.title, inline: false },
+          { name: 'Dátum', value: old_record.date ? fmtDate(old_record.date) : '—', inline: true },
+          { name: 'Mesto', value: old_record.city ?? '—', inline: true },
         ],
         timestamp: new Date().toISOString(),
       });
@@ -109,24 +141,26 @@ serve(async (req) => {
     // ── User joined event ────────────────────────────────────────────────────
     if (table === 'event_attendees' && type === 'INSERT') {
       const [{ data: user }, { data: event }] = await Promise.all([
-        supabase.from('profiles').select('name, email').eq('id', record.user_id).single(),
-        supabase.from('events').select('title, date, price, city, ticket_type').eq('id', record.event_id).single(),
+        supabase.from('profiles').select('name').eq('id', record.user_id).single(),
+        supabase.from('events').select('title, date, price, city, venue, pay_at_door').eq('id', record.event_id).single(),
       ]);
 
       const paid = record.paid
         ? `€${Number(event?.price ?? 0).toFixed(2)}`
-        : (event?.ticket_type === 'pay_at_door' ? 'Platba pri vstupe' : 'Zadarmo');
+        : (event?.pay_at_door ? 'Platba pri vstupe' : 'Zadarmo');
+
+      const location = event?.city ?? event?.venue ?? '—';
 
       await sendEmbed({
         title: '✅ Prihlásenie na event',
         color: 0x22C55E,
         fields: [
           { name: 'Používateľ', value: user?.name ?? record.user_id, inline: true },
-          { name: 'Email', value: user?.email ?? '—', inline: true },
+          { name: 'Platba', value: paid, inline: true },
           { name: 'Event', value: event?.title ?? record.event_id, inline: false },
           { name: 'Dátum eventu', value: event?.date ? fmtDate(event.date) : '—', inline: true },
-          { name: 'Mesto', value: event?.city ?? '—', inline: true },
-          { name: 'Platba', value: paid, inline: true },
+          { name: 'Mesto', value: location, inline: true },
+          { name: 'Link', value: `https://woeva.com/share-event?id=${record.event_id}`, inline: false },
         ],
         timestamp: new Date().toISOString(),
       });
@@ -136,20 +170,23 @@ serve(async (req) => {
     // ── User left event ──────────────────────────────────────────────────────
     if (table === 'event_attendees' && type === 'DELETE') {
       const [{ data: user }, { data: event }] = await Promise.all([
-        supabase.from('profiles').select('name, email').eq('id', old_record.user_id).single(),
-        supabase.from('events').select('title, date, city').eq('id', old_record.event_id).single(),
+        supabase.from('profiles').select('name').eq('id', old_record.user_id).single(),
+        supabase.from('events').select('title, date, city, venue, price').eq('id', old_record.event_id).single(),
       ]);
+
+      const location = event?.city ?? event?.venue ?? '—';
+      const eventPrice = event?.price > 0 ? `€${Number(event.price).toFixed(2)}` : 'Zadarmo';
 
       await sendEmbed({
         title: '↩️ Odhlásenie z eventu',
         color: 0xEAB308,
         fields: [
           { name: 'Používateľ', value: user?.name ?? old_record.user_id, inline: true },
-          { name: 'Email', value: user?.email ?? '—', inline: true },
+          { name: 'Cena eventu', value: eventPrice, inline: true },
           { name: 'Event', value: event?.title ?? old_record.event_id, inline: false },
           { name: 'Dátum eventu', value: event?.date ? fmtDate(event.date) : '—', inline: true },
-          { name: 'Mesto', value: event?.city ?? '—', inline: true },
-          { name: 'Bolo zaplatené', value: old_record.paid ? 'Áno' : 'Nie', inline: true },
+          { name: 'Mesto', value: location, inline: true },
+          { name: 'Link', value: `https://woeva.com/share-event?id=${old_record.event_id}`, inline: false },
         ],
         timestamp: new Date().toISOString(),
       });

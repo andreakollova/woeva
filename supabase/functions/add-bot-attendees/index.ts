@@ -29,9 +29,10 @@ serve(async (req) => {
     const { data: event } = await db.from('events').select('id, city, creator_id, source').eq('id', event_id).single();
     if (!event) return new Response(JSON.stringify({ error: 'Event not found' }), { status: 404, headers: corsHeaders });
 
-    // Only add bots to Woeva Picks events
-    if (event.source !== 'woeva_picks') {
-      return new Response(JSON.stringify({ ok: true, added: 0, message: 'Bots only for woeva_picks' }), { headers: corsHeaders });
+    // Only add bots to Woeva-managed events (woeva_picks, scraped, discord, etc.)
+    // Skip user-created events (source is null)
+    if (!event.source) {
+      return new Response(JSON.stringify({ ok: true, added: 0, message: 'Bots only for Woeva-managed events' }), { headers: corsHeaders });
     }
 
     // Get bots from the same city (or any city if none found)

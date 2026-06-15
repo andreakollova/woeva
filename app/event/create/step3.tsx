@@ -289,29 +289,27 @@ export default function CreateStep3Screen() {
       is_recurring: isRecurring,
       recurring_end_date: isRecurring ? `${recurringEndDate.getFullYear()}-${String(recurringEndDate.getMonth() + 1).padStart(2, '0')}-${String(recurringEndDate.getDate()).padStart(2, '0')}` : null,
       capacity: hasCapacity && capacity ? parseInt(capacity, 10) : null,
-      going_count: hasCapacity && capacity ? 0 : 1,
+      going_count: 0,
       city: eventCity,
       publish_at: hasPublishAt ? (() => {
         if (isRecurring && publishAtWeekday !== null) {
-          // Find nearest occurrence of selected weekday at or before event date
+          // For recurring: compute publish_at for the FIRST occurrence
           const d = new Date(date);
-          d.setHours(publishAtTime.getHours(), publishAtTime.getMinutes(), 0, 0);
+          d.setHours(0, 0, 0, 0);
           let attempts = 0;
           while (d.getDay() !== publishAtWeekday && attempts < 7) { d.setDate(d.getDate() - 1); attempts++; }
+          d.setHours(publishAtTime.getHours(), publishAtTime.getMinutes(), 0, 0);
           return d.toISOString();
         }
         const d = new Date(publishAtDate);
         d.setHours(publishAtTime.getHours(), publishAtTime.getMinutes(), 0, 0);
         return d.toISOString();
       })() : null,
+      recurring_open_weekday: isRecurring && hasPublishAt && publishAtWeekday !== null ? publishAtWeekday : null,
+      recurring_open_time: isRecurring && hasPublishAt && publishAtWeekday !== null ? `${publishAtTime.getHours().toString().padStart(2, '0')}:${publishAtTime.getMinutes().toString().padStart(2, '0')}` : null,
     }).select().single();
 
     if (!error && data) {
-      if (!(hasCapacity && capacity)) {
-        supabase.from('event_attendees').insert({ event_id: data.id, user_id: currentUser.id, paid: true }).then(() => {});
-      }
-
-
       // Send push + in-app notifications to club members
       let clubMemberUserIds: string[] = [];
       if (clubData?.id) {
@@ -362,15 +360,6 @@ export default function CreateStep3Screen() {
         });
       }
 
-      // Notify city users — exclude club members who already got a notification
-      notify.newEvent({
-        creatorId: currentUser.id,
-        eventId: data.id,
-        eventTitle: String(params.title),
-        tags: parsedTags,
-        city: profile?.city ?? 'Bratislava',
-        excludeUserIds: clubMemberUserIds,
-      });
     }
 
     setLoading(false);
@@ -382,6 +371,7 @@ export default function CreateStep3Screen() {
 
   const dateStr = date.toLocaleDateString(undefined, { weekday: 'short', month: 'short', day: 'numeric' });
   const timeStr = `${time.getHours().toString().padStart(2, '0')}:${time.getMinutes().toString().padStart(2, '0')}`;
+  const endTimeStr = `${endTime.getHours().toString().padStart(2, '0')}:${endTime.getMinutes().toString().padStart(2, '0')}`;
 
   return (
     <KeyboardAvoidingView style={{ flex: 1, backgroundColor: Colors.white }} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
@@ -436,56 +426,46 @@ export default function CreateStep3Screen() {
           <View style={styles.halfRow}>
             <View style={styles.halfCol}>
               <Text style={styles.label}>{t.event.time}</Text>
-              <TouchableOpacity style={styles.field} onPress={() => setShowTime(true)}>
+              <TouchableOpacity style={styles.field} onPress={() => { setShowTime(true); setShowEndTime(false); }}>
                 <Text style={styles.fieldValue}>{timeStr}</Text>
               </TouchableOpacity>
-              {showTime && (
-                <DateTimePicker
-                  value={time}
-                  mode="time"
-                  display="spinner"
-                  onChange={(_, t) => {
-                    setShowTime(false);
-                    if (t) {
-                      setTime(t);
-                      // Shift end time by the same offset to keep duration
-                      setEndTime(prev => {
-                        const diff = prev.getTime() - time.getTime();
-                        return new Date(t.getTime() + Math.max(diff, 3600000));
-                      });
-                    }
-                  }}
-                />
-              )}
             </View>
 
             <View style={styles.halfCol}>
-              <Text style={styles.label}>{lang === 'sk' ? 'Čas ukončenia' : 'End time'}</Text>
-              <TouchableOpacity style={styles.field} onPress={() => setShowEndTime(true)}>
-                <Text style={styles.fieldValue}>{`${endTime.getHours().toString().padStart(2, '0')}:${endTime.getMinutes().toString().padStart(2, '0')}`}</Text>
+              <Text style={styles.label}>{t.event.endTime}</Text>
+              <TouchableOpacity style={styles.field} onPress={() => { setShowEndTime(true); setShowTime(false); }}>
+                <Text style={styles.fieldValue}>{endTimeStr}</Text>
               </TouchableOpacity>
-              <Modal visible={showEndTime} transparent animationType="slide" onRequestClose={() => setShowEndTime(false)}>
-                <Pressable style={styles.modalOverlay} onPress={() => setShowEndTime(false)}>
-                  <Pressable style={styles.calendarSheet} onPress={() => {}}>
-                    <View style={styles.calendarHandle} />
-                    <Text style={styles.durationSheetTitle}>{lang === 'sk' ? 'Čas ukončenia' : 'End time'}</Text>
-                    <DateTimePicker
-                      value={endTime}
-                      mode="time"
-                      display={Platform.OS === 'ios' ? 'spinner' : 'default'}
-                      onChange={(_, t) => { if (Platform.OS === 'android') setShowEndTime(false); if (t) setEndTime(t); }}
-                      themeVariant="light"
-                    />
-                    {Platform.OS === 'ios' && (
-                      <TouchableOpacity style={styles.calendarDone} onPress={() => setShowEndTime(false)} activeOpacity={0.8}>
-                        <Text style={styles.calendarDoneText}>{lang === 'sk' ? 'Hotovo' : 'Done'}</Text>
-                      </TouchableOpacity>
-                    )}
-                  </Pressable>
-                </Pressable>
-              </Modal>
             </View>
           </View>
+          {showTime && (
+            <DateTimePicker
+              value={time}
+              mode="time"
+              display="spinner"
+              onChange={(_, t) => {
+                setShowTime(false);
+                if (t) {
+                  setTime(t);
+                  setEndTime(prev => {
+                    const diff = prev.getTime() - time.getTime();
+                    return new Date(t.getTime() + Math.max(diff, 3600000));
+                  });
+                }
+              }}
+            />
+          )}
+          {showEndTime && (
+            <DateTimePicker
+              value={endTime}
+              mode="time"
+              display="spinner"
+              onChange={(_, t) => {
+                setShowEndTime(false);
+                if (t) setEndTime(t);
+              }}
+            />
+          )}
 
           {/* Price */}
           <Input
@@ -568,6 +548,46 @@ export default function CreateStep3Screen() {
                     <View style={[styles.toggleThumb, isRecurring && styles.toggleThumbOn]} />
                   </View>
                 </TouchableOpacity>
+
+                {isRecurring && (() => {
+                  const weeks = Math.max(1, Math.floor((recurringEndDate.getTime() - date.getTime()) / (7 * 24 * 60 * 60 * 1000)));
+                  return (
+                    <View>
+                      <Text style={styles.label}>{lang === 'sk' ? 'Opakovať event do' : 'Repeat until'}</Text>
+                      <TouchableOpacity style={[styles.field, { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }]} onPress={() => setShowRecurringEnd(true)} activeOpacity={0.7}>
+                        <Text style={styles.fieldValue}>{recurringEndDate.toLocaleDateString(locale, { day: 'numeric', month: 'long', year: 'numeric' })}</Text>
+                        <Text style={styles.selectDateLink}>{lang === 'sk' ? 'Vybrať dátum' : 'Select date'}</Text>
+                      </TouchableOpacity>
+                      <Modal visible={showRecurringEnd} transparent animationType="slide" onRequestClose={() => setShowRecurringEnd(false)}>
+                        <Pressable style={styles.modalOverlay} onPress={() => setShowRecurringEnd(false)}>
+                          <Pressable style={styles.calendarSheet} onPress={() => {}}>
+                            <View style={styles.calendarHandle} />
+                            <Text style={styles.durationSheetTitle}>{lang === 'sk' ? 'Opakovať do' : 'Repeat until'}</Text>
+                            <DateTimePicker
+                              value={recurringEndDate}
+                              mode="date"
+                              display={Platform.OS === 'ios' ? 'inline' : 'default'}
+                              minimumDate={new Date(date.getTime() + 7 * 24 * 60 * 60 * 1000)}
+                              onChange={(_, d) => {
+                                if (Platform.OS === 'android') setShowRecurringEnd(false);
+                                if (d) setRecurringEndDate(d);
+                              }}
+                              style={Platform.OS === 'ios' ? { alignSelf: 'center' } : undefined}
+                              themeVariant="light"
+                              accentColor={Colors.black}
+                            />
+                            {Platform.OS === 'ios' && (
+                              <TouchableOpacity style={styles.calendarDone} onPress={() => setShowRecurringEnd(false)} activeOpacity={0.8}>
+                                <Text style={styles.calendarDoneText}>{lang === 'sk' ? 'Hotovo' : 'Done'}</Text>
+                              </TouchableOpacity>
+                            )}
+                          </Pressable>
+                        </Pressable>
+                      </Modal>
+                      <Text style={styles.recurringWeeksHint}>{weeks} {weeks === 1 ? 'týždeň' : weeks < 5 ? 'týždne' : 'týždňov'}</Text>
+                    </View>
+                  );
+                })()}
 
                 {/* Capacity toggle */}
                 <TouchableOpacity style={styles.recurringRow} onPress={() => setHasCapacity(r => !r)} activeOpacity={0.7}>
@@ -703,51 +723,15 @@ export default function CreateStep3Screen() {
             )}
           </View>
 
-          {/* Recurring end date — only when recurring is on */}
+          {/* Rotating cover photos — only when recurring is on */}
           {isRecurring && (() => {
             const weeks = Math.max(1, Math.floor((recurringEndDate.getTime() - date.getTime()) / (7 * 24 * 60 * 60 * 1000)));
             const maxPhotos = Math.min(5, weeks) - 1; // -1 because primary cover from step2 counts as slot 1
-            const recurEndStr = recurringEndDate.toLocaleDateString(locale, { day: 'numeric', month: 'long', year: 'numeric' });
             return (
             <View style={{ gap: 16 }}>
-              <View>
-                <Text style={styles.label}>{lang === 'sk' ? 'Opakovať do' : 'Repeat until'}</Text>
-                <TouchableOpacity style={[styles.field, { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }]} onPress={() => setShowRecurringEnd(true)} activeOpacity={0.7}>
-                  <Text style={styles.fieldValue}>{recurEndStr}</Text>
-                  <Text style={styles.selectDateLink}>{lang === 'sk' ? 'Vybrať dátum' : 'Select date'}</Text>
-                </TouchableOpacity>
-                <Modal visible={showRecurringEnd} transparent animationType="slide" onRequestClose={() => setShowRecurringEnd(false)}>
-                  <Pressable style={styles.modalOverlay} onPress={() => setShowRecurringEnd(false)}>
-                    <Pressable style={styles.calendarSheet} onPress={() => {}}>
-                      <View style={styles.calendarHandle} />
-                      <Text style={styles.durationSheetTitle}>{lang === 'sk' ? 'Opakovať do' : 'Repeat until'}</Text>
-                      <DateTimePicker
-                        value={recurringEndDate}
-                        mode="date"
-                        display={Platform.OS === 'ios' ? 'inline' : 'default'}
-                        minimumDate={new Date(date.getTime() + 7 * 24 * 60 * 60 * 1000)}
-                        onChange={(_, d) => {
-                          if (Platform.OS === 'android') setShowRecurringEnd(false);
-                          if (d) setRecurringEndDate(d);
-                        }}
-                        style={Platform.OS === 'ios' ? { alignSelf: 'center' } : undefined}
-                        themeVariant="light"
-                        accentColor={Colors.black}
-                      />
-                      {Platform.OS === 'ios' && (
-                        <TouchableOpacity style={styles.calendarDone} onPress={() => setShowRecurringEnd(false)} activeOpacity={0.8}>
-                          <Text style={styles.calendarDoneText}>{lang === 'sk' ? 'Hotovo' : 'Done'}</Text>
-                        </TouchableOpacity>
-                      )}
-                    </Pressable>
-                  </Pressable>
-                </Modal>
-                <Text style={styles.recurringWeeksHint}>{weeks} {weeks === 1 ? 'týždeň' : weeks < 5 ? 'týždne' : 'týždňov'}</Text>
-              </View>
-
               {/* Rotating cover photos */}
               <View>
-                <Text style={styles.label}>Striedajúce sa obálky</Text>
+                <Text style={styles.label}>Striedajúce sa obrázky</Text>
                 <View style={styles.rotatingDivider} />
                 <Text style={styles.rotatingSub}>Pridaj až {maxPhotos + 1} {maxPhotos + 1 === 1 ? 'fotku' : maxPhotos + 1 < 5 ? 'fotky' : 'fotiek'} – každý týždeň sa zobrazí iná.</Text>
                 <View style={styles.rotatingRow}>
@@ -796,6 +780,7 @@ export default function CreateStep3Screen() {
             </View>
             );
           })()}
+
         </View>
 
         <View style={[styles.footer, { paddingBottom: insets.bottom }]}>

@@ -7,6 +7,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Colors } from '@/constants/colors';
 import { Fonts } from '@/constants/fonts';
 import { supabase } from '@/lib/supabase';
+import { containsBlockedContent } from '@/lib/moderation';
 import { Message } from '@/types';
 import { useAuth } from '@/context/AuthContext';
 import { useTranslations } from '@/context/LanguageContext';
@@ -142,6 +143,16 @@ export default function ChatScreen() {
   async function sendMessage(content?: string) {
     const msg = (content ?? text).trim();
     if (!msg || !user) return;
+
+    if (containsBlockedContent(msg)) {
+      Alert.alert(
+        'Správa nebola odoslaná',
+        'Táto správa obsahuje nevhodný obsah a nemôže byť odoslaná.',
+        [{ text: 'OK' }]
+      );
+      return;
+    }
+
     if (!content) setText('');
 
     // Optimistic update - show immediately
@@ -170,31 +181,51 @@ export default function ChatScreen() {
       .from('event_attendees').select('user_id')
       .eq('event_id', roomId).neq('user_id', user.id);
 
-    // Only admins (creator / club admin) send push notifications to attendees
-    if ((attendees ?? []).length > 0 && adminIds.has(user.id)) {
-      const attendeeIds = (attendees ?? []).map((a: any) => a.user_id);
+    const senderFirst = (profile?.name ?? 'Someone').split(' ')[0];
+    const pushBody = `${senderFirst}: ${msg.length > 60 ? msg.slice(0, 60) + '…' : msg}`;
+    const pushTitle = `💬 ${eventTitle || 'Chat'}`;
 
-      // Push notifications only — no in-app bell for chat (would feel like duplicate)
-      const { data: pushProfiles } = await supabase
+    if (adminIds.has(user.id)) {
+      // Admin wrote → push to attendees
+      const attendeeIds = (attendees ?? []).map((a: any) => a.user_id);
+      if (attendeeIds.length > 0) {
+        const { data: pushProfiles } = await supabase
+          .from('profiles')
+          .select('push_token, muted_chats')
+          .in('id', attendeeIds)
+          .neq('notifications_enabled', false)
+          .not('push_token', 'is', null);
+
+        const tokens = (pushProfiles ?? [])
+          .filter((p: any) => !(p.muted_chats ?? []).includes(roomId))
+          .map((p: any) => p.push_token)
+          .filter((t: string) => t?.startsWith('ExponentPushToken['));
+
+        if (tokens.length > 0) {
+          supabase.functions.invoke('send-push', {
+            body: { tokens, title: pushTitle, body: pushBody, data: { event_id: roomId, type: 'chat' } },
+          });
+        }
+      }
+    } else if (adminIds.size > 0) {
+      // Attendee wrote → push to creator / admins
+      const adminIdList = Array.from(adminIds);
+      const { data: adminProfiles } = await supabase
         .from('profiles')
         .select('push_token, muted_chats')
-        .in('id', attendeeIds)
-        .eq('notifications_enabled', true)
+        .in('id', adminIdList)
+        .neq('id', user.id)
+        .neq('notifications_enabled', false)
         .not('push_token', 'is', null);
 
-      const tokens = (pushProfiles ?? [])
+      const adminTokens = (adminProfiles ?? [])
         .filter((p: any) => !(p.muted_chats ?? []).includes(roomId))
-        .map((p: any) => p.push_token).filter(Boolean);
+        .map((p: any) => p.push_token)
+        .filter((t: string) => t?.startsWith('ExponentPushToken['));
 
-      if (tokens.length > 0) {
-        const senderFirst = (profile?.name ?? 'Someone').split(' ')[0];
+      if (adminTokens.length > 0) {
         supabase.functions.invoke('send-push', {
-          body: {
-            tokens,
-            title: `💬 ${eventTitle || 'Chat'}`,
-            body: `${senderFirst}: ${msg.length > 60 ? msg.slice(0, 60) + '…' : msg}`,
-            data: { event_id: roomId, type: 'chat' },
-          },
+          body: { tokens: adminTokens, title: pushTitle, body: pushBody, data: { event_id: roomId, type: 'chat' } },
         });
       }
     }
@@ -285,6 +316,7 @@ export default function ChatScreen() {
         renderItem={renderItem}
         contentContainerStyle={styles.list}
         showsVerticalScrollIndicator={false}
+        style={{ flex: 1 }}
       />
 
       {/* Quick emoji bar */}
@@ -352,11 +384,11 @@ const styles = StyleSheet.create({
   msgText: { fontSize: 15, color: Colors.black, lineHeight: 20 },
   msgTextMe: { color: Colors.white },
   msgTimeInline: { fontSize: 10, color: Colors.gray, marginLeft: 'auto' },
-  emojiBar: { flexGrow: 0, borderTopWidth: 1, borderColor: Colors.grayBorder },
+  emojiBar: { flexGrow: 0, flexShrink: 0, borderTopWidth: 1, borderColor: Colors.grayBorder },
   emojiBarContent: { paddingHorizontal: 12, paddingVertical: 8, gap: 8, flexDirection: 'row' },
   emojiBtn: { width: 40, height: 40, borderRadius: 20, backgroundColor: Colors.grayLight, alignItems: 'center', justifyContent: 'center' },
   emojiText: { fontSize: 20 },
-  inputBar: { flexDirection: 'row', alignItems: 'flex-end', paddingHorizontal: 16, paddingTop: 10, gap: 10, borderTopWidth: 1, borderColor: Colors.grayBorder },
+  inputBar: { flexDirection: 'row', alignItems: 'flex-end', paddingHorizontal: 16, paddingTop: 10, gap: 10, borderTopWidth: 1, borderColor: Colors.grayBorder, flexShrink: 0 },
   input: { flex: 1, backgroundColor: Colors.grayLight, borderRadius: 22, paddingHorizontal: 16, paddingVertical: 10, fontSize: 15, color: Colors.black, maxHeight: 100 },
   sendBtn: { width: 40, height: 40, borderRadius: 20, backgroundColor: Colors.lime, alignItems: 'center', justifyContent: 'center', flexShrink: 0 },
   sendBtnDisabled: { opacity: 0.4 },

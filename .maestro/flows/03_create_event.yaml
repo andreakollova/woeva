@@ -1,0 +1,45 @@
+appId: com.woeva.app
+name: "03 - Vytvorenie eventu"
+---
+- launchApp
+
+# Prejdeme na Create tab
+- tapOn:
+    text: ".*"
+    id: "tab-create"
+- assertVisible: "Vytvoriť udalosť"
+- takeScreenshot: "03_create_step1"
+
+# Step 1 - základné info
+- tapOn: "Názov udalosti"
+- inputText: "Maestro Test Event"
+- tapOn: "Popis (max 30 slov)"
+- inputText: "Testovací event vytvorený automaticky"
+- hideKeyboard
+
+# Vyberieme kategóriu
+- tapOn: "Pohyb & Šport"
+- takeScreenshot: "03_step1_filled"
+
+# Ďalej
+- tapOn: "Ďalej"
+- assertVisible:
+    text: ".*"
+    timeout: 5000
+- takeScreenshot: "03_create_step2"
+
+# Step 2 - cover (preskočíme, nie je povinné)
+- tapOn: "Ďalej"
+- assertVisible:
+    text: ".*"
+    timeout: 5000
+- takeScreenshot: "03_create_step3"
+
+# Step 3 - dátum/čas/miesto
+- tapOn: "Miesto"
+- inputText: "Bratislava"
+- hideKeyboard
+- takeScreenshot: "03_step3_venue"
+
+# Cena - necháme 0
+- takeScreenshot: "03_step3_filled"
