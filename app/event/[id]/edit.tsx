@@ -74,8 +74,7 @@ export default function EditEventScreen() {
     const { error } = await supabase.from('events').update({
       title: title.trim(),
       tagline: tagline.trim(),
-      tags,
-      category: tags[0] ?? 'Other',
+      category: tags.join(', '),
       date: eventDate,
       time: eventTime,
       venue: venue.trim(),

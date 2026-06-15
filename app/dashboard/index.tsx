@@ -624,7 +624,7 @@ export default function DashboardScreen() {
     setConnectingStripe(true);
     try {
       const res = await supabase.functions.invoke('create-connect-account', {
-        body: { return_url: 'woeva://dashboard?tab=payouts' },
+        body: { return_url: 'https://woeva.com/stripe-success' },
       });
 
       if (res.error) {
@@ -834,16 +834,16 @@ export default function DashboardScreen() {
               <Text style={s.billingSheetSub}>{t.dashboard.billingDetailsSub}</Text>
 
               <View style={s.billingForm}>
-                <Input label={t.dashboard.companyName} value={bCompany} onChangeText={v => setBCompany(sanitize(v))} placeholder="My Company Ltd." />
+                <Input label={t.dashboard.companyName} value={bCompany} onChangeText={v => setBCompany(sanitize(v))} placeholder="Moja spoločnosť s.r.o." />
                 <Input label={t.dashboard.companyId} value={bIco} onChangeText={v => setBIco(sanitize(v))} placeholder="12345678" />
                 <Input label={t.dashboard.taxId} value={bDic} onChangeText={v => setBDic(sanitize(v))} placeholder="SK2012345678" />
-                <Input label={t.dashboard.streetAddress} value={bAddress} onChangeText={v => setBAddress(sanitize(v))} placeholder="123 Main Street" />
+                <Input label={t.dashboard.streetAddress} value={bAddress} onChangeText={v => setBAddress(sanitize(v))} placeholder="Hlavná 1, Bratislava" />
                 <View style={s.billingRow}>
                   <View style={{ flex: 1 }}>
                     <Input label={t.dashboard.cityLabel} value={bCity} onChangeText={v => setBCity(sanitize(v))} placeholder="Bratislava" />
                   </View>
                   <View style={{ flex: 1 }}>
-                    <Input label={t.dashboard.country} value={bCountry} onChangeText={v => setBCountry(sanitize(v))} placeholder="Slovakia" />
+                    <Input label={t.dashboard.country} value={bCountry} onChangeText={v => setBCountry(sanitize(v))} placeholder="Slovensko" />
                   </View>
                 </View>
               </View>
@@ -1128,7 +1128,7 @@ export default function DashboardScreen() {
                           </View>
                           <TouchableOpacity
                             style={s.shareBtn}
-                            onPress={() => Share.share({ url: `https://ticket.woeva.com/event/${e.id}`, message: `${e.title}\nhttps://ticket.woeva.com/event/${e.id}` })}
+                            onPress={() => Share.share({ url: `https://woeva.com/event/${e.id}`, message: `${e.title}\nhttps://woeva.com/event/${e.id}` })}
                             hitSlop={8}
                           >
                             <Svg width={15} height={15} viewBox="0 0 24 24" fill="none">
@@ -1201,7 +1201,7 @@ export default function DashboardScreen() {
                           </View>
                           <TouchableOpacity
                             style={s.shareBtn}
-                            onPress={() => Share.share({ url: `https://ticket.woeva.com/event/${e.id}`, message: `${e.title}\nhttps://ticket.woeva.com/event/${e.id}` })}
+                            onPress={() => Share.share({ url: `https://woeva.com/event/${e.id}`, message: `${e.title}\nhttps://woeva.com/event/${e.id}` })}
                             hitSlop={8}
                           >
                             <Svg width={15} height={15} viewBox="0 0 24 24" fill="none">

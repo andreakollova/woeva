@@ -2,7 +2,7 @@
   "expo": {
     "name": "Woeva",
     "slug": "woeva",
-    "version": "1.1.0",
+    "version": "1.2.0",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
     "userInterfaceStyle": "light",
@@ -19,7 +19,7 @@
       "config": {
         "googleMapsApiKey": "AIzaSyDhtj5z-Us7Ic01tHuaJxC_mLTZPG3moj0"
       },
-      "buildNumber": "39",
+      "buildNumber": "40",
       "entitlements": {
         "com.apple.developer.in-app-payments": [
           "merchant.com.woeva.app"

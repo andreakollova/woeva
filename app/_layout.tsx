@@ -53,7 +53,7 @@ export default function RootLayout() {
         <LanguageProvider>
         <AuthProvider>
         <StripeProvider publishableKey={STRIPE_KEY} merchantIdentifier="merchant.com.woeva.app">
-          <StatusBar style="auto" />
+          <StatusBar style="light" />
           <NotificationHandler />
           <Stack screenOptions={{ headerShown: false, animation: 'fade_from_bottom' }}>
             <Stack.Screen name="(auth)" options={{ animation: 'none' }} />

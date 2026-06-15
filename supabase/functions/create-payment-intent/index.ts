@@ -51,7 +51,25 @@ serve(async (req) => {
       .eq('user_id', event.creator_id)
       .single();
 
-    if (!stripeAccount?.stripe_account_id || !stripeAccount.charges_enabled) {
+    if (!stripeAccount?.stripe_account_id) {
+      return new Response(JSON.stringify({ error: 'Organizer payment not set up' }), { status: 422, headers: corsHeaders });
+    }
+
+    // If charges_enabled is stale/false in DB, check live from Stripe
+    let chargesEnabled = stripeAccount.charges_enabled;
+    if (!chargesEnabled) {
+      const liveAccount = await stripe.accounts.retrieve(stripeAccount.stripe_account_id);
+      chargesEnabled = liveAccount.charges_enabled ?? false;
+      if (chargesEnabled) {
+        await admin.from('stripe_accounts').update({
+          charges_enabled: true,
+          payouts_enabled: liveAccount.payouts_enabled,
+          onboarding_complete: liveAccount.details_submitted,
+        }).eq('user_id', event.creator_id);
+      }
+    }
+
+    if (!chargesEnabled) {
       return new Response(JSON.stringify({ error: 'Organizer payment not set up' }), { status: 422, headers: corsHeaders });
     }
 

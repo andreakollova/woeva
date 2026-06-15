@@ -12,7 +12,7 @@ async function sendEmail(to: string | string[], subject: string, html: string) {
 }
 
 async function sendPush(tokens: string[], title: string, body: string, data?: Record<string, any>) {
-  const valid = tokens.filter(Boolean);
+  const valid = [...new Set(tokens.filter(t => t && t.startsWith('ExponentPushToken[')))];
   if (!valid.length) return;
   try {
     await supabase.functions.invoke('send-push', { body: { tokens: valid, title, body, data } });

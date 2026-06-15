@@ -275,29 +275,32 @@ export default function EventDetailScreen() {
     setEvent(prev => prev ? { ...prev, status: 'cancelled' } : prev);
   }
 
+  function openMaps() {
+    if (!event) return;
+    const query = encodeURIComponent(event.venue ?? '');
+    const url = Platform.OS === 'ios'
+      ? (event.lat && event.lng
+          ? `maps://?ll=${event.lat},${event.lng}&q=${query}`
+          : `maps://?q=${query}`)
+      : (event.lat && event.lng
+          ? `geo:${event.lat},${event.lng}?q=${query}`
+          : `geo:0,0?q=${query}`);
+    Linking.openURL(url).catch(() => {
+      Linking.openURL(`https://maps.google.com/?q=${query}`);
+    });
+  }
+
   async function handleInvite() {
     if (!event) return;
     const d = new Date(event.date + 'T00:00:00');
-    const dateStr = d.toLocaleDateString('en-US', { weekday: 'short', day: 'numeric', month: 'short' });
+    const dateStr = d.toLocaleDateString('sk-SK', { weekday: 'short', day: 'numeric', month: 'short' });
     const venueStr = event.venue ? ` · ${event.venue}` : '';
-    const deepLink = `woeva://event/${id}`;
-    const storeLink = Platform.OS === 'ios'
-      ? 'https://apps.apple.com/app/woeva/id000000000'
-      : 'https://play.google.com/store/apps/details?id=com.woeva.app';
-    const message = `Hey! Join me at ${event.title} 🎉\n${dateStr}${venueStr}\n\nOpen in Woeva: ${deepLink}\n\nDon't have the app? Download here: ${storeLink}`;
+    const webLink = `https://woeva.com/event/${id}`;
+    const message = `${event.title} 🎉\n${dateStr}${venueStr}\n\n${webLink}`;
     try {
-      let sharePayload: { title: string; message: string; url?: string } = { title: event.title, message };
-      if (event.cover_url) {
-        try {
-          const ext = event.cover_url.split('?')[0].split('.').pop() ?? 'jpg';
-          const localUri = `${FileSystem.cacheDirectory as string}event_cover_${id}.${ext}`;
-          await FileSystem.downloadAsync(event.cover_url, localUri);
-          sharePayload.url = localUri;
-        } catch (_) {}
-      }
       await Share.share(
-        sharePayload,
-        { dialogTitle: 'Invite a friend' }
+        { title: event.title, message },
+        { dialogTitle: 'Pozvať priateľa' }
       );
     } catch {}
   }
@@ -308,6 +311,8 @@ export default function EventDetailScreen() {
   const isPayAtDoor = !!(event as any).pay_at_door;
   const isFree = !isPayAtDoor && (event.is_free || event.price === 0);
   const isWoevaEvent = !!(event as any).source;
+  const publishAt = (event as any).publish_at ? new Date((event as any).publish_at) : null;
+  const isNotYetPublished = !!publishAt && publishAt > new Date();
   const priceLabel = isPayAtDoor ? `€${event.price}` : (isFree ? t.event.freeLabel : `€${event.price}`);
   const eventStart = new Date(`${event.date}T${event.time || '00:00'}`);
   const eventDurationH = event.duration ?? 3;
@@ -612,7 +617,7 @@ export default function EventDetailScreen() {
                 {/* Location row */}
                 {event.venue ? (
                   <View style={[s.infoRow, { justifyContent: 'space-between' }]}>
-                    <View style={[s.infoRow, { flex: 1 }]}>
+                    <TouchableOpacity style={[s.infoRow, { flex: 1 }]} onPress={openMaps} activeOpacity={0.7}>
                       <View style={s.infoIconBox}>
                         <Svg width={15} height={15} viewBox="0 0 24 24" fill="none">
                           <Path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7z" stroke={Colors.black} strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" />
@@ -620,10 +625,10 @@ export default function EventDetailScreen() {
                         </Svg>
                       </View>
                       <View style={{ flex: 1 }}>
-                        <Text style={s.infoText}>{formatVenue(event.venue)}</Text>
+                        <Text style={[s.infoText, { textDecorationLine: 'underline' }]}>{formatVenue(event.venue)}</Text>
                         {event.city ? <Text style={s.infoSub}>{event.city}</Text> : null}
                       </View>
-                    </View>
+                    </TouchableOpacity>
                     {!isAttending && (
                       <TouchableOpacity onPress={handleInvite} activeOpacity={0.7} style={s.shareIconBtn} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
                         <Svg width={13} height={13} viewBox="0 0 24 24" fill="none">
@@ -700,8 +705,8 @@ export default function EventDetailScreen() {
               <View style={s.hairline} />
               <TouchableOpacity
                 style={s.hostRow}
-                onPress={() => event.club ? router.push(`/club/${event.club!.id}`) : event.creator_id ? router.push(`/profile/${event.creator_id}` as any) : undefined}
-                activeOpacity={0.7}
+                onPress={() => event.club ? router.push(`/club/${event.club!.id}`) : undefined}
+                activeOpacity={event.club ? 0.7 : 1}
               >
                 {(event.club ? event.club.logo_url : creator?.avatar_url)
                   ? <Image source={{ uri: (event.club ? event.club.logo_url : creator?.avatar_url)! }} style={s.hostAvatar} />
@@ -711,18 +716,17 @@ export default function EventDetailScreen() {
                   <Text style={s.hostLabel}>{t.event.hostedBy}</Text>
                   <Text style={s.hostName}>{hostName}</Text>
                 </View>
-                {isMember
-                  ? <View style={s.joinPillMember}><Text style={s.joinPillMemberText}>✓ {t.event.memberLabel}</Text></View>
-                  : event.club && user
-                    ? <TouchableOpacity style={s.joinPillFollow} onPress={async (e) => {
-                        e.stopPropagation?.();
-                        await supabase.from('club_members').insert({ club_id: event.club!.id, user_id: user.id, role: 'member', status: 'approved' });
-                        setIsMember(true);
-                      }}><Text style={s.joinPillFollowText}>+ {t.event.joinPlus}</Text></TouchableOpacity>
-                    : (event.club || event.creator_id)
-                      ? <Svg width={16} height={16} viewBox="0 0 24 24" fill="none"><Path d="M9 18l6-6-6-6" stroke={Colors.gray} strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" /></Svg>
-                      : null
-                }
+                {event.club && (
+                  isMember
+                    ? <View style={s.joinPillMember}><Text style={s.joinPillMemberText}>✓ {t.event.memberLabel}</Text></View>
+                    : user
+                      ? <TouchableOpacity style={s.joinPillFollow} onPress={async (e) => {
+                          e.stopPropagation?.();
+                          await supabase.from('club_members').insert({ club_id: event.club!.id, user_id: user.id, role: 'member', status: 'approved' });
+                          setIsMember(true);
+                        }}><Text style={s.joinPillFollowText}>+ {t.event.joinPlus}</Text></TouchableOpacity>
+                      : <Svg width={16} height={16} viewBox="0 0 24 24" fill="none"><Path d="M9 18l6-6-6-6" stroke={Colors.gray} strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" /></Svg>
+                )}
               </TouchableOpacity>
             </>
           ) : null}
@@ -805,7 +809,14 @@ export default function EventDetailScreen() {
                 </TouchableOpacity>
               </View>
             )
-            : event.capacity != null && goingCount >= event.capacity
+            : isNotYetPublished
+              ? <Button
+                  label={`Prihlasovanie od ${publishAt!.toLocaleDateString('sk-SK', { day: 'numeric', month: 'short' })} ${publishAt!.toLocaleTimeString('sk-SK', { hour: '2-digit', minute: '2-digit' })}`}
+                  onPress={() => {}}
+                  variant="lime"
+                  disabled
+                />
+              : event.capacity != null && goingCount >= event.capacity
               ? <Button label={lang === 'sk' ? 'Kapacita naplnená' : 'Event is full'} onPress={() => {}} variant="lime" disabled />
               : <Button
                 label={user ? (isFree ? t.event.joinFree : isPayAtDoor ? (lang === 'sk' ? `Zaplatiť €${event.price} na mieste` : `Pay €${event.price} at the venue`) : t.event.buyTicket(priceLabel)) : t.event.getWoeva}

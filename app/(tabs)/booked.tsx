@@ -184,7 +184,7 @@ export default function BookedScreen() {
 
   return (
     <View style={[styles.container, { paddingTop: insets.top }]}>
-      <StatusBar style="dark" />
+      <StatusBar style="light" />
       <View style={styles.topBar}>
         <TouchableOpacity onPress={() => router.push('/(tabs)')} activeOpacity={0.7}>
           <WMark size={90} color={Colors.lime} style={{ marginVertical: -10 }} />

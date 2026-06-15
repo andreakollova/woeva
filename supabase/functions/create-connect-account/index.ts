@@ -57,18 +57,26 @@ serve(async (req) => {
       });
     }
 
-    if (existing?.onboarding_complete) {
-      // Already connected — check live status and update
+    // Always do live Stripe check when account exists
+    if (accountId) {
       const account = await stripe.accounts.retrieve(accountId);
       await admin.from('stripe_accounts').update({
-        payouts_enabled: account.payouts_enabled,
-        charges_enabled: account.charges_enabled,
-        onboarding_complete: account.details_submitted,
+        onboarding_complete: account.details_submitted ?? false,
+        charges_enabled: account.charges_enabled ?? false,
+        payouts_enabled: account.payouts_enabled ?? false,
       }).eq('user_id', user.id);
 
-      return new Response(JSON.stringify({ already_connected: true, payouts_enabled: account.payouts_enabled }), {
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-      });
+      if (account.charges_enabled) {
+        return new Response(JSON.stringify({ already_connected: true, charges_enabled: true }), {
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        });
+      }
+      if (account.details_submitted) {
+        // Submitted but Stripe still reviewing
+        return new Response(JSON.stringify({ pending_review: true, charges_enabled: false }), {
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        });
+      }
     }
 
     const accountLink = await stripe.accountLinks.create({

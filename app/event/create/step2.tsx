@@ -114,7 +114,7 @@ export default function CreateStep2Screen() {
 
   return (
     <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : undefined} keyboardVerticalOffset={0}>
-      <StatusBar style="dark" />
+      <StatusBar style="light" />
       <ScrollView
         style={styles.container}
         contentContainerStyle={[styles.scroll, { paddingTop: insets.top + 4, paddingBottom: 16 }]}
@@ -180,15 +180,25 @@ export default function CreateStep2Screen() {
                 onPress={() => setPostAs('individual')}
                 activeOpacity={0.8}
               >
-                <View style={[styles.postAsAvatar, { backgroundColor: postAs === 'individual' ? Colors.lime : Colors.grayLight }]}>
-                  <Text style={[styles.postAsAvatarInitial, postAs === 'individual' && { color: Colors.black }]}>
-                    {(profile?.name || '?').charAt(0).toUpperCase()}
-                  </Text>
-                </View>
-                <View style={{ flex: 1 }}>
-                  <Text style={[styles.postAsTitle, postAs === 'individual' && styles.postAsTitleActive]}>{profile?.name || t.chat.you}</Text>
-                  <Text style={[styles.postAsSub, postAs === 'individual' && styles.postAsSubActive]}>{t.event.individual}</Text>
-                </View>
+                {(() => {
+                  const displayName = profile?.name || (user as any)?.user_metadata?.full_name || (user as any)?.user_metadata?.name || '';
+                  const initial = displayName ? displayName.charAt(0).toUpperCase() : (user?.email?.charAt(0).toUpperCase() ?? '?');
+                  const avatarUri = profile?.avatar_url || (user as any)?.user_metadata?.avatar_url || (user as any)?.user_metadata?.picture || null;
+                  return (
+                    <>
+                      <View style={[styles.postAsAvatar, { backgroundColor: postAs === 'individual' ? Colors.lime : Colors.grayLight }]}>
+                        {avatarUri
+                          ? <Image source={{ uri: avatarUri }} style={styles.postAsAvatarImg} />
+                          : <Text style={[styles.postAsAvatarInitial, postAs === 'individual' && { color: Colors.black }]}>{initial}</Text>
+                        }
+                      </View>
+                      <View style={{ flex: 1 }}>
+                        <Text style={[styles.postAsTitle, postAs === 'individual' && styles.postAsTitleActive]}>{displayName || t.chat.you}</Text>
+                        <Text style={[styles.postAsSub, postAs === 'individual' && styles.postAsSubActive]}>{t.event.individual}</Text>
+                      </View>
+                    </>
+                  );
+                })()}
                 <View style={[styles.postAsRadio, postAs === 'individual' && styles.postAsRadioActive]}>
                   {postAs === 'individual' && <View style={styles.postAsRadioDot} />}
                 </View>

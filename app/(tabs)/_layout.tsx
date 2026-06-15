@@ -230,7 +230,7 @@ export default function TabsLayout() {
 
   return (
     <>
-    <StatusBar style="dark" />
+    <StatusBar style="light" />
     <Tabs
       tabBar={props => <TabBar {...props} />}
       screenOptions={{ headerShown: false }}

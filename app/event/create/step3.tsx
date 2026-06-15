@@ -1,5 +1,7 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, ScrollView, KeyboardAvoidingView, Platform, Alert, Modal, Pressable, Image, TextInput } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, ScrollView, KeyboardAvoidingView, Platform, Alert, Modal, Pressable, Image, TextInput, Animated } from 'react-native';
+import Svg, { Path } from 'react-native-svg';
+import * as WebBrowser from 'expo-web-browser';
 import { StatusBar } from 'expo-status-bar';
 import * as FileSystem from 'expo-file-system/legacy';
 import * as ImagePicker from 'expo-image-picker';
@@ -61,20 +63,115 @@ export default function CreateStep3Screen() {
   const [extraCovers, setExtraCovers] = useState<string[]>(draft3.extraCovers);
   const [toast, setToast] = useState(false);
   const [stripeConnected, setStripeConnected] = useState(false);
+  const [stripePending, setStripePending] = useState(false);
+  const [connectingStripe, setConnectingStripe] = useState(false);
+  const [stripeJustConnected, setStripeJustConnected] = useState(false);
+
+  // Advanced settings
+  const [advancedOpen, setAdvancedOpen] = useState(false);
+  const [hasPublishAt, setHasPublishAt] = useState(false);
+  const [publishAtDate, setPublishAtDate] = useState<Date>(() => {
+    const d = new Date(); d.setDate(d.getDate() + 1); d.setHours(10, 0, 0, 0); return d;
+  });
+  const [publishAtTime, setPublishAtTime] = useState<Date>(() => {
+    const d = new Date(); d.setHours(10, 0, 0, 0); return d;
+  });
+  const [showPublishAtDate, setShowPublishAtDate] = useState(false);
+  const [showPublishAtTime, setShowPublishAtTime] = useState(false);
+  const [publishAtWeekday, setPublishAtWeekday] = useState<number | null>(null); // 0=Sun..6=Sat, for recurring
 
   useFocusEffect(useCallback(() => {
     if (!user) return;
     supabase
       .from('stripe_accounts')
-      .select('onboarding_complete, charges_enabled')
+      .select('stripe_account_id, charges_enabled, onboarding_complete')
       .eq('user_id', user.id)
       .maybeSingle()
-      .then(({ data }) => {
-        if (data?.onboarding_complete && data?.charges_enabled) {
+      .then(async ({ data }) => {
+        if (!data?.stripe_account_id) return; // no account yet, nothing to check
+        if (data.charges_enabled) {
           setStripeConnected(true);
+          setStripePending(false);
+          return;
+        }
+        if (data.onboarding_complete) {
+          // Has submitted — do live Stripe check to get real status
+          setStripePending(true);
+          try {
+            const res = await supabase.functions.invoke('create-connect-account', {
+              body: { return_url: 'https://woeva.com/stripe-success?from=create' },
+            });
+            if (res.data?.already_connected) {
+              setStripeConnected(true);
+              setStripePending(false);
+            }
+          } catch (_) {}
         }
       });
   }, [user]));
+
+  // Auto-poll Stripe status every 5s while pending
+  useEffect(() => {
+    if (!stripePending || stripeConnected) return;
+    const interval = setInterval(async () => {
+      try {
+        const res = await supabase.functions.invoke('create-connect-account', {
+          body: { return_url: 'https://woeva.com/stripe-success?from=create' },
+        });
+        if (res.data?.already_connected) {
+          setStripeConnected(true);
+          setStripePending(false);
+          setStripeJustConnected(true);
+          clearInterval(interval);
+        }
+      } catch (_) {}
+    }, 5000);
+    return () => clearInterval(interval);
+  }, [stripePending, stripeConnected]);
+
+  async function connectStripe() {
+    setConnectingStripe(true);
+    try {
+      const res = await supabase.functions.invoke('create-connect-account', {
+        body: { return_url: 'https://woeva.com/stripe-success?from=create' },
+      });
+      if (res.data?.error) { Alert.alert('Chyba', res.data.error); return; }
+      if (res.data?.already_connected) {
+        setStripeConnected(true);
+        setStripePending(false);
+        setStripeJustConnected(true);
+        return;
+      }
+      if (res.data?.pending_review) {
+        setStripePending(true);
+        return;
+      }
+      if (res.data?.url) {
+        await WebBrowser.openBrowserAsync(res.data.url);
+        // Poll every 2s for up to 30s until Stripe confirms charges_enabled
+        let connected = false;
+        for (let i = 0; i < 15; i++) {
+          await new Promise(r => setTimeout(r, 2000));
+          try {
+            const recheck = await supabase.functions.invoke('create-connect-account', {
+              body: { return_url: 'https://woeva.com/stripe-success?from=create' },
+            });
+            if (recheck.data?.already_connected) {
+              setStripeConnected(true);
+              setStripePending(false);
+              setStripeJustConnected(true);
+              connected = true;
+              break;
+            }
+          } catch (_) {}
+        }
+        if (!connected) setStripePending(true);
+      }
+    } catch (e: any) {
+      Alert.alert('Chyba', e?.message ?? 'Nepodarilo sa pripojiť Stripe.');
+    }
+    setConnectingStripe(false);
+  }
 
   // Keep draft in sync
   useEffect(() => {
@@ -89,6 +186,11 @@ export default function CreateStep3Screen() {
   async function handleShare() {
     if (!venue.trim()) { Alert.alert(t.event.missingVenue, t.event.missingVenueMsg); return; }
     if (!params.title) { Alert.alert(t.event.missingTitle, t.event.missingTitleMsg); return; }
+    const priceVal = parseFloat(price) || 0;
+    if (priceVal > 0 && !payAtDoor && !stripeConnected) {
+      router.push('/dashboard?tab=payouts' as any);
+      return;
+    }
     // Validate date+time is in the future
     const eventDateTime = new Date(`${date.getFullYear()}-${String(date.getMonth()+1).padStart(2,'0')}-${String(date.getDate()).padStart(2,'0')}T${time.getHours().toString().padStart(2,'0')}:${time.getMinutes().toString().padStart(2,'0')}:00`);
     if (eventDateTime <= new Date()) { Alert.alert(lang === 'sk' ? 'Neplatný čas' : 'Invalid time', lang === 'sk' ? 'Čas začiatku musí byť v budúcnosti.' : 'Start time must be in the future.'); return; }
@@ -189,6 +291,19 @@ export default function CreateStep3Screen() {
       capacity: hasCapacity && capacity ? parseInt(capacity, 10) : null,
       going_count: hasCapacity && capacity ? 0 : 1,
       city: eventCity,
+      publish_at: hasPublishAt ? (() => {
+        if (isRecurring && publishAtWeekday !== null) {
+          // Find nearest occurrence of selected weekday at or before event date
+          const d = new Date(date);
+          d.setHours(publishAtTime.getHours(), publishAtTime.getMinutes(), 0, 0);
+          let attempts = 0;
+          while (d.getDay() !== publishAtWeekday && attempts < 7) { d.setDate(d.getDate() - 1); attempts++; }
+          return d.toISOString();
+        }
+        const d = new Date(publishAtDate);
+        d.setHours(publishAtTime.getHours(), publishAtTime.getMinutes(), 0, 0);
+        return d.toISOString();
+      })() : null,
     }).select().single();
 
     if (!error && data) {
@@ -270,7 +385,7 @@ export default function CreateStep3Screen() {
 
   return (
     <KeyboardAvoidingView style={{ flex: 1, backgroundColor: Colors.white }} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
-      <StatusBar style="dark" />
+      <StatusBar style="light" />
       <ScrollView
         style={styles.container}
         contentContainerStyle={[styles.scroll, { paddingTop: insets.top + 4, paddingBottom: 0 }]}
@@ -379,6 +494,35 @@ export default function CreateStep3Screen() {
               Minimálna cena je €0.50
             </Text>
           )}
+          {parseFloat(price) > 0 && !payAtDoor && stripeJustConnected && (
+            <View style={[styles.stripeNotice, { backgroundColor: '#1a1a1a' }]}>
+              <Text style={styles.stripeIcon}>✅</Text>
+              <View style={styles.stripeText}>
+                <Text style={styles.stripeTitle}>Stripe prepojený!</Text>
+                <Text style={styles.stripeSub}>Môžeš prijímať online platby za eventy.</Text>
+              </View>
+            </View>
+          )}
+          {parseFloat(price) > 0 && !payAtDoor && !stripeConnected && stripePending && (
+            <TouchableOpacity style={[styles.stripeNotice, { backgroundColor: '#7c5200' }]} onPress={connectStripe} activeOpacity={0.85} disabled={connectingStripe}>
+              <Text style={styles.stripeIcon}>⏳</Text>
+              <View style={styles.stripeText}>
+                <Text style={styles.stripeTitle}>Stripe overuje tvoj účet</Text>
+                <Text style={styles.stripeSub}>Zvyčajne to trvá pár minút.</Text>
+                <Text style={styles.stripeLink}>{connectingStripe ? 'Kontrolujem...' : 'Skontrolovať stav'}</Text>
+              </View>
+            </TouchableOpacity>
+          )}
+          {parseFloat(price) > 0 && !payAtDoor && !stripeConnected && !stripePending && (
+            <TouchableOpacity style={styles.stripeNotice} onPress={connectStripe} activeOpacity={0.85} disabled={connectingStripe}>
+              <Text style={styles.stripeIcon}>💳</Text>
+              <View style={styles.stripeText}>
+                <Text style={styles.stripeTitle}>Zatiaľ nemôžeš prijímať platby</Text>
+                <Text style={styles.stripeSub}>{t.event.stripeRequiredSub}</Text>
+                <Text style={styles.stripeLink}>{connectingStripe ? 'Otváranie...' : t.event.setUpPayments}</Text>
+              </View>
+            </TouchableOpacity>
+          )}
           {parseFloat(price) > 0 && (
             <TouchableOpacity style={styles.recurringRow} onPress={() => setPayAtDoor(r => !r)} activeOpacity={0.7}>
               <View style={styles.recurringText}>
@@ -390,53 +534,162 @@ export default function CreateStep3Screen() {
               </View>
             </TouchableOpacity>
           )}
-          {parseFloat(price) > 0 && !payAtDoor && !stripeConnected && (
-            <View style={styles.stripeNotice}>
-              <Text style={styles.stripeIcon}>💳</Text>
-              <View style={styles.stripeText}>
-                <Text style={styles.stripeTitle}>{t.event.stripeRequired}</Text>
-                <Text style={styles.stripeSub}>{t.event.stripeRequiredSub}</Text>
-                <TouchableOpacity onPress={() => router.push('/dashboard?tab=payouts' as any)} activeOpacity={0.7}>
-                  <Text style={styles.stripeLink}>{t.event.setUpPayments}</Text>
+
+          {/* ── Pokročilé nastavenia ── */}
+          <View style={styles.advancedWrap}>
+            <TouchableOpacity style={styles.advancedHeader} onPress={() => setAdvancedOpen(o => !o)} activeOpacity={0.75}>
+              <Text style={styles.advancedTitle}>Pokročilé nastavenia</Text>
+              <Svg width={18} height={18} viewBox="0 0 24 24" fill="none" style={{ transform: [{ rotate: advancedOpen ? '180deg' : '0deg' }] }}>
+                <Path d="M6 9l6 6 6-6" stroke={Colors.gray} strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" />
+              </Svg>
+            </TouchableOpacity>
+
+            {advancedOpen && (
+              <View style={styles.advancedBody}>
+                {/* Recurring toggle */}
+                <TouchableOpacity style={styles.recurringRow} onPress={() => setIsRecurring(r => !r)} activeOpacity={0.7}>
+                  <View style={styles.recurringText}>
+                    <Text style={styles.recurringTitle}>{t.event.repeatWeekly}</Text>
+                    <Text style={styles.recurringSub}>{t.event.repeatSub}</Text>
+                  </View>
+                  <View style={[styles.toggle, isRecurring && styles.toggleOn]}>
+                    <View style={[styles.toggleThumb, isRecurring && styles.toggleThumbOn]} />
+                  </View>
                 </TouchableOpacity>
+
+                {/* Capacity toggle */}
+                <TouchableOpacity style={styles.recurringRow} onPress={() => setHasCapacity(r => !r)} activeOpacity={0.7}>
+                  <View style={styles.recurringText}>
+                    <Text style={styles.recurringTitle}>{lang === 'sk' ? 'Obmedzená kapacita' : 'Limited capacity'}</Text>
+                    <Text style={styles.recurringSub}>{lang === 'sk' ? 'Nastav maximálny počet účastníkov.' : 'Set a maximum number of attendees.'}</Text>
+                  </View>
+                  <View style={[styles.toggle, hasCapacity && styles.toggleOn]}>
+                    <View style={[styles.toggleThumb, hasCapacity && styles.toggleThumbOn]} />
+                  </View>
+                </TouchableOpacity>
+                {hasCapacity && (
+                  <View>
+                    <Text style={styles.label}>{lang === 'sk' ? 'Maximálny počet miest' : 'Max attendees'}</Text>
+                    <TextInput
+                      style={styles.field}
+                      value={capacity}
+                      onChangeText={v => setCapacity(v.replace(/[^0-9]/g, ''))}
+                      placeholder={lang === 'sk' ? 'napr. 30' : 'e.g. 30'}
+                      keyboardType="number-pad"
+                      maxLength={5}
+                    />
+                  </View>
+                )}
+
+                {/* Publish At toggle */}
+                <TouchableOpacity style={styles.recurringRow} onPress={() => setHasPublishAt(v => !v)} activeOpacity={0.7}>
+                  <View style={styles.recurringText}>
+                    <Text style={styles.recurringTitle}>Definovať čas zobrazenia</Text>
+                    <Text style={styles.recurringSub}>Event bude viditeľný a otvorený na prihlásenie až od nastaveného času.</Text>
+                  </View>
+                  <View style={[styles.toggle, hasPublishAt && styles.toggleOn]}>
+                    <View style={[styles.toggleThumb, hasPublishAt && styles.toggleThumbOn]} />
+                  </View>
+                </TouchableOpacity>
+
+                {hasPublishAt && (
+                  <View style={styles.publishAtBox}>
+                    <Text style={styles.publishAtLabel}>Zobraziť od:</Text>
+
+                    {isRecurring ? (
+                      // Recurring: pick weekday + time
+                      <View style={{ gap: 10 }}>
+                        <View style={styles.weekdayRow}>
+                          {['Ne','Po','Ut','St','Št','Pi','So'].map((label, idx) => (
+                            <TouchableOpacity
+                              key={idx}
+                              style={[styles.weekdayPill, publishAtWeekday === idx && styles.weekdayPillActive]}
+                              onPress={() => setPublishAtWeekday(publishAtWeekday === idx ? null : idx)}
+                              activeOpacity={0.7}
+                            >
+                              <Text style={[styles.weekdayPillText, publishAtWeekday === idx && styles.weekdayPillTextActive]}>{label}</Text>
+                            </TouchableOpacity>
+                          ))}
+                        </View>
+                        <TouchableOpacity style={[styles.field, { alignSelf: 'flex-start', minWidth: 90 }]} onPress={() => setShowPublishAtTime(true)} activeOpacity={0.7}>
+                          <Text style={styles.fieldValue}>{`${publishAtTime.getHours().toString().padStart(2,'0')}:${publishAtTime.getMinutes().toString().padStart(2,'0')}`}</Text>
+                        </TouchableOpacity>
+                        <Text style={styles.publishAtHint}>Každý týždeň sa event otvorí v tento deň a čas.</Text>
+                      </View>
+                    ) : (
+                      // One-time: pick date + time
+                      <View style={{ gap: 10 }}>
+                        <View style={styles.publishAtRow}>
+                          <TouchableOpacity style={[styles.field, styles.publishAtField]} onPress={() => setShowPublishAtDate(true)} activeOpacity={0.7}>
+                            <Text style={styles.fieldValue}>{publishAtDate.toLocaleDateString('sk-SK', { weekday: 'short', day: 'numeric', month: 'short' })}</Text>
+                          </TouchableOpacity>
+                          <TouchableOpacity style={[styles.field, styles.publishAtField]} onPress={() => setShowPublishAtTime(true)} activeOpacity={0.7}>
+                            <Text style={styles.fieldValue}>{`${publishAtTime.getHours().toString().padStart(2,'0')}:${publishAtTime.getMinutes().toString().padStart(2,'0')}`}</Text>
+                          </TouchableOpacity>
+                        </View>
+                        <Text style={styles.publishAtHint}>Ľudia sa môžu prihlasovať až od tohto momentu.</Text>
+                      </View>
+                    )}
+
+                    {/* PublishAt Date Modal (one-time only) */}
+                    {!isRecurring && (
+                      <Modal visible={showPublishAtDate} transparent animationType="slide" onRequestClose={() => setShowPublishAtDate(false)}>
+                        <Pressable style={styles.modalOverlay} onPress={() => setShowPublishAtDate(false)}>
+                          <Pressable style={styles.calendarSheet} onPress={() => {}}>
+                            <View style={styles.calendarHandle} />
+                            <Text style={styles.durationSheetTitle}>Dátum zobrazenia</Text>
+                            <DateTimePicker
+                              value={publishAtDate}
+                              mode="date"
+                              display={Platform.OS === 'ios' ? 'inline' : 'default'}
+                              maximumDate={date}
+                              onChange={(_, d) => {
+                                if (Platform.OS === 'android') setShowPublishAtDate(false);
+                                if (d) setPublishAtDate(d);
+                              }}
+                              style={Platform.OS === 'ios' ? { alignSelf: 'center' } : undefined}
+                              themeVariant="light"
+                              accentColor={Colors.black}
+                            />
+                            {Platform.OS === 'ios' && (
+                              <TouchableOpacity style={styles.calendarDone} onPress={() => setShowPublishAtDate(false)} activeOpacity={0.8}>
+                                <Text style={styles.calendarDoneText}>Hotovo</Text>
+                              </TouchableOpacity>
+                            )}
+                          </Pressable>
+                        </Pressable>
+                      </Modal>
+                    )}
+
+                    {/* PublishAt Time Modal */}
+                    <Modal visible={showPublishAtTime} transparent animationType="slide" onRequestClose={() => setShowPublishAtTime(false)}>
+                      <Pressable style={styles.modalOverlay} onPress={() => setShowPublishAtTime(false)}>
+                        <Pressable style={styles.calendarSheet} onPress={() => {}}>
+                          <View style={styles.calendarHandle} />
+                          <Text style={styles.durationSheetTitle}>Čas zobrazenia</Text>
+                          <DateTimePicker
+                            value={publishAtTime}
+                            mode="time"
+                            display={Platform.OS === 'ios' ? 'spinner' : 'default'}
+                            onChange={(_, t) => {
+                              if (Platform.OS === 'android') setShowPublishAtTime(false);
+                              if (t) setPublishAtTime(t);
+                            }}
+                            themeVariant="light"
+                          />
+                          {Platform.OS === 'ios' && (
+                            <TouchableOpacity style={styles.calendarDone} onPress={() => setShowPublishAtTime(false)} activeOpacity={0.8}>
+                              <Text style={styles.calendarDoneText}>Hotovo</Text>
+                            </TouchableOpacity>
+                          )}
+                        </Pressable>
+                      </Pressable>
+                    </Modal>
+                  </View>
+                )}
               </View>
-            </View>
-          )}
-
-          {/* Recurring toggle */}
-          <TouchableOpacity style={styles.recurringRow} onPress={() => setIsRecurring(r => !r)} activeOpacity={0.7}>
-            <View style={styles.recurringText}>
-              <Text style={styles.recurringTitle}>{t.event.repeatWeekly}</Text>
-              <Text style={styles.recurringSub}>{t.event.repeatSub}</Text>
-            </View>
-            <View style={[styles.toggle, isRecurring && styles.toggleOn]}>
-              <View style={[styles.toggleThumb, isRecurring && styles.toggleThumbOn]} />
-            </View>
-          </TouchableOpacity>
-
-          {/* Capacity toggle */}
-          <TouchableOpacity style={styles.recurringRow} onPress={() => setHasCapacity(r => !r)} activeOpacity={0.7}>
-            <View style={styles.recurringText}>
-              <Text style={styles.recurringTitle}>{lang === 'sk' ? 'Obmedzená kapacita' : 'Limited capacity'}</Text>
-              <Text style={styles.recurringSub}>{lang === 'sk' ? 'Nastav maximálny počet účastníkov.' : 'Set a maximum number of attendees.'}</Text>
-            </View>
-            <View style={[styles.toggle, hasCapacity && styles.toggleOn]}>
-              <View style={[styles.toggleThumb, hasCapacity && styles.toggleThumbOn]} />
-            </View>
-          </TouchableOpacity>
-          {hasCapacity && (
-            <View>
-              <Text style={styles.label}>{lang === 'sk' ? 'Maximálny počet miest' : 'Max attendees'}</Text>
-              <TextInput
-                style={styles.field}
-                value={capacity}
-                onChangeText={v => setCapacity(v.replace(/[^0-9]/g, ''))}
-                placeholder={lang === 'sk' ? 'napr. 30' : 'e.g. 30'}
-                keyboardType="number-pad"
-                maxLength={5}
-              />
-            </View>
-          )}
+            )}
+          </View>
 
           {/* Recurring end date — only when recurring is on */}
           {isRecurring && (() => {
@@ -477,14 +730,14 @@ export default function CreateStep3Screen() {
                     </Pressable>
                   </Pressable>
                 </Modal>
-                <Text style={styles.recurringWeeksHint}>{weeks} {weeks === 1 ? 'week' : 'weeks'}</Text>
+                <Text style={styles.recurringWeeksHint}>{weeks} {weeks === 1 ? 'týždeň' : weeks < 5 ? 'týždne' : 'týždňov'}</Text>
               </View>
 
               {/* Rotating cover photos */}
               <View>
-                <Text style={styles.label}>Rotating covers</Text>
+                <Text style={styles.label}>Striedajúce sa obálky</Text>
                 <View style={styles.rotatingDivider} />
-                <Text style={styles.rotatingSub}>Add up to {maxPhotos + 1} photos - a different one shows each week.</Text>
+                <Text style={styles.rotatingSub}>Pridaj až {maxPhotos + 1} {maxPhotos + 1 === 1 ? 'fotku' : maxPhotos + 1 < 5 ? 'fotky' : 'fotiek'} – každý týždeň sa zobrazí iná.</Text>
                 <View style={styles.rotatingRow}>
                   {params.cover ? (
                     <View style={styles.rotatingThumbWrap}>
@@ -595,10 +848,24 @@ const styles = StyleSheet.create({
   calendarDone: { marginTop: 12, backgroundColor: Colors.black, borderRadius: 50, paddingVertical: 14, alignItems: 'center' },
   calendarDoneText: { fontSize: 15, fontWeight: '700', color: Colors.white, fontFamily: Fonts.semibold },
   rotatingDivider: { height: 1, backgroundColor: Colors.grayBorder, marginVertical: 8 },
-  stripeNotice: { flexDirection: 'row', gap: 12, backgroundColor: '#EFFFB0', borderRadius: 12, padding: 14, alignItems: 'flex-start' },
-  stripeIcon: { fontSize: 20 },
+  advancedWrap: { borderWidth: 1.5, borderColor: Colors.grayBorder, borderRadius: 14, overflow: 'hidden' },
+  advancedHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 14, paddingVertical: 14 },
+  advancedTitle: { fontSize: 14, fontWeight: '600', fontFamily: Fonts.semibold, color: Colors.black },
+  advancedBody: { borderTopWidth: 1, borderTopColor: Colors.grayBorder, gap: 12, padding: 12 },
+  publishAtBox: { backgroundColor: Colors.grayLight, borderRadius: 12, padding: 12, gap: 8 },
+  publishAtLabel: { fontSize: 12, fontWeight: '600', color: Colors.gray, fontFamily: Fonts.semibold },
+  publishAtRow: { flexDirection: 'row', gap: 10 },
+  publishAtField: { flex: 1, height: 44 },
+  publishAtHint: { fontSize: 12, color: Colors.gray, fontFamily: Fonts.regular, lineHeight: 16 },
+  weekdayRow: { flexDirection: 'row', gap: 6 },
+  weekdayPill: { flex: 1, paddingVertical: 8, borderRadius: 8, borderWidth: 1.5, borderColor: Colors.grayBorder, alignItems: 'center', backgroundColor: Colors.white },
+  weekdayPillActive: { backgroundColor: Colors.black, borderColor: Colors.black },
+  weekdayPillText: { fontSize: 12, fontWeight: '600', fontFamily: Fonts.semibold, color: Colors.gray },
+  weekdayPillTextActive: { color: Colors.white },
+  stripeNotice: { flexDirection: 'row', gap: 14, backgroundColor: Colors.black, borderRadius: 16, padding: 16, alignItems: 'flex-start' },
+  stripeIcon: { fontSize: 24 },
   stripeText: { flex: 1, gap: 4 },
-  stripeTitle: { fontSize: 14, fontWeight: '600', fontFamily: Fonts.semibold, color: Colors.black },
-  stripeSub: { fontSize: 13, color: Colors.gray, fontFamily: Fonts.regular, lineHeight: 18 },
-  stripeLink: { fontSize: 13, fontWeight: '600', fontFamily: Fonts.semibold, color: Colors.black, marginTop: 6 },
+  stripeTitle: { fontSize: 15, fontWeight: '700', fontFamily: Fonts.bold, color: Colors.white },
+  stripeSub: { fontSize: 13, color: 'rgba(255,255,255,0.65)', fontFamily: Fonts.regular, lineHeight: 18 },
+  stripeLink: { fontSize: 13, fontWeight: '700', fontFamily: Fonts.bold, color: Colors.lime, marginTop: 6 },
 });

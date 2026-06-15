@@ -344,7 +344,7 @@ export default function ClubDetailScreen() {
             )}
             {!isAdmin && !isMember && user && (
               <TouchableOpacity style={styles.memberJoinBtn} onPress={handleJoin} activeOpacity={0.8}>
-                <Text style={styles.memberJoinText}>Pridať sa</Text>
+                <Text style={styles.memberJoinText}>+ Sledovať</Text>
               </TouchableOpacity>
             )}
           </View>

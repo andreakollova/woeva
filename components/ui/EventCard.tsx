@@ -76,13 +76,9 @@ export function EventCard({ event, featured, attending }: EventCardProps) {
               isFree={isFree}
               clubName={clubName}
               goingCount={goingCount}
+              attending={attending}
               dark
             />
-            {attending && (
-              <View style={styles.featuredGoingBadge}>
-                <Text style={styles.goingBadgeText}>✓</Text>
-              </View>
-            )}
           </ImageBackground>
         ) : (
           <View style={[styles.featuredBg, { backgroundColor: Colors.black }]}>
@@ -96,13 +92,9 @@ export function EventCard({ event, featured, attending }: EventCardProps) {
               isFree={isFree}
               clubName={clubName}
               goingCount={goingCount}
+              attending={attending}
               dark={false}
             />
-            {attending && (
-              <View style={styles.featuredGoingBadge}>
-                <Text style={styles.goingBadgeText}>✓</Text>
-              </View>
-            )}
           </View>
         )}
       </TouchableOpacity>
@@ -254,7 +246,7 @@ const avStyles = StyleSheet.create({
   fallbackText: { fontSize: 7, fontWeight: '800', color: Colors.black },
 });
 
-function FeaturedContent({ event, isToday, dayName, dayNum, monthShort, priceLabel, isFree, clubName, goingCount, dark }: any) {
+function FeaturedContent({ event, isToday, dayName, dayNum, monthShort, priceLabel, isFree, clubName, goingCount, attending, dark }: any) {
   const { t, lang } = useTranslations();
   const textColor = dark ? Colors.white : Colors.white;
   const subColor = dark ? 'rgba(255,255,255,0.75)' : 'rgba(255,255,255,0.7)';
@@ -267,11 +259,18 @@ function FeaturedContent({ event, isToday, dayName, dayNum, monthShort, priceLab
 
   return (
     <View style={styles.featuredContent}>
-      {/* Top row: price */}
+      {/* Top row: price + going badge */}
       <View style={styles.featuredTopRow}>
         <View />
-        <View style={[styles.featuredPricePill, isFree && styles.featuredPricePillFree]}>
-          <Text style={[styles.featuredPriceText, isFree && styles.featuredPriceTextFree]}>{priceLabel}</Text>
+        <View style={{ alignItems: 'flex-end', gap: 6 }}>
+          <View style={[styles.featuredPricePill, isFree && styles.featuredPricePillFree]}>
+            <Text style={[styles.featuredPriceText, isFree && styles.featuredPriceTextFree]}>{priceLabel}</Text>
+          </View>
+          {attending && (
+            <View style={styles.featuredGoingBadge}>
+              <Text style={styles.goingBadgeText}>✓</Text>
+            </View>
+          )}
         </View>
       </View>
 
@@ -406,7 +405,7 @@ const styles = StyleSheet.create({
   capacityFullText: { fontSize: 10, fontWeight: '700', color: '#FF3B30' },
   goingBadge: { position: 'absolute', top: 4, right: 4, width: 22, height: 22, borderRadius: 11, backgroundColor: Colors.lime, alignItems: 'center', justifyContent: 'center', zIndex: 10 },
   goingBadgeText: { fontSize: 10, fontWeight: '800', color: Colors.black },
-  featuredGoingBadge: { position: 'absolute', top: 14, right: 14, width: 28, height: 28, borderRadius: 14, backgroundColor: Colors.lime, alignItems: 'center', justifyContent: 'center', zIndex: 10 },
+  featuredGoingBadge: { width: 28, height: 28, borderRadius: 14, backgroundColor: Colors.lime, alignItems: 'center', justifyContent: 'center' },
 
   rowThumbWrap: { width: 64, height: 64, borderRadius: 12, borderTopRightRadius: 0, overflow: 'hidden' },
   rowThumb: { width: 64, height: 64 },

@@ -32,7 +32,7 @@ const FILTER_TAGS = [
   'My Interests', 'Free',
   'Movement & Sport', 'Wellness & Body', 'Food & Drinks',
   'Art & Creation', 'Music & Nightlife', 'Learning & Mind',
-  'Community & Belonging', 'All Events',
+  'Community & Belonging',
 ];
 
 const SK_MONTHS_FULL = ['Január','Február','Marec','Apríl','Máj','Jún','Júl','August','September','Október','November','December'];
@@ -314,6 +314,7 @@ export default function HomeScreen() {
 
   const [events, setEvents] = useState<any[]>([]);
   const [nextWeekSeed, setNextWeekSeed] = useState(() => Math.random());
+  const [showAllNearby, setShowAllNearby] = useState(false);
   const [trendingEvents, setTrendingEvents] = useState<any[]>([]);
   const [clubs, setClubs] = useState<any[]>([]);
   const [attendingIds, setAttendingIds] = useState<Set<string>>(new Set());
@@ -406,7 +407,8 @@ export default function HomeScreen() {
     const baseOr = `date.gte.${today},and(is_recurring.eq.true,recurring_end_date.gte.${today})`;
     const cityFilter = city && city !== 'Your city' && city !== 'Select city' ? city : null;
 
-    let mainQ = supabase.from('events').select(sel).or(baseOr).order('date').limit(60);
+    const nowIso = new Date().toISOString();
+    let mainQ = supabase.from('events').select(sel).or(baseOr).or(`publish_at.is.null,publish_at.lte.${nowIso}`).order('date').limit(60);
     if (cityFilter) {
       const aliases = CITY_DB_ALIASES[cityFilter] ?? [cityFilter];
       mainQ = aliases.length > 1
@@ -414,13 +416,7 @@ export default function HomeScreen() {
         : mainQ.eq('city', cityFilter);
     }
     if (filter === 'Free') mainQ = mainQ.eq('is_free', true);
-    else if (filter === 'My Interests') {
-      const interests = (profile?.interests ?? []).filter((i: string) => Object.keys(CATEGORY_KEYWORDS).includes(i));
-      if (interests.length > 0) {
-        const keywords = [...new Set(interests.flatMap((i: string) => CATEGORY_KEYWORDS[i] ?? [i]))];
-        mainQ = (mainQ as any).or(keywords.map((k: string) => `category.ilike.%${k}%`).join(','));
-      }
-    } else if (filter !== 'All Events') {
+    else if (filter !== 'My Interests') {
       const keywords = CATEGORY_KEYWORDS[filter] ?? [filter];
       mainQ = (mainQ as any).or(keywords.map((k: string) => `category.ilike.%${k}%`).join(','));
     }
@@ -530,6 +526,13 @@ export default function HomeScreen() {
     .filter((e: any) => !shownIds.has(e.id))
     .slice(0, 10);
 
+  // Coffee & brunch events
+  const COFFEE_KEYWORDS = ['kav', 'brunch', 'matcha', 'coffee', 'latte', 'cappuccino', 'espresso', 'pekár', 'pekar', 'croissant', 'bagel', 'raňajk', 'ranajk', 'breakfast', 'čajovn', 'kakao', 'wafle', 'pancake', 'palacinky', 'džús', 'smoothie', 'avokádo', 'avokado', 'toast', 'mimosa'];
+  const coffeeEvents = events.filter((e: any) => {
+    const text = `${e.title ?? ''} ${e.tagline ?? ''} ${e.description ?? ''}`.toLowerCase();
+    return COFFEE_KEYWORDS.some(k => text.includes(k));
+  }).slice(0, 10);
+
   // Next week: Monday–Sunday of the upcoming week, reshuffled on every focus
   const nextWeekEvents = (() => {
     const today = new Date(); today.setHours(0, 0, 0, 0);
@@ -555,7 +558,7 @@ export default function HomeScreen() {
 
   return (
     <View style={[styles.container, { paddingTop: insets.top }]}>
-      <StatusBar style="dark" />
+      <StatusBar style="light" />
       <ScrollView
         contentContainerStyle={{ paddingBottom: insets.bottom + 80 }}
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={Colors.lime} />}
@@ -563,7 +566,14 @@ export default function HomeScreen() {
       >
         {/* Top bar */}
         <View style={styles.topBar}>
-          <View style={styles.topBarSide} />
+          <View style={[styles.topBarSide, { justifyContent: 'flex-start' }]}>
+            <TouchableOpacity style={styles.avatar} onPress={() => router.push('/(tabs)/profile')}>
+              <View style={styles.avatarCircle}>
+                <Text style={styles.avatarInitial}>{avatarInitial}</Text>
+                {profile?.avatar_url ? <Image source={{ uri: profile.avatar_url }} style={StyleSheet.absoluteFill} onError={() => {}} /> : null}
+              </View>
+            </TouchableOpacity>
+          </View>
           <WMark size={90} color={Colors.lime} style={{ marginVertical: -10 }} />
           <View style={styles.topBarSide}>
             {user && (
@@ -574,12 +584,6 @@ export default function HomeScreen() {
                 {unreadNotifs > 0 && <View style={styles.bellDot} />}
               </TouchableOpacity>
             )}
-            <TouchableOpacity style={styles.avatar} onPress={() => router.push('/(tabs)/profile')}>
-              <View style={styles.avatarCircle}>
-                <Text style={styles.avatarInitial}>{avatarInitial}</Text>
-                {profile?.avatar_url ? <Image source={{ uri: profile.avatar_url }} style={StyleSheet.absoluteFill} onError={() => {}} /> : null}
-              </View>
-            </TouchableOpacity>
           </View>
         </View>
 
@@ -682,6 +686,25 @@ export default function HomeScreen() {
           </View>
         )}
 
+        {/* ── Káva & brunch ── */}
+        {!loading && coffeeEvents.length > 0 && (
+          <View style={styles.section}>
+            <SectionHeader title="☕ Káva & brunch" />
+            <ScrollView
+              horizontal
+              showsHorizontalScrollIndicator={false}
+              snapToInterval={HERO_W + 12}
+              decelerationRate="fast"
+              contentContainerStyle={{ paddingHorizontal: 20, paddingBottom: 4 }}
+              style={{ marginBottom: 4 }}
+            >
+              {coffeeEvents.map(event => (
+                <HeroCard key={event.id} event={event} attending={attendingIds.has(event.id)} onPress={() => goToEvent(event.id)} lang={lang} />
+              ))}
+            </ScrollView>
+          </View>
+        )}
+
         {/* ── Letné kino ── */}
         {!loading && kinoEvents.length > 0 && (
           <View style={styles.section}>
@@ -731,8 +754,8 @@ export default function HomeScreen() {
           <View style={{ marginTop: 8 }}>
             <SectionHeader title="Najbližšie akcie" />
             <View style={styles.list}>
-              {nonKinoEvents.map((event, i) => {
-                const prevEvent = nonKinoEvents[i - 1];
+              {(showAllNearby ? nonKinoEvents : nonKinoEvents.slice(0, 7)).map((event, i, arr) => {
+                const prevEvent = arr[i - 1];
                 const curMonth = event.date?.slice(0, 7);
                 const prevMonth = prevEvent?.date?.slice(0, 7);
                 const showMonthDivider = i > 0 && curMonth && curMonth !== prevMonth;
@@ -747,7 +770,7 @@ export default function HomeScreen() {
                     )}
                     <View>
                       <EventCard event={event} attending={attendingIds.has(event.id)} />
-                      {i < events.length - 1 && <View style={styles.divider} />}
+                      {i < arr.length - 1 && <View style={styles.divider} />}
                     </View>
                   </React.Fragment>
                 );
@@ -759,6 +782,14 @@ export default function HomeScreen() {
                 </View>
               )}
             </View>
+            {!showAllNearby && nonKinoEvents.length > 7 && (
+              <View style={styles.seeAllBtnRow}>
+                <TouchableOpacity style={styles.seeAllBtn} onPress={() => setShowAllNearby(true)} activeOpacity={0.75}>
+                  <Text style={styles.seeAllBtnText}>Zobraziť všetky</Text>
+                  <View style={styles.seeAllArrow}><Text style={styles.seeAllArrowText}>→</Text></View>
+                </TouchableOpacity>
+              </View>
+            )}
           </View>
         )}
 

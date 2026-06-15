@@ -19,12 +19,15 @@ export default function ProfileSetupScreen() {
   const { t } = useTranslations();
   const [avatar, setAvatar] = useState<string | null>(null);
   const [googleAvatar, setGoogleAvatar] = useState<string | null>(null);
+  const [name, setName] = useState('');
   const [bio, setBio] = useState('');
 
   React.useEffect(() => {
     supabase.auth.getUser().then(({ data: { user } }) => {
       const pic = user?.user_metadata?.avatar_url ?? user?.user_metadata?.picture ?? null;
       if (pic) setGoogleAvatar(pic);
+      const metaName = user?.user_metadata?.full_name ?? user?.user_metadata?.name ?? '';
+      if (metaName) setName(metaName);
     });
   }, []);
   const [loading, setLoading] = useState(false);
@@ -62,12 +65,11 @@ export default function ProfileSetupScreen() {
           avatar_url = await uploadImage(avatar, 'avatars', `avatars/${user.id}.${ext}`);
         }
         const patch: Record<string, unknown> = { id: user.id };
+        if (name.trim()) patch.name = name.trim();
         if (avatar_url) patch.avatar_url = `${avatar_url}?t=${Date.now()}`;
         else if (googleAvatar) patch.avatar_url = googleAvatar;
         if (bio.trim()) patch.bio = bio.trim();
-        if (avatar_url || googleAvatar || bio.trim()) {
-          await supabase.from('profiles').upsert(patch);
-        }
+        await supabase.from('profiles').upsert(patch);
       }
     } finally {
       setLoading(false);
@@ -128,6 +130,20 @@ export default function ProfileSetupScreen() {
             <Text style={styles.socialProofText}>{t.auth.addYourPhoto}</Text>
           </View>
         )}
+
+        {/* Name */}
+        <View style={styles.bioWrap}>
+          <Text style={styles.label}>{t.auth.yourName}</Text>
+          <TextInput
+            style={[styles.bioInput, { minHeight: undefined, height: 52, paddingVertical: 14 }]}
+            placeholder={t.auth.fullNamePlaceholder}
+            placeholderTextColor={Colors.gray}
+            value={name}
+            onChangeText={setName}
+            maxLength={60}
+            autoCapitalize="words"
+          />
+        </View>
 
         {/* Bio */}
         <View style={styles.bioWrap}>
