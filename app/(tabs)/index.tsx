@@ -396,7 +396,7 @@ export default function HomeScreen() {
       if (e.status === 'cancelled') return false;
       if (!e.date || !e.time) return true;
       const start = new Date(`${e.date}T${e.time}`);
-      return now < new Date(start.getTime() + ((e.duration ?? 3) + 3) * 3600000);
+      return now < new Date(start.getTime() + (e.duration ?? 2) * 3600000 + 30 * 60000);
     });
   }
 

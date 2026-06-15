@@ -464,14 +464,26 @@ export default function CreateStep3Screen() {
               <TouchableOpacity style={styles.field} onPress={() => setShowEndTime(true)}>
                 <Text style={styles.fieldValue}>{`${endTime.getHours().toString().padStart(2, '0')}:${endTime.getMinutes().toString().padStart(2, '0')}`}</Text>
               </TouchableOpacity>
-              {showEndTime && (
-                <DateTimePicker
-                  value={endTime}
-                  mode="time"
-                  display="spinner"
-                  onChange={(_, t) => { setShowEndTime(false); if (t) setEndTime(t); }}
-                />
-              )}
+              <Modal visible={showEndTime} transparent animationType="slide" onRequestClose={() => setShowEndTime(false)}>
+                <Pressable style={styles.modalOverlay} onPress={() => setShowEndTime(false)}>
+                  <Pressable style={styles.calendarSheet} onPress={() => {}}>
+                    <View style={styles.calendarHandle} />
+                    <Text style={styles.durationSheetTitle}>{lang === 'sk' ? 'Čas ukončenia' : 'End time'}</Text>
+                    <DateTimePicker
+                      value={endTime}
+                      mode="time"
+                      display={Platform.OS === 'ios' ? 'spinner' : 'default'}
+                      onChange={(_, t) => { if (Platform.OS === 'android') setShowEndTime(false); if (t) setEndTime(t); }}
+                      themeVariant="light"
+                    />
+                    {Platform.OS === 'ios' && (
+                      <TouchableOpacity style={styles.calendarDone} onPress={() => setShowEndTime(false)} activeOpacity={0.8}>
+                        <Text style={styles.calendarDoneText}>{lang === 'sk' ? 'Hotovo' : 'Done'}</Text>
+                      </TouchableOpacity>
+                    )}
+                  </Pressable>
+                </Pressable>
+              </Modal>
             </View>
           </View>
 
