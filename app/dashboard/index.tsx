@@ -1159,20 +1159,26 @@ export default function DashboardScreen() {
                   const dateLine = e.time ? `${dateStr} · ${e.time.slice(0, 5)}` : dateStr;
                   const going = e.is_free ? realGoing(e, user!.id) : e.paid_count;
                   return (
-                    <TouchableOpacity key={e.id} style={[s.listRow, i < displayedEvents.length - 1 && s.listRowBorder]}
-                      onPress={() => openAttendees(e)} activeOpacity={0.7}>
-                      {getRotatingCover(e)
-                        ? <Image source={{ uri: getRotatingCover(e)! }} style={s.listAvatar} />
-                        : <View style={[s.listAvatar, s.listAvatarFallback]}><Text style={s.listAvatarInitial}>{e.title.charAt(0).toUpperCase()}</Text></View>
-                      }
-                      <View style={{ flex: 1 }}>
-                        <Text style={s.listName} numberOfLines={1}>{e.title}</Text>
-                        <Text style={s.listSub}>{dateLine}{e.capacity != null ? `  ·  ${going}/${e.capacity}` : ''}</Text>
-                        {e.paid_count > 0 && (
-                          <Text style={s.listRevenue}>{lang === 'sk' ? 'Naskenované' : 'Scanned'} {e.scan_count}/{e.paid_count}{(e.price ?? 0) > 0 ? `  ·  €${Number(e.price).toFixed(2)}` : ''}</Text>
-                        )}
-                        {e.paid_count === 0 && (e.price ?? 0) > 0 && <Text style={s.listRevenue}>€{Number(e.price).toFixed(2)}</Text>}
-                      </View>
+                    <View key={e.id} style={[s.listRow, i < displayedEvents.length - 1 && s.listRowBorder]}>
+                      {/* Tappable left: cover + title → navigate to event */}
+                      <TouchableOpacity
+                        style={{ flexDirection: 'row', alignItems: 'center', flex: 1, gap: 10 }}
+                        onPress={() => { const uid = e.id.indexOf('_') > 0 ? e.id.slice(0, e.id.indexOf('_')) : e.id; router.push(`/event/${uid}` as any); }}
+                        activeOpacity={0.7}
+                      >
+                        {getRotatingCover(e)
+                          ? <Image source={{ uri: getRotatingCover(e)! }} style={s.listAvatar} />
+                          : <View style={[s.listAvatar, s.listAvatarFallback]}><Text style={s.listAvatarInitial}>{e.title.charAt(0).toUpperCase()}</Text></View>
+                        }
+                        <View style={{ flex: 1 }}>
+                          <Text style={s.listName} numberOfLines={1}>{e.title}</Text>
+                          <Text style={s.listSub}>{dateLine}{e.capacity != null ? `  ·  ${going}/${e.capacity}` : ''}</Text>
+                          {e.paid_count > 0 && (
+                            <Text style={s.listRevenue}>{lang === 'sk' ? 'Naskenované' : 'Scanned'} {e.scan_count}/{e.paid_count}{(e.price ?? 0) > 0 ? `  ·  €${Number(e.price).toFixed(2)}` : ''}</Text>
+                          )}
+                          {e.paid_count === 0 && (e.price ?? 0) > 0 && <Text style={s.listRevenue}>€{Number(e.price).toFixed(2)}</Text>}
+                        </View>
+                      </TouchableOpacity>
                       {e.status === 'cancelled' && <View style={s.cancelledBadge}><Text style={s.cancelledBadgeText}>{t.dashboard.cancelled}</Text></View>}
                       {e.status !== 'cancelled' && (
                         <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
@@ -1190,19 +1196,17 @@ export default function DashboardScreen() {
                               <Path d="M14 11a5 5 0 00-7.54-.54l-3 3a5 5 0 007.07 7.07l1.71-1.71" stroke={Colors.gray} strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" />
                             </Svg>
                           </TouchableOpacity>
-                          <TouchableOpacity
-                            style={s.shareBtn}
-                            onPress={() => router.push(`/event/${e.id}/edit`)}
-                            hitSlop={8}
-                          >
+                          {/* People icon → open attendees */}
+                          <TouchableOpacity style={s.shareBtn} onPress={() => openAttendees(e)} hitSlop={8}>
                             <Svg width={15} height={15} viewBox="0 0 24 24" fill="none">
-                              <Path d="M11 4H4a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2v-7" stroke={Colors.gray} strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" />
-                              <Path d="M18.5 2.5a2.121 2.121 0 013 3L12 15l-4 1 1-4 9.5-9.5z" stroke={Colors.gray} strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" />
+                              <Path d="M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2" stroke={Colors.gray} strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" />
+                              <Circle cx="9" cy="7" r="4" stroke={Colors.gray} strokeWidth={2} />
+                              <Path d="M23 21v-2a4 4 0 00-3-3.87M16 3.13a4 4 0 010 7.75" stroke={Colors.gray} strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" />
                             </Svg>
                           </TouchableOpacity>
                         </View>
                       )}
-                    </TouchableOpacity>
+                    </View>
                   );
                 })}
               </View>
@@ -1243,20 +1247,26 @@ export default function DashboardScreen() {
                   const dateLine = e.time ? `${dateStr} · ${e.time.slice(0, 5)}` : dateStr;
                   const going = e.is_free ? realGoing(e, user!.id) : e.paid_count;
                   return (
-                    <TouchableOpacity key={e.id} style={[s.listRow, i < displayedEvents.length - 1 && s.listRowBorder]}
-                      onPress={() => openAttendees(e)} activeOpacity={0.7}>
-                      {getRotatingCover(e)
-                        ? <Image source={{ uri: getRotatingCover(e)! }} style={s.listAvatar} />
-                        : <View style={[s.listAvatar, s.listAvatarFallback]}><Text style={s.listAvatarInitial}>{e.title.charAt(0).toUpperCase()}</Text></View>
-                      }
-                      <View style={{ flex: 1 }}>
-                        <Text style={s.listName} numberOfLines={1}>{e.title}</Text>
-                        <Text style={s.listSub}>{dateLine}{e.capacity != null ? `  ·  ${going}/${e.capacity}` : ''}</Text>
-                        {e.paid_count > 0 && (
-                          <Text style={s.listRevenue}>{lang === 'sk' ? 'Naskenované' : 'Scanned'} {e.scan_count}/{e.paid_count}{(e.price ?? 0) > 0 ? `  ·  €${Number(e.price).toFixed(2)}` : ''}</Text>
-                        )}
-                        {e.paid_count === 0 && (e.price ?? 0) > 0 && <Text style={s.listRevenue}>€{Number(e.price).toFixed(2)}</Text>}
-                      </View>
+                    <View key={e.id} style={[s.listRow, i < displayedEvents.length - 1 && s.listRowBorder]}>
+                      {/* Tappable left: cover + title → navigate to event */}
+                      <TouchableOpacity
+                        style={{ flexDirection: 'row', alignItems: 'center', flex: 1, gap: 10 }}
+                        onPress={() => { const uid = e.id.indexOf('_') > 0 ? e.id.slice(0, e.id.indexOf('_')) : e.id; router.push(`/event/${uid}` as any); }}
+                        activeOpacity={0.7}
+                      >
+                        {getRotatingCover(e)
+                          ? <Image source={{ uri: getRotatingCover(e)! }} style={s.listAvatar} />
+                          : <View style={[s.listAvatar, s.listAvatarFallback]}><Text style={s.listAvatarInitial}>{e.title.charAt(0).toUpperCase()}</Text></View>
+                        }
+                        <View style={{ flex: 1 }}>
+                          <Text style={s.listName} numberOfLines={1}>{e.title}</Text>
+                          <Text style={s.listSub}>{dateLine}{e.capacity != null ? `  ·  ${going}/${e.capacity}` : ''}</Text>
+                          {e.paid_count > 0 && (
+                            <Text style={s.listRevenue}>{lang === 'sk' ? 'Naskenované' : 'Scanned'} {e.scan_count}/{e.paid_count}{(e.price ?? 0) > 0 ? `  ·  €${Number(e.price).toFixed(2)}` : ''}</Text>
+                          )}
+                          {e.paid_count === 0 && (e.price ?? 0) > 0 && <Text style={s.listRevenue}>€{Number(e.price).toFixed(2)}</Text>}
+                        </View>
+                      </TouchableOpacity>
                       {e.status === 'cancelled' && <View style={s.cancelledBadge}><Text style={s.cancelledBadgeText}>{t.dashboard.cancelled}</Text></View>}
                       {e.status !== 'cancelled' && (
                         <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
@@ -1274,19 +1284,17 @@ export default function DashboardScreen() {
                               <Path d="M14 11a5 5 0 00-7.54-.54l-3 3a5 5 0 007.07 7.07l1.71-1.71" stroke={Colors.gray} strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" />
                             </Svg>
                           </TouchableOpacity>
-                          <TouchableOpacity
-                            style={s.shareBtn}
-                            onPress={() => router.push(`/event/${e.id}/edit`)}
-                            hitSlop={8}
-                          >
+                          {/* People icon → open attendees */}
+                          <TouchableOpacity style={s.shareBtn} onPress={() => openAttendees(e)} hitSlop={8}>
                             <Svg width={15} height={15} viewBox="0 0 24 24" fill="none">
-                              <Path d="M11 4H4a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2v-7" stroke={Colors.gray} strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" />
-                              <Path d="M18.5 2.5a2.121 2.121 0 013 3L12 15l-4 1 1-4 9.5-9.5z" stroke={Colors.gray} strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" />
+                              <Path d="M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2" stroke={Colors.gray} strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" />
+                              <Circle cx="9" cy="7" r="4" stroke={Colors.gray} strokeWidth={2} />
+                              <Path d="M23 21v-2a4 4 0 00-3-3.87M16 3.13a4 4 0 010 7.75" stroke={Colors.gray} strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" />
                             </Svg>
                           </TouchableOpacity>
                         </View>
                       )}
-                    </TouchableOpacity>
+                    </View>
                   );
                 })}
               </View>
