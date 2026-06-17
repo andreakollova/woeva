@@ -174,7 +174,7 @@ export default function ChatScreen() {
 
     const senderFirst = (profile?.name ?? 'Someone').split(' ')[0];
     const pushBody = `${senderFirst}: ${msg.length > 60 ? msg.slice(0, 60) + '…' : msg}`;
-    const pushTitle = `💬 ${eventTitle || 'Chat'}`;
+    const pushTitle = `Nova správa - ${eventTitle || 'Chat'}`;
 
     if (adminIds.has(user.id)) {
       // Admin wrote → push to attendees
@@ -224,7 +224,7 @@ export default function ChatScreen() {
 
   function handleOptions() {
     Alert.alert('Chat', undefined, [
-      { text: muted ? '🔔 Zapnúť notifikácie' : '🔕 Stlmiť notifikácie', onPress: toggleMute },
+      { text: muted ? 'Zapnúť notifikácie' : 'Stlmiť notifikácie', onPress: toggleMute },
       { text: tr.chat.reportChat, style: 'destructive', onPress: () => {
         Alert.alert(tr.chat.reportChat, tr.chat.reportChatMsg, [
           { text: tr.common.cancel, style: 'cancel' },
