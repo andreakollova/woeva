@@ -1,6 +1,6 @@
 import { BackButton } from '@/components/ui/BackButton';
 import React, { useCallback } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, ScrollView, Alert } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, ScrollView, Alert, Linking } from 'react-native';
 import Svg, { Path, Rect, Circle, Line } from 'react-native-svg';
 import { useRouter, useFocusEffect } from 'expo-router';
 import { setStatusBarStyle } from 'expo-status-bar';
@@ -28,6 +28,7 @@ function Icon({ name, color = '#0A0A0A' }: { name: string; color?: string }) {
     case 'bell': return <Svg width={18} height={18} viewBox="0 0 24 24" fill="none"><Path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9" {...s}/><Path d="M13.73 21a2 2 0 0 1-3.46 0" {...s}/></Svg>;
     case 'chart': return <Svg width={18} height={18} viewBox="0 0 24 24" fill="none"><Line x1="18" y1="20" x2="18" y2="10" {...s}/><Line x1="12" y1="20" x2="12" y2="4" {...s}/><Line x1="6" y1="20" x2="6" y2="14" {...s}/></Svg>;
     case 'info': return <Svg width={18} height={18} viewBox="0 0 24 24" fill="none"><Circle cx="12" cy="12" r="10" {...s}/><Line x1="12" y1="8" x2="12" y2="8" strokeWidth={2.5} stroke={color}/><Path d="M12 12v4" {...s}/></Svg>;
+    case 'mail': return <Svg width={18} height={18} viewBox="0 0 24 24" fill="none"><Path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z" {...s}/><Path d="M22 6l-10 7L2 6" {...s}/></Svg>;
     case 'logout': return <Svg width={18} height={18} viewBox="0 0 24 24" fill="none"><Path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4" {...s}/><Path d="M16 17l5-5-5-5" {...s}/><Path d="M21 12H9" {...s}/></Svg>;
     case 'trash': return <Svg width={18} height={18} viewBox="0 0 24 24" fill="none"><Path d="M3 6h18M19 6l-1 14H6L5 6M10 11v6M14 11v6M9 6V4h6v2" {...s}/></Svg>;
     default: return null;
@@ -47,20 +48,20 @@ export default function SettingsScreen() {
       items: [
         { label: t.settings.profileInfo, route: '/settings/profile', icon: 'user' },
         { label: t.settings.interests, route: '/settings/profile', icon: 'star' },
-        { label: t.settings.paymentMethods, route: '/settings/payment-methods', icon: 'card' },
       ],
     },
     {
       title: t.settings.creator,
       items: [
         { label: t.common.notifications, route: '/settings/notifications', icon: 'bell' },
-        { label: t.dashboard.revenue, route: '/dashboard', icon: 'chart' },
+        { label: t.dashboard.revenue, route: '/dashboard?tab=payouts', icon: 'chart' },
       ],
     },
     {
       title: t.settings.support,
       items: [
         { label: t.settings.about, route: '/settings/about', icon: 'info' },
+        { label: lang === 'sk' ? 'Kontaktovať podporu' : 'Contact support', route: 'mailto:admin@woeva.com', icon: 'mail' },
       ],
     },
   ];
@@ -82,32 +83,15 @@ export default function SettingsScreen() {
 
       <ScrollView contentContainerStyle={[styles.scroll, { paddingBottom: insets.bottom + 40 }]} showsVerticalScrollIndicator={false}>
 
-        {/* Language */}
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>{t.settings.language}</Text>
-          <View style={styles.langRow}>
-            {(['en', 'sk'] as Lang[]).map(l => (
-              <TouchableOpacity
-                key={l}
-                style={[styles.langChip, lang === l && styles.langChipActive]}
-                onPress={() => setLang(l)}
-                activeOpacity={0.7}
-              >
-                <Text style={[styles.langChipText, lang === l && styles.langChipTextActive]}>{t.languages[l]}</Text>
-              </TouchableOpacity>
-            ))}
-          </View>
-        </View>
-
-        {SECTIONS.map(section => (
+        {SECTIONS.map((section, si) => (
           <View key={section.title} style={styles.section}>
             <Text style={styles.sectionTitle}>{section.title}</Text>
             <View style={styles.list}>
               {section.items.map((item, i) => (
                 <TouchableOpacity
                   key={item.label}
-                  style={[styles.row, i === section.items.length - 1 && styles.rowLast]}
-                  onPress={() => router.push(item.route as any)}
+                  style={[styles.row, i === section.items.length - 1 && si !== 0 && styles.rowLast]}
+                  onPress={() => item.route.startsWith('mailto:') ? Linking.openURL(item.route) : router.push(item.route as any)}
                   activeOpacity={0.6}
                 >
                   <View style={styles.rowLeft}>
@@ -119,6 +103,32 @@ export default function SettingsScreen() {
                   <ChevronIcon />
                 </TouchableOpacity>
               ))}
+              {/* Language picker — shown at end of Account section */}
+              {si === 0 && (
+                <View style={[styles.row, styles.rowLast, { justifyContent: 'space-between' }]}>
+                  <View style={styles.rowLeft}>
+                    <View style={styles.rowIconWrap}>
+                      <Svg width={18} height={18} viewBox="0 0 24 24" fill="none">
+                        <Path d="M12 22c5.523 0 10-4.477 10-10S17.523 2 12 2 2 6.477 2 12s4.477 10 10 10z" stroke="#0A0A0A" strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round" />
+                        <Path d="M2 12h20M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z" stroke="#0A0A0A" strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round" />
+                      </Svg>
+                    </View>
+                    <Text style={styles.rowLabel}>{t.settings.language}</Text>
+                  </View>
+                  <View style={styles.langRow}>
+                    {(['en', 'sk'] as Lang[]).map(l => (
+                      <TouchableOpacity
+                        key={l}
+                        style={[styles.langChip, lang === l && styles.langChipActive]}
+                        onPress={() => setLang(l)}
+                        activeOpacity={0.7}
+                      >
+                        <Text style={[styles.langChipText, lang === l && styles.langChipTextActive]}>{t.languages[l]}</Text>
+                      </TouchableOpacity>
+                    ))}
+                  </View>
+                </View>
+              )}
             </View>
           </View>
         ))}

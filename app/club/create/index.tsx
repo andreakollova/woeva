@@ -123,7 +123,6 @@ export default function CreateClubScreen() {
       >
         <View style={styles.stepRow}>
           <BackButton />
-          <WMark size={28} color={Colors.lime} />
           <View style={{ width: 36 }} />
         </View>
 
@@ -244,40 +243,45 @@ export default function CreateClubScreen() {
       {/* Category request modal */}
       <Modal visible={showCatRequest} transparent animationType="slide" onRequestClose={() => setShowCatRequest(false)}>
         <Pressable style={styles.modalBackdrop} onPress={() => setShowCatRequest(false)} />
-        <View style={styles.catModal}>
+        <View
+          style={styles.catModal}
+          onStartShouldSetResponder={() => true}
+          onMoveShouldSetResponder={(_, { dy }) => dy > 5}
+          onResponderRelease={(_, { dy }) => { if (dy > 60) setShowCatRequest(false); }}
+        >
           <View style={styles.catModalHandle} />
           {catRequestSent ? (
             <View style={{ alignItems: 'center', paddingVertical: 24, gap: 10 }}>
-              <Text style={styles.catModalTitle}>Request sent!</Text>
-              <Text style={styles.catModalSub}>We'll review your suggestion and add it soon.</Text>
+              <Text style={styles.catModalTitle}>Žiadosť odoslaná!</Text>
+              <Text style={styles.catModalSub}>Tvoj návrh preveríme a čoskoro pridáme.</Text>
               <TouchableOpacity style={styles.catModalBtn} onPress={() => setShowCatRequest(false)} activeOpacity={0.8}>
-                <Text style={styles.catModalBtnText}>Close</Text>
+                <Text style={styles.catModalBtnText}>Zavrieť</Text>
               </TouchableOpacity>
             </View>
           ) : (
             <>
-              <Text style={styles.catModalTitle}>Request a category</Text>
-              <Text style={styles.catModalSub}>Tell us what category you need and we'll add it.</Text>
+              <Text style={styles.catModalTitle}>Navrhnúť kategóriu</Text>
+              <Text style={styles.catModalSub}>Napíš, akú kategóriu potrebuješ, a my ju pridáme.</Text>
               <View style={{ gap: 12, marginTop: 20 }}>
                 <View style={{ gap: 6 }}>
-                  <Text style={styles.catModalLabel}>Category name</Text>
+                  <Text style={styles.catModalLabel}>Názov kategórie</Text>
                   <TextInput
                     style={styles.catModalInput}
                     value={catRequestName}
                     onChangeText={setCatRequestName}
-                    placeholder="e.g. Cycling, Meditation..."
+                    placeholder="napr. Cyklistika, Meditácia..."
                     placeholderTextColor={D.placeholder}
                     selectionColor={Colors.lime}
                     maxLength={60}
                   />
                 </View>
                 <View style={{ gap: 6 }}>
-                  <Text style={styles.catModalLabel}>Your club name (optional)</Text>
+                  <Text style={styles.catModalLabel}>Názov tvojho klubu (voliteľné)</Text>
                   <TextInput
                     style={styles.catModalInput}
                     value={catRequestClub}
                     onChangeText={setCatRequestClub}
-                    placeholder="e.g. Bratislava Cyclists"
+                    placeholder="napr. Bratislavskí cyklisti"
                     placeholderTextColor={D.placeholder}
                     maxLength={80}
                     selectionColor={Colors.lime}
@@ -290,7 +294,7 @@ export default function CreateClubScreen() {
                 disabled={!catRequestName.trim()}
                 activeOpacity={0.8}
               >
-                <Text style={styles.catModalBtnText}>Send request</Text>
+                <Text style={styles.catModalBtnText}>Odoslať žiadosť</Text>
               </TouchableOpacity>
             </>
           )}
@@ -338,8 +342,8 @@ const styles = StyleSheet.create({
     minHeight: 88, backgroundColor: D.card,
   },
   nameWarning: { fontSize: 12, color: '#FFD60A', fontFamily: Fonts.regular, marginTop: 6 },
-  catMissingLink: { fontSize: 11, color: Colors.lime, fontWeight: '600' },
-  catSubLabel: { fontSize: 11, color: 'rgba(255,255,255,0.75)' },
+  catMissingLink: { fontSize: 10, color: Colors.lime, fontWeight: '600', textDecorationLine: 'underline' },
+  catSubLabel: { fontSize: 10, color: 'rgba(255,255,255,0.75)' },
   modalBackdrop: { flex: 1, backgroundColor: 'rgba(0,0,0,0.6)' },
   catModal: {
     backgroundColor: D.card,

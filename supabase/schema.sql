@@ -191,6 +191,21 @@ create policy "Reporters can submit reports" on reports for insert with check (a
 create policy "Admins can read reports" on reports for select using (auth.uid() = reporter_id);
 
 -- ─────────────────────────────────────────────
+-- CATEGORY REQUESTS
+-- ─────────────────────────────────────────────
+create table if not exists category_requests (
+  id uuid primary key default uuid_generate_v4(),
+  category_name text not null,
+  club_name text,
+  user_id uuid references profiles(id) on delete set null,
+  created_at timestamptz default now()
+);
+
+alter table category_requests enable row level security;
+create policy "Anyone can submit category requests" on category_requests for insert with check (true);
+create policy "Only service role can read category requests" on category_requests for select using (false);
+
+-- ─────────────────────────────────────────────
 -- STORAGE BUCKETS
 -- ─────────────────────────────────────────────
 insert into storage.buckets (id, name, public) values ('event-covers', 'event-covers', true) on conflict do nothing;

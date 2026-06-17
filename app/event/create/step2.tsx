@@ -299,40 +299,45 @@ export default function CreateStep2Screen() {
       {/* Category request modal */}
       <Modal visible={showCatRequest} transparent animationType="slide" onRequestClose={() => setShowCatRequest(false)}>
         <Pressable style={styles.modalBackdrop} onPress={() => setShowCatRequest(false)} />
-        <View style={styles.catModal}>
+        <View
+          style={styles.catModal}
+          onStartShouldSetResponder={() => true}
+          onMoveShouldSetResponder={(_, { dy }) => dy > 5}
+          onResponderRelease={(_, { dy }) => { if (dy > 60) setShowCatRequest(false); }}
+        >
           <View style={styles.catModalHandle} />
           {catRequestSent ? (
             <View style={{ alignItems: 'center', paddingVertical: 24, gap: 10 }}>
-              <Text style={styles.catModalTitle}>Request sent!</Text>
-              <Text style={styles.catModalSub}>We'll review your suggestion and add it soon.</Text>
+              <Text style={styles.catModalTitle}>Žiadosť odoslaná!</Text>
+              <Text style={styles.catModalSub}>Tvoj návrh preveríme a čoskoro pridáme.</Text>
               <TouchableOpacity style={styles.catModalBtn} onPress={() => setShowCatRequest(false)} activeOpacity={0.8}>
-                <Text style={styles.catModalBtnText}>Close</Text>
+                <Text style={styles.catModalBtnText}>Zavrieť</Text>
               </TouchableOpacity>
             </View>
           ) : (
             <>
-              <Text style={styles.catModalTitle}>Request a category</Text>
-              <Text style={styles.catModalSub}>Tell us what category you need and we'll add it.</Text>
+              <Text style={styles.catModalTitle}>Navrhnúť kategóriu</Text>
+              <Text style={styles.catModalSub}>Napíš, akú kategóriu potrebuješ, a my ju pridáme.</Text>
               <View style={{ gap: 12, marginTop: 20 }}>
                 <View style={{ gap: 6 }}>
-                  <Text style={styles.catModalLabel}>Category name</Text>
+                  <Text style={styles.catModalLabel}>Názov kategórie</Text>
                   <TextInput
                     style={styles.catModalInput}
                     value={catRequestName}
                     onChangeText={setCatRequestName}
-                    placeholder="e.g. Cycling, Meditation..."
+                    placeholder="napr. Cyklistika, Meditácia..."
                     placeholderTextColor={Colors.gray}
                     selectionColor={Colors.lime}
                     maxLength={60}
                   />
                 </View>
                 <View style={{ gap: 6 }}>
-                  <Text style={styles.catModalLabel}>Your club name (optional)</Text>
+                  <Text style={styles.catModalLabel}>Názov tvojho klubu (voliteľné)</Text>
                   <TextInput
                     style={styles.catModalInput}
                     value={catRequestClub}
                     onChangeText={setCatRequestClub}
-                    placeholder="e.g. Bratislava Cyclists"
+                    placeholder="napr. Bratislavskí cyklisti"
                     placeholderTextColor={Colors.gray}
                     selectionColor={Colors.lime}
                     maxLength={80}
@@ -345,7 +350,7 @@ export default function CreateStep2Screen() {
                 disabled={!catRequestName.trim()}
                 activeOpacity={0.8}
               >
-                <Text style={styles.catModalBtnText}>Send request</Text>
+                <Text style={styles.catModalBtnText}>Odoslať žiadosť</Text>
               </TouchableOpacity>
             </>
           )}
@@ -395,7 +400,7 @@ const styles = StyleSheet.create({
   posterName: { fontSize: 15, fontWeight: '600', color: Colors.black, fontFamily: Fonts.semibold },
   createClubRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'flex-end', gap: 6, paddingTop: 10, paddingBottom: 2 },
   createClubIcon: { width: 20, height: 20, borderRadius: 10, borderWidth: 1.5, borderColor: Colors.black, alignItems: 'center', justifyContent: 'center' },
-  createClubPlus: { fontSize: 13, fontWeight: '700', color: Colors.black, lineHeight: 16 },
+  createClubPlus: { fontSize: 13, fontWeight: '700', color: Colors.black, lineHeight: 13, marginTop: -1 },
   createClubLink: { fontSize: 13, fontWeight: '600', color: Colors.black, fontFamily: Fonts.semibold },
   createClubArrow: { fontSize: 14, color: Colors.black, fontWeight: '600' },
   postAsList: { gap: 8 },

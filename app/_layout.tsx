@@ -64,32 +64,13 @@ export default function RootLayout() {
         <StripeProvider publishableKey={STRIPE_KEY} merchantIdentifier="merchant.com.woeva.app">
           <StatusBar style="light" />
           <NotificationHandler />
-          <Stack screenOptions={{ headerShown: false, animation: 'fade_from_bottom' }}>
+          <Stack screenOptions={{ headerShown: false, animation: 'slide_from_right' }}>
             <Stack.Screen name="(auth)" options={{ animation: 'none' }} />
             <Stack.Screen name="(tabs)" options={{ animation: 'none' }} />
             <Stack.Screen name="event/[id]" options={{ animation: 'none', gestureEnabled: false, contentStyle: { backgroundColor: '#0A0A0A' } }} />
             <Stack.Screen name="event/[id]/payment" options={{ animation: 'slide_from_bottom', presentation: 'modal' }} />
-            <Stack.Screen name="event/[id]/edit" options={{ animation: 'slide_from_right' }} />
             <Stack.Screen name="event/create/step1" options={{ animation: 'slide_from_bottom', presentation: 'modal' }} />
-            <Stack.Screen name="event/create/step2" options={{ animation: 'slide_from_right' }} />
-            <Stack.Screen name="event/create/step3" options={{ animation: 'slide_from_right' }} />
             <Stack.Screen name="event/create/published" options={{ animation: 'fade', gestureEnabled: false }} />
-            <Stack.Screen name="club/[id]" options={{ animation: 'slide_from_right' }} />
-            <Stack.Screen name="club/[id]/members" options={{ animation: 'slide_from_right' }} />
-            <Stack.Screen name="club/create" options={{ animation: 'slide_from_right' }} />
-            <Stack.Screen name="chat/[roomId]" options={{ animation: 'slide_from_right' }} />
-            <Stack.Screen name="settings/index" options={{ animation: 'slide_from_right' }} />
-            <Stack.Screen name="settings/profile" options={{ animation: 'slide_from_right' }} />
-            <Stack.Screen name="settings/payment-methods" options={{ animation: 'slide_from_right' }} />
-            <Stack.Screen name="settings/notifications" options={{ animation: 'slide_from_right' }} />
-            <Stack.Screen name="settings/about" options={{ animation: 'slide_from_right' }} />
-            <Stack.Screen name="settings/delete-account" options={{ animation: 'slide_from_right' }} />
-            <Stack.Screen name="settings/legal" options={{ animation: 'slide_from_right' }} />
-            <Stack.Screen name="notifications/index" options={{ animation: 'slide_from_right' }} />
-            <Stack.Screen name="dashboard/index" options={{ animation: 'slide_from_right' }} />
-            <Stack.Screen name="club/[id]/edit" options={{ animation: 'slide_from_right' }} />
-            <Stack.Screen name="profile/[id]" options={{ animation: 'slide_from_right' }} />
-            <Stack.Screen name="admin" options={{ animation: 'slide_from_right' }} />
           </Stack>
         </StripeProvider>
         </AuthProvider>

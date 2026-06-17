@@ -196,7 +196,12 @@ export default function ClubEditScreen() {
     <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
       <Modal visible={showDeleteModal} animationType="slide" transparent onRequestClose={() => setShowDeleteModal(false)}>
         <View style={styles.modalOverlay}>
-          <View style={styles.deleteSheet}>
+          <View
+            style={styles.deleteSheet}
+            onStartShouldSetResponder={() => true}
+            onMoveShouldSetResponder={(_, { dy }) => dy > 5}
+            onResponderRelease={(_, { dy }) => { if (dy > 60) setShowDeleteModal(false); }}
+          >
             <View style={styles.deleteSheetHandle} />
             <View style={styles.deleteWarningIcon}>
               <Text style={styles.deleteWarningEmoji}>⚠️</Text>
