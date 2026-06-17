@@ -1,6 +1,6 @@
 import React, { useState, useCallback, useMemo, useRef } from 'react';
 import {
-  View, Text, StyleSheet, ScrollView, TouchableOpacity,
+  View, Text, StyleSheet, ScrollView, TouchableOpacity, Pressable,
   Image, Alert, ActivityIndicator, Modal, TextInput, Platform, FlatList, KeyboardAvoidingView, RefreshControl, Share,
 } from 'react-native';
 // expo-camera requires a native build - safe lazy import
@@ -756,7 +756,7 @@ export default function DashboardScreen() {
       const confirmed = checkedInSet.has(att.id);
       return `<tr style="border-bottom:1px solid #f0f0f0;">
         <td style="padding:10px 8px;color:#888;font-size:13px;width:36px;">${i + 1}</td>
-        <td style="padding:10px 8px;font-size:14px;font-weight:600;color:#0a0a0a;">${att.name}</td>
+        <td style="padding:10px 8px;font-size:14px;font-weight:600;color:#0a0a0a;">${att.name.split(' ')[0]}</td>
         <td style="padding:10px 8px;text-align:right;">
           <span style="display:inline-block;padding:4px 12px;border-radius:20px;font-size:12px;font-weight:700;${confirmed ? 'background:#e8faf0;color:#16a34a;' : 'background:#f5f5f5;color:#888;'}">
             ${confirmed ? (lang === 'sk' ? 'Potvrdený' : 'Confirmed') : (lang === 'sk' ? 'Nepotvrdený' : 'Not confirmed')}
@@ -827,7 +827,7 @@ export default function DashboardScreen() {
       const profile = (att as any)?.profile;
       setScannedTicket({
         eventTitle: matchedEvent?.title ?? 'Event',
-        userName: profile?.name ?? 'Unknown',
+        userName: profile?.name?.split(' ')[0] ?? 'Unknown',
         avatar_url: profile?.avatar_url ?? null,
         valid: !!att,
         eventId,
@@ -1801,14 +1801,17 @@ export default function DashboardScreen() {
 
       {/* ── Club Settings Modal ─────────────────────────────────────────────── */}
       <Modal visible={showClubSettings} transparent animationType="slide" onRequestClose={() => setShowClubSettings(false)}>
-        <TouchableOpacity style={s.modalOverlay} activeOpacity={1} onPress={() => setShowClubSettings(false)}>
-          <View
-            style={[s.attendeesSheet, { paddingBottom: insets.bottom + 24 }]}
-            onStartShouldSetResponder={() => true}
-            onMoveShouldSetResponder={(_, { dy }) => dy > 5}
-            onResponderRelease={(_, { dy }) => { if (dy > 60) setShowClubSettings(false); }}
-          >
-            <View style={s.billingSheetHandle} />
+        <View style={s.modalOverlay}>
+          <Pressable style={StyleSheet.absoluteFill} onPress={() => setShowClubSettings(false)} />
+          <View style={[s.attendeesSheet, { paddingBottom: insets.bottom + 24 }]}>
+            <View
+              style={{ paddingTop: 8, alignItems: 'center', marginBottom: 4 }}
+              onStartShouldSetResponder={() => true}
+              onMoveShouldSetResponder={(_, { dy }) => dy > 5}
+              onResponderRelease={(_, { dy }) => { if (dy > 60) setShowClubSettings(false); }}
+            >
+              <View style={s.billingSheetHandle} />
+            </View>
             <Text style={s.billingSheetTitle}>{t.dashboard.clubSettings}</Text>
 
             {/* Admins */}
@@ -1820,7 +1823,7 @@ export default function DashboardScreen() {
                     {a.avatar_url ? <Image source={{ uri: a.avatar_url }} style={StyleSheet.absoluteFill as any} /> : null}
                     {!a.avatar_url && <Text style={s.attendeeInitial}>{a.name.charAt(0).toUpperCase()}</Text>}
                   </View>
-                  <Text style={[s.attendeeName, { flex: 1 }]}>{a.name}</Text>
+                  <Text style={[s.attendeeName, { flex: 1 }]}>{a.name.split(' ')[0]}</Text>
                   {a.user_id === user?.id
                     ? <Text style={s.settingsOwnerBadge}>{t.club.owner}</Text>
                     : <TouchableOpacity onPress={() => removeAdmin(a.user_id)} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
@@ -1855,19 +1858,22 @@ export default function DashboardScreen() {
               ))}
             </View>
           </View>
-        </TouchableOpacity>
+        </View>
       </Modal>
 
       {/* ── Invite Admin Modal ──────────────────────────────────────────────── */}
       <Modal visible={showInviteAdmin} transparent animationType="slide" onRequestClose={() => setShowInviteAdmin(false)}>
-        <TouchableOpacity style={s.modalOverlay} activeOpacity={1} onPress={() => setShowInviteAdmin(false)}>
-          <View
-            style={[s.attendeesSheet, { paddingBottom: insets.bottom + 16 }]}
-            onStartShouldSetResponder={() => true}
-            onMoveShouldSetResponder={(_, { dy }) => dy > 5}
-            onResponderRelease={(_, { dy }) => { if (dy > 60) { setShowInviteAdmin(false); setInviteQuery(''); setInviteResults([]); } }}
-          >
-            <View style={s.billingSheetHandle} />
+        <View style={s.modalOverlay}>
+          <Pressable style={StyleSheet.absoluteFill} onPress={() => { setShowInviteAdmin(false); setInviteQuery(''); setInviteResults([]); }} />
+          <View style={[s.attendeesSheet, { paddingBottom: insets.bottom + 16 }]}>
+            <View
+              style={{ paddingTop: 8, alignItems: 'center', marginBottom: 4 }}
+              onStartShouldSetResponder={() => true}
+              onMoveShouldSetResponder={(_, { dy }) => dy > 5}
+              onResponderRelease={(_, { dy }) => { if (dy > 60) { setShowInviteAdmin(false); setInviteQuery(''); setInviteResults([]); } }}
+            >
+              <View style={s.billingSheetHandle} />
+            </View>
             <Text style={s.billingSheetTitle}>{t.club.inviteAdmin}</Text>
             <Text style={[s.listSub, { marginBottom: 12 }]}>{t.club.inviteAdminSub((selectedClub ?? clubs[0])?.name ?? '')}</Text>
             <TextInput
@@ -1893,7 +1899,7 @@ export default function DashboardScreen() {
                   {!r.avatar_url && <Text style={s.attendeeInitial}>{r.name.charAt(0).toUpperCase()}</Text>}
                 </View>
                 <View style={{ flex: 1 }}>
-                  <Text style={s.attendeeName}>{r.name}</Text>
+                  <Text style={s.attendeeName}>{r.name.split(' ')[0]}</Text>
                   {r.email && <Text style={s.listSub}>{r.email}</Text>}
                 </View>
                 <Text style={[s.listSub, { marginLeft: 'auto' }]}>{t.club.addArrow}</Text>
@@ -1903,12 +1909,13 @@ export default function DashboardScreen() {
               <Text style={[s.emptySub, { marginTop: 12 }]}>{t.club.notFound}</Text>
             )}
           </View>
-        </TouchableOpacity>
+        </View>
       </Modal>
 
       {/* ── Attendees Modal ─────────────────────────────────────────────────── */}
       <Modal visible={!!attendeesEvent} transparent animationType="slide" onRequestClose={() => setAttendeesEvent(null)}>
-        <TouchableOpacity style={s.modalOverlay} activeOpacity={1} onPress={() => setAttendeesEvent(null)}>
+        <View style={s.modalOverlay}>
+          <Pressable style={StyleSheet.absoluteFill} onPress={() => setAttendeesEvent(null)} />
           <View style={[s.attendeesSheet, { paddingBottom: insets.bottom + 16 }]}>
             {/* Handle — swipe zone */}
             <View
@@ -1920,9 +1927,9 @@ export default function DashboardScreen() {
               <View style={s.billingSheetHandle} />
             </View>
             {/* Header row */}
-            <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 4, paddingHorizontal: 0 }}>
-              <View style={{ flex: 1 }}>
-                <Text style={s.billingSheetTitle} numberOfLines={1}>{attendeesEvent?.title}</Text>
+            <View style={{ flexDirection: 'row', alignItems: 'flex-start', justifyContent: 'space-between', marginBottom: 4, paddingHorizontal: 0 }}>
+              <View style={{ flex: 1, marginRight: 12 }}>
+                <Text style={s.billingSheetTitle}>{attendeesEvent?.title}</Text>
                 <Text style={s.listSub}>
                   {(() => { const n = attendeesEvent ? (attendeesEvent.is_free ? realGoing(attendeesEvent, user!.id) : attendeesEvent.paid_count) : 0; return `${n} ${goingLabel(n, lang)}`; })()}
                 </Text>
@@ -1953,7 +1960,7 @@ export default function DashboardScreen() {
                           {item.avatar_url ? <Image source={{ uri: item.avatar_url }} style={StyleSheet.absoluteFill as any} /> : null}
                           {!item.avatar_url && <Text style={s.attendeeInitial}>{item.name.charAt(0).toUpperCase()}</Text>}
                         </View>
-                        <Text style={[s.attendeeName, { flex: 1 }]}>{item.name}</Text>
+                        <Text style={[s.attendeeName, { flex: 1 }]}>{item.name.split(' ')[0]}</Text>
                         {isMe
                           ? <View style={s.meBadge}><Text style={s.meBadgeText}>ja</Text></View>
                           : isIn
@@ -1977,7 +1984,7 @@ export default function DashboardScreen() {
                 />
             }
           </View>
-        </TouchableOpacity>
+        </View>
       </Modal>
 
       {/* ── Bottom Nav ──────────────────────────────────────────────────────── */}
@@ -1994,42 +2001,19 @@ export default function DashboardScreen() {
           {/* Dashboard */}
           <TouchableOpacity style={s.bottomNavItem} onPress={() => setActiveTab('home')} activeOpacity={0.7}>
             <Svg width={22} height={22} viewBox="0 0 24 24" fill="none">
-              <Rect x="3" y="3" width="7" height="7" rx="1" stroke={activeTab === 'home' ? Colors.black : 'rgba(0,0,0,0.35)'} strokeWidth={activeTab === 'home' ? 2.5 : 1.8} />
-              <Rect x="14" y="3" width="7" height="7" rx="1" stroke={activeTab === 'home' ? Colors.black : 'rgba(0,0,0,0.35)'} strokeWidth={activeTab === 'home' ? 2.5 : 1.8} />
-              <Rect x="3" y="14" width="7" height="7" rx="1" stroke={activeTab === 'home' ? Colors.black : 'rgba(0,0,0,0.35)'} strokeWidth={activeTab === 'home' ? 2.5 : 1.8} />
-              <Rect x="14" y="14" width="7" height="7" rx="1" stroke={activeTab === 'home' ? Colors.black : 'rgba(0,0,0,0.35)'} strokeWidth={activeTab === 'home' ? 2.5 : 1.8} />
+              <Path d="M3 6h18M3 12h18M3 18h18" stroke={activeTab === 'home' ? Colors.black : 'rgba(0,0,0,0.35)'} strokeWidth={activeTab === 'home' ? 2.5 : 1.8} strokeLinecap="round" />
             </Svg>
             <Text style={[s.bottomNavLabel, activeTab === 'home' && s.bottomNavLabelActive]}>{t.dashboard.dashboard}</Text>
           </TouchableOpacity>
 
           {/* QR scan — center */}
           <TouchableOpacity style={s.bottomNavScanBtn} onPress={() => setActiveTab('scan')} activeOpacity={0.85}>
-            {(() => {
-              const qc = activeTab === 'scan' ? Colors.black : Colors.gray;
-              return (
-                <Svg width={24} height={24} viewBox="0 0 24 24" fill="none">
-                  {/* Corner scan brackets */}
-                  <Path d="M3 9V3h6" stroke={qc} strokeWidth={2.2} strokeLinecap="round" strokeLinejoin="round" />
-                  <Path d="M21 9V3h-6" stroke={qc} strokeWidth={2.2} strokeLinecap="round" strokeLinejoin="round" />
-                  <Path d="M3 15v6h6" stroke={qc} strokeWidth={2.2} strokeLinecap="round" strokeLinejoin="round" />
-                  <Path d="M21 15v6h-6" stroke={qc} strokeWidth={2.2} strokeLinecap="round" strokeLinejoin="round" />
-                  {/* TL finder */}
-                  <Rect x="4.5" y="4.5" width="5" height="5" rx="1" stroke={qc} strokeWidth={1.7} />
-                  <Rect x="6.25" y="6.25" width="1.5" height="1.5" fill={qc} />
-                  {/* TR finder */}
-                  <Rect x="14.5" y="4.5" width="5" height="5" rx="1" stroke={qc} strokeWidth={1.7} />
-                  <Rect x="16.25" y="6.25" width="1.5" height="1.5" fill={qc} />
-                  {/* BL finder */}
-                  <Rect x="4.5" y="14.5" width="5" height="5" rx="1" stroke={qc} strokeWidth={1.7} />
-                  <Rect x="6.25" y="16.25" width="1.5" height="1.5" fill={qc} />
-                  {/* BR data bits */}
-                  <Rect x="14.5" y="14.5" width="2" height="2" rx="0.4" fill={qc} />
-                  <Rect x="17.5" y="14.5" width="2" height="2" rx="0.4" fill={qc} />
-                  <Rect x="14.5" y="17.5" width="2" height="2" rx="0.4" fill={qc} />
-                  <Rect x="17.5" y="17.5" width="2" height="2" rx="0.4" fill={qc} />
-                </Svg>
-              );
-            })()}
+            <Svg width={22} height={22} viewBox="0 0 24 24" fill="none">
+              <Rect x="3" y="3" width="6" height="6" rx="1" stroke={activeTab === 'scan' ? Colors.black : Colors.gray} strokeWidth={2} />
+              <Rect x="15" y="3" width="6" height="6" rx="1" stroke={activeTab === 'scan' ? Colors.black : Colors.gray} strokeWidth={2} />
+              <Rect x="3" y="15" width="6" height="6" rx="1" stroke={activeTab === 'scan' ? Colors.black : Colors.gray} strokeWidth={2} />
+              <Path d="M15 17h3M17 15v3" stroke={activeTab === 'scan' ? Colors.black : Colors.gray} strokeWidth={2} strokeLinecap="round" />
+            </Svg>
           </TouchableOpacity>
 
           {/* Stats */}

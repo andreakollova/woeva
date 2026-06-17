@@ -1,6 +1,6 @@
 import React, { useEffect, useState, useCallback } from 'react';
 import {
-  View, Text, StyleSheet, ScrollView, TouchableOpacity,
+  View, Text, StyleSheet, ScrollView, TouchableOpacity, Pressable,
   RefreshControl, Image, Modal, Dimensions,
 } from 'react-native';
 import { StatusBar, setStatusBarStyle } from 'expo-status-bar';
@@ -810,13 +810,13 @@ export default function HomeScreen() {
 
       {/* City picker modal */}
       <Modal visible={showCityPicker} transparent animationType="slide" onRequestClose={() => setShowCityPicker(false)}>
-        <TouchableOpacity style={styles.cityModalBg} activeOpacity={1} onPress={() => setShowCityPicker(false)}>
+        <View style={styles.cityModalBg}>
+          <Pressable style={StyleSheet.absoluteFill} onPress={() => setShowCityPicker(false)} />
           <ScrollView
             style={styles.cityModalSheet}
             contentContainerStyle={styles.cityModalContent}
             bounces={false}
             showsVerticalScrollIndicator={false}
-            onStartShouldSetResponder={() => true}
           >
             <View style={styles.cityModalHandle} />
             <Text style={styles.cityModalTitle}>{t.home.selectCity}</Text>
@@ -857,7 +857,7 @@ export default function HomeScreen() {
             })}
             <View style={{ height: 20 }} />
           </ScrollView>
-        </TouchableOpacity>
+        </View>
       </Modal>
     </View>
   );

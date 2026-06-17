@@ -494,7 +494,7 @@ const styles = StyleSheet.create({
   },
   header: { paddingHorizontal: 22, paddingTop: 6, paddingBottom: 18 },
   titleRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 16 },
-  title: { fontSize: 34, fontWeight: '800', fontFamily: Fonts.extrabold, color: Colors.white, letterSpacing: -1 },
+  title: { fontSize: 34, fontWeight: '700', fontFamily: Fonts.bold, color: Colors.white, letterSpacing: -1 },
   togglePill: {
     flexDirection: 'row',
     backgroundColor: 'rgba(255,255,255,0.08)',

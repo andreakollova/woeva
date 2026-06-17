@@ -366,7 +366,7 @@ export default function ClubDetailScreen() {
                   {!r.avatar_url && <Text style={styles.inviteAvatarInitial}>{r.name.charAt(0).toUpperCase()}</Text>}
                 </View>
                 <View style={{ flex: 1 }}>
-                  <Text style={styles.inviteRowName}>{r.name}</Text>
+                  <Text style={styles.inviteRowName}>{r.name.split(' ')[0]}</Text>
                   {r.email && <Text style={styles.inviteRowEmail}>{r.email}</Text>}
                 </View>
                 <Text style={styles.inviteRowAction}>{t.club.addArrow}</Text>

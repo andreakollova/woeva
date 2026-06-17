@@ -86,7 +86,7 @@ export default function ClubMembersScreen() {
         )}
         {list.map(member => {
           const profile = member.profile as any;
-          const name = profile?.name ?? 'Unknown';
+          const name = (profile?.name ?? 'Unknown').split(' ')[0];
           const initial = name.charAt(0).toUpperCase();
           return (
             <View key={member.id} style={styles.row}>

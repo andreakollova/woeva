@@ -1,5 +1,5 @@
 import React, { useEffect, useState, useCallback } from 'react';
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity, RefreshControl, Image, ImageStyle, Modal, Alert, Share, Linking, Platform, ActivityIndicator } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Pressable, RefreshControl, Image, ImageStyle, Modal, Alert, Share, Linking, Platform, ActivityIndicator } from 'react-native';
 import { StatusBar, setStatusBarStyle } from 'expo-status-bar';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useRouter, useFocusEffect } from 'expo-router';
@@ -329,9 +329,17 @@ function TicketCard({ event, userId, userAvatar, userName, isPast, onPress, onDe
     <TouchableOpacity onPress={onPress} activeOpacity={0.92} style={styles.ticket}>
       {/* Options modal */}
       <Modal visible={optionsModal} transparent animationType="fade" onRequestClose={() => setOptionsModal(false)}>
-        <TouchableOpacity style={styles.optionsOverlay} activeOpacity={1} onPress={() => setOptionsModal(false)}>
+        <View style={styles.optionsOverlay}>
+          <Pressable style={StyleSheet.absoluteFill} onPress={() => setOptionsModal(false)} />
           <View style={styles.optionsSheet}>
-            <View style={styles.optionsHandle} />
+            <View
+              style={{ paddingTop: 8, alignItems: 'center', marginBottom: 4 }}
+              onStartShouldSetResponder={() => true}
+              onMoveShouldSetResponder={(_, { dy }) => dy > 5}
+              onResponderRelease={(_, { dy }) => { if (dy > 60) setOptionsModal(false); }}
+            >
+              <View style={styles.optionsHandle} />
+            </View>
             <Text style={styles.optionsTitle}>{event.title}</Text>
 
             {event.venue ? (
@@ -366,7 +374,7 @@ function TicketCard({ event, userId, userAvatar, userName, isPast, onPress, onDe
             )}
 
           </View>
-        </TouchableOpacity>
+        </View>
       </Modal>
 
       {/* Cover strip */}

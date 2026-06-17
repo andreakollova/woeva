@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { StatusBar, setStatusBarStyle } from 'expo-status-bar';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { View, Text, StyleSheet, TouchableOpacity, Image, Alert, Dimensions, Modal, Share, Platform, TextInput, ScrollView as RNScrollView, Linking } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, Pressable, Image, Alert, Dimensions, Modal, Share, Platform, TextInput, ScrollView as RNScrollView, Linking } from 'react-native';
 import QRCode from 'react-native-qrcode-svg';
 import { useLocalSearchParams, useRouter, useFocusEffect } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -383,9 +383,17 @@ export default function EventDetailScreen() {
 
       {/* Cancel modal */}
       <Modal visible={cancelModal} transparent animationType="slide" onRequestClose={() => setCancelModal(false)}>
-        <TouchableOpacity style={s.modalOverlay} activeOpacity={1} onPress={() => setCancelModal(false)}>
-          <TouchableOpacity activeOpacity={1} style={s.cancelSheet}>
-            <View style={s.cancelSheetHandle} />
+        <View style={s.modalOverlay}>
+          <Pressable style={StyleSheet.absoluteFill} onPress={() => setCancelModal(false)} />
+          <View style={s.cancelSheet}>
+            <View
+              style={{ paddingTop: 8, alignItems: 'center', marginBottom: 4 }}
+              onStartShouldSetResponder={() => true}
+              onMoveShouldSetResponder={(_, { dy }) => dy > 5}
+              onResponderRelease={(_, { dy }) => { if (dy > 60) setCancelModal(false); }}
+            >
+              <View style={s.cancelSheetHandle} />
+            </View>
             <Text style={s.cancelSheetTitle}>{t.event.cancelEvent}</Text>
             <Text style={s.cancelSheetSub}>{t.event.cancelCannotUndo}</Text>
 
@@ -425,8 +433,8 @@ export default function EventDetailScreen() {
                 variant="black"
               />
             </View>
-          </TouchableOpacity>
-        </TouchableOpacity>
+          </View>
+        </View>
       </Modal>
 
       {/* Confirm cancel modal */}
