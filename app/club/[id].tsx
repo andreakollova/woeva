@@ -298,8 +298,8 @@ export default function ClubDetailScreen() {
           {/* Members bubbles */}
           <View style={styles.divider} />
           <View style={styles.membersBubbleRow}>
-            <TouchableOpacity style={{ flexDirection: 'row', alignItems: 'center', flex: 1 }} onPress={() => setShowMembersModal(true)} activeOpacity={0.8}>
-              {members.slice(0, 6).map((m, i) => {
+            <TouchableOpacity style={{ flexDirection: 'row', alignItems: 'center', flexShrink: 1, flexWrap: 'nowrap', overflow: 'hidden' }} onPress={() => setShowMembersModal(true)} activeOpacity={0.8}>
+              {members.slice(0, 4).map((m, i) => {
                 const prof = (m as any)?.profile;
                 const firstName = (prof?.name ?? '?').split(' ')[0];
                 const mi = firstName.charAt(0).toUpperCase();
@@ -312,9 +312,9 @@ export default function ClubDetailScreen() {
                   </View>
                 );
               })}
-              {memberCount > 6 && (
+              {memberCount > 4 && (
                 <View style={[styles.memberBubble, styles.memberBubbleMore, { marginLeft: -10, zIndex: 0 }]}>
-                  <Text style={styles.memberBubbleMoreText}>+{memberCount - 6}</Text>
+                  <Text style={styles.memberBubbleMoreText}>+{memberCount - 4}</Text>
                 </View>
               )}
               <Text style={styles.membersClickLabel}>{t.club.memberCount(memberCount)}</Text>
@@ -478,7 +478,7 @@ const styles = StyleSheet.create({
   logoInitial: { fontSize: 32, fontWeight: '800', color: Colors.white, fontFamily: Fonts.extrabold },
 
   // Members bubbles row
-  membersBubbleRow: { flexDirection: 'row', alignItems: 'center', marginBottom: 4, gap: 10 },
+  membersBubbleRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 4, gap: 8 },
   memberStatusBadge: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 12, paddingVertical: 6, borderRadius: 50, borderWidth: 1.5, borderColor: Colors.black },
   memberStatusText: { fontSize: 13, fontWeight: '700', color: Colors.black, fontFamily: Fonts.bold },
   memberJoinBtn: { paddingHorizontal: 14, paddingVertical: 7, borderRadius: 50, backgroundColor: Colors.black },

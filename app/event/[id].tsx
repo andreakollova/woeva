@@ -919,10 +919,10 @@ const s = StyleSheet.create({
   memberPillText: { fontSize: 11, fontWeight: '700', color: Colors.black },
   joinPill: { borderWidth: 1, borderColor: Colors.grayBorder, borderRadius: 50, paddingHorizontal: 12, paddingVertical: 5 },
   joinPillText: { fontSize: 12, fontWeight: '600', color: Colors.gray },
-  joinPillFollow: { borderWidth: 1.5, borderColor: Colors.black, borderRadius: 50, paddingHorizontal: 12, paddingVertical: 5 },
-  joinPillFollowText: { fontSize: 12, fontWeight: '600', color: Colors.black },
-  joinPillMember: { borderWidth: 1.5, borderColor: '#16A34A', borderRadius: 50, paddingHorizontal: 12, paddingVertical: 5 },
-  joinPillMemberText: { fontSize: 12, fontWeight: '600', color: '#16A34A' },
+  joinPillFollow: { backgroundColor: Colors.black, borderRadius: 50, paddingHorizontal: 12, paddingVertical: 5 },
+  joinPillFollowText: { fontSize: 12, fontWeight: '600', color: Colors.white },
+  joinPillMember: { borderWidth: 1.5, borderColor: Colors.black, borderRadius: 50, paddingHorizontal: 12, paddingVertical: 5 },
+  joinPillMemberText: { fontSize: 12, fontWeight: '600', color: Colors.black },
 
   // Chat
   chatRow: { flexDirection: 'row', alignItems: 'center', gap: 14, paddingHorizontal: 6, paddingVertical: 16 },
