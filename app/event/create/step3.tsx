@@ -741,82 +741,89 @@ export default function CreateStep3Screen() {
                   </View>
                 )}
 
-                {/* Registration opens toggle */}
-                <TouchableOpacity style={styles.recurringRow} onPress={() => setHasRegistrationOpens(v => !v)} activeOpacity={0.7}>
-                  <View style={styles.recurringText}>
-                    <Text style={styles.recurringTitle}>Otvorenie prihlasovania</Text>
-                    <Text style={styles.recurringSub}>Členovia klubu dostanú push notifikáciu keď sa otvorí prihlasovanie.</Text>
-                  </View>
-                  <View style={[styles.toggle, hasRegistrationOpens && styles.toggleOn]}>
-                    <View style={[styles.toggleThumb, hasRegistrationOpens && styles.toggleThumbOn]} />
-                  </View>
-                </TouchableOpacity>
-
-                {hasRegistrationOpens && (
-                  <View style={styles.publishAtBox}>
+                {/* Registration opens — always visible, no toggle */}
+                <View style={styles.publishAtBox}>
+                  <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
                     <Text style={styles.publishAtLabel}>Prihlasovanie sa otvorí:</Text>
-                    <View style={styles.publishAtRow}>
-                      <TouchableOpacity style={[styles.field, styles.publishAtField]} onPress={() => setShowRegOpensDate(true)} activeOpacity={0.7}>
-                        <Text style={styles.fieldValue}>{registrationOpensDate.toLocaleDateString('sk-SK', { weekday: 'short', day: 'numeric', month: 'short' })}</Text>
+                    {hasRegistrationOpens && (
+                      <TouchableOpacity onPress={() => setHasRegistrationOpens(false)} activeOpacity={0.7}>
+                        <Text style={{ fontSize: 12, color: Colors.gray }}>Zrušiť</Text>
                       </TouchableOpacity>
-                      <TouchableOpacity style={[styles.field, styles.publishAtField]} onPress={() => setShowRegOpensTime(true)} activeOpacity={0.7}>
-                        <Text style={styles.fieldValue}>{`${registrationOpensTime.getHours().toString().padStart(2,'0')}:${registrationOpensTime.getMinutes().toString().padStart(2,'0')}`}</Text>
-                      </TouchableOpacity>
-                    </View>
-                    <Text style={styles.publishAtHint}>V tento čas dostanú členovia klubu notifikáciu 🎟️</Text>
-
-                    <Modal visible={showRegOpensDate} transparent animationType="slide" onRequestClose={() => setShowRegOpensDate(false)}>
-                      <Pressable style={styles.modalOverlay} onPress={() => setShowRegOpensDate(false)}>
-                        <Pressable style={styles.calendarSheet} onPress={() => {}}>
-                          <View style={styles.calendarHandle} />
-                          <Text style={styles.durationSheetTitle}>Dátum otvorenia</Text>
-                          <DateTimePicker
-                            value={registrationOpensDate}
-                            mode="date"
-                            display={Platform.OS === 'ios' ? 'inline' : 'default'}
-                            maximumDate={date}
-                            onChange={(_, d) => {
-                              if (Platform.OS === 'android') setShowRegOpensDate(false);
-                              if (d) setRegistrationOpensDate(d);
-                            }}
-                            style={Platform.OS === 'ios' ? { alignSelf: 'center' } : undefined}
-                            themeVariant="light"
-                            accentColor={Colors.black}
-                          />
-                          {Platform.OS === 'ios' && (
-                            <TouchableOpacity style={styles.calendarDone} onPress={() => setShowRegOpensDate(false)} activeOpacity={0.8}>
-                              <Text style={styles.calendarDoneText}>Hotovo</Text>
-                            </TouchableOpacity>
-                          )}
-                        </Pressable>
-                      </Pressable>
-                    </Modal>
-
-                    <Modal visible={showRegOpensTime} transparent animationType="slide" onRequestClose={() => setShowRegOpensTime(false)}>
-                      <Pressable style={styles.modalOverlay} onPress={() => setShowRegOpensTime(false)}>
-                        <Pressable style={styles.calendarSheet} onPress={() => {}}>
-                          <View style={styles.calendarHandle} />
-                          <Text style={styles.durationSheetTitle}>Čas otvorenia</Text>
-                          <DateTimePicker
-                            value={registrationOpensTime}
-                            mode="time"
-                            display={Platform.OS === 'ios' ? 'spinner' : 'default'}
-                            onChange={(_, t) => {
-                              if (Platform.OS === 'android') setShowRegOpensTime(false);
-                              if (t) setRegistrationOpensTime(t);
-                            }}
-                            themeVariant="light"
-                          />
-                          {Platform.OS === 'ios' && (
-                            <TouchableOpacity style={styles.calendarDone} onPress={() => setShowRegOpensTime(false)} activeOpacity={0.8}>
-                              <Text style={styles.calendarDoneText}>Hotovo</Text>
-                            </TouchableOpacity>
-                          )}
-                        </Pressable>
-                      </Pressable>
-                    </Modal>
+                    )}
                   </View>
-                )}
+                  {hasRegistrationOpens ? (
+                    <>
+                      <View style={styles.publishAtRow}>
+                        <TouchableOpacity style={[styles.field, styles.publishAtField]} onPress={() => setShowRegOpensDate(true)} activeOpacity={0.7}>
+                          <Text style={styles.fieldValue}>{registrationOpensDate.toLocaleDateString('sk-SK', { weekday: 'short', day: 'numeric', month: 'short' })}</Text>
+                        </TouchableOpacity>
+                        <TouchableOpacity style={[styles.field, styles.publishAtField]} onPress={() => setShowRegOpensTime(true)} activeOpacity={0.7}>
+                          <Text style={styles.fieldValue}>{`${registrationOpensTime.getHours().toString().padStart(2,'0')}:${registrationOpensTime.getMinutes().toString().padStart(2,'0')}`}</Text>
+                        </TouchableOpacity>
+                      </View>
+                      <Text style={styles.publishAtHint}>Sledovatelia dostanú push automaticky v tento čas.</Text>
+                    </>
+                  ) : (
+                    <TouchableOpacity
+                      style={[styles.field, { alignSelf: 'flex-start', paddingHorizontal: 16 }]}
+                      onPress={() => setHasRegistrationOpens(true)}
+                      activeOpacity={0.7}
+                    >
+                      <Text style={styles.fieldValue}>Nastaviť čas otvorenia</Text>
+                    </TouchableOpacity>
+                  )}
+
+                  <Modal visible={showRegOpensDate} transparent animationType="slide" onRequestClose={() => setShowRegOpensDate(false)}>
+                    <Pressable style={styles.modalOverlay} onPress={() => setShowRegOpensDate(false)}>
+                      <Pressable style={styles.calendarSheet} onPress={() => {}}>
+                        <View style={styles.calendarHandle} />
+                        <Text style={styles.durationSheetTitle}>Dátum otvorenia</Text>
+                        <DateTimePicker
+                          value={registrationOpensDate}
+                          mode="date"
+                          display={Platform.OS === 'ios' ? 'inline' : 'default'}
+                          maximumDate={date}
+                          onChange={(_, d) => {
+                            if (Platform.OS === 'android') setShowRegOpensDate(false);
+                            if (d) setRegistrationOpensDate(d);
+                          }}
+                          style={Platform.OS === 'ios' ? { alignSelf: 'center' } : undefined}
+                          themeVariant="light"
+                          accentColor={Colors.black}
+                        />
+                        {Platform.OS === 'ios' && (
+                          <TouchableOpacity style={styles.calendarDone} onPress={() => setShowRegOpensDate(false)} activeOpacity={0.8}>
+                            <Text style={styles.calendarDoneText}>Hotovo</Text>
+                          </TouchableOpacity>
+                        )}
+                      </Pressable>
+                    </Pressable>
+                  </Modal>
+
+                  <Modal visible={showRegOpensTime} transparent animationType="slide" onRequestClose={() => setShowRegOpensTime(false)}>
+                    <Pressable style={styles.modalOverlay} onPress={() => setShowRegOpensTime(false)}>
+                      <Pressable style={styles.calendarSheet} onPress={() => {}}>
+                        <View style={styles.calendarHandle} />
+                        <Text style={styles.durationSheetTitle}>Čas otvorenia</Text>
+                        <DateTimePicker
+                          value={registrationOpensTime}
+                          mode="time"
+                          display={Platform.OS === 'ios' ? 'spinner' : 'default'}
+                          onChange={(_, t) => {
+                            if (Platform.OS === 'android') setShowRegOpensTime(false);
+                            if (t) setRegistrationOpensTime(t);
+                          }}
+                          themeVariant="light"
+                        />
+                        {Platform.OS === 'ios' && (
+                          <TouchableOpacity style={styles.calendarDone} onPress={() => setShowRegOpensTime(false)} activeOpacity={0.8}>
+                            <Text style={styles.calendarDoneText}>Hotovo</Text>
+                          </TouchableOpacity>
+                        )}
+                      </Pressable>
+                    </Pressable>
+                  </Modal>
+                </View>
               </View>
             )}
           </View>
