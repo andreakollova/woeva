@@ -231,12 +231,10 @@ export default function EventDetailScreen() {
           type: 'event_cancelled',
           title: isCreator
             ? `Zrušili ste event: ${event.title}`
-            : `Event bol zrušený: ${event.title}`,
+            : `Ľutujeme, event bol zrušený`,
           body: isCreator
             ? 'Event bol úspešne zrušený.'
-            : refundEligible && a.paid && a.payment_intent_id
-              ? 'Vrátenie platby bude spracované na váš pôvodný platobný prostriedok.'
-              : 'Ľutujeme, za toto zrušenie nie je možné vrátiť platbu.',
+            : `${event.title} bol organizátorom zrušený.`,
           data: { event_id: id },
         };
       });
