@@ -204,11 +204,13 @@ export default function CreateStep2Screen() {
                 </View>
               </TouchableOpacity>
 
-              {clubs.length === 0 && (
-                <TouchableOpacity onPress={() => router.push('/club/create' as any)} activeOpacity={0.7} style={{ paddingTop: 6 }}>
-                  <Text style={styles.createClubLink}>{t.event.createClubLink}</Text>
-                </TouchableOpacity>
-              )}
+              <TouchableOpacity onPress={() => router.push('/club/create' as any)} activeOpacity={0.7} style={styles.createClubRow}>
+                <View style={styles.createClubIcon}>
+                  <Text style={styles.createClubPlus}>+</Text>
+                </View>
+                <Text style={styles.createClubLink}>{t.event.createClubLink}</Text>
+                <Text style={styles.createClubArrow}>→</Text>
+              </TouchableOpacity>
             </View>
           </View>
           <View>
@@ -391,7 +393,11 @@ const styles = StyleSheet.create({
   posterInfo: { gap: 2 },
   posterLabel: { fontSize: 11, fontWeight: '600', color: Colors.gray, fontFamily: Fonts.medium, letterSpacing: 0.3 },
   posterName: { fontSize: 15, fontWeight: '600', color: Colors.black, fontFamily: Fonts.semibold },
+  createClubRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'flex-end', gap: 6, paddingTop: 10, paddingBottom: 2 },
+  createClubIcon: { width: 20, height: 20, borderRadius: 10, borderWidth: 1.5, borderColor: Colors.black, alignItems: 'center', justifyContent: 'center' },
+  createClubPlus: { fontSize: 13, fontWeight: '700', color: Colors.black, lineHeight: 16 },
   createClubLink: { fontSize: 13, fontWeight: '600', color: Colors.black, fontFamily: Fonts.semibold },
+  createClubArrow: { fontSize: 14, color: Colors.black, fontWeight: '600' },
   postAsList: { gap: 8 },
   postAsRow: {
     flexDirection: 'row', alignItems: 'center', gap: 12,

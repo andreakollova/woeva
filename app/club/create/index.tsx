@@ -15,6 +15,7 @@ import { uploadImage } from '@/lib/uploadImage';
 import { useAuth } from '@/context/AuthContext';
 import { useCategories } from '@/hooks/useCategories';
 import { useTranslations } from '@/context/LanguageContext';
+import { CATEGORY_SK } from '@/types';
 
 const D = {
   bg: '#0a0a0a',
@@ -188,7 +189,7 @@ export default function CreateClubScreen() {
                     }}
                     activeOpacity={0.7}
                   >
-                    <Text style={[styles.chipText, active && styles.chipTextActive]}>{cat}</Text>
+                    <Text style={[styles.chipText, active && styles.chipTextActive]}>{CATEGORY_SK[cat] ?? cat}</Text>
                   </TouchableOpacity>
                 );
               })}

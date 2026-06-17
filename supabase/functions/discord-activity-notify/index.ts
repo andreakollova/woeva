@@ -138,6 +138,30 @@ serve(async (req) => {
       return new Response('ok');
     }
 
+    // ── New club created ─────────────────────────────────────────────────────
+    if (table === 'clubs' && type === 'INSERT') {
+      const { data: creator } = await supabase
+        .from('profiles')
+        .select('name, email')
+        .eq('id', record.creator_id)
+        .single();
+
+      await sendEmbed({
+        title: '🏛️ Nový klub',
+        color: 0xB9FF00,
+        ...(record.cover_url ? { image: { url: record.cover_url } } : {}),
+        fields: [
+          { name: 'Názov', value: record.name ?? '—', inline: false },
+          { name: 'Zakladateľ', value: creator?.name ?? '—', inline: true },
+          { name: 'Email', value: creator?.email ?? '—', inline: true },
+          { name: 'Mesto', value: record.city ?? '—', inline: true },
+          { name: 'Kategória', value: record.category ?? '—', inline: true },
+        ],
+        timestamp: new Date().toISOString(),
+      });
+      return new Response('ok');
+    }
+
     // ── User joined event ────────────────────────────────────────────────────
     if (table === 'event_attendees' && type === 'INSERT') {
       const [{ data: user }, { data: event }] = await Promise.all([
