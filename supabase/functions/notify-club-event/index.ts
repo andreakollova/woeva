@@ -6,26 +6,50 @@ const db = createClient(
   Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!,
 );
 
+const WOEVA_ADMIN_ID = 'ceeafc86-7da8-442d-ac22-2e06ce363973';
+
 serve(async (req) => {
   try {
     const body = await req.json();
     const record = body.record ?? body;
 
-    // Skip user-created events (no source) — they handle notifications in the app (step3.tsx)
-    if (!record?.id || !record?.source) {
-      return new Response('skip', { status: 200 });
+    if (!record?.id) {
+      return new Response('skip: no record id', { status: 200 });
     }
 
-    // Resolve which club IDs to notify
     let clubIds: string[] = [];
     let clubName = 'Woeva Picks';
 
-    if (!record.club_id) {
-      return new Response('skip: no club_id', { status: 200 });
+    if (record.source) {
+      // ── Woeva Picks event — find city-specific club ──────────────────────────
+      // Normalize city aliases (Wien → Vienna, Praha → Prague)
+      const CITY_NORMALIZE: Record<string, string> = { Wien: 'Vienna', Praha: 'Prague' };
+      const rawCity: string = record.city ?? '';
+      const city = CITY_NORMALIZE[rawCity] ?? rawCity;
+
+      if (!city) return new Response('skip: no city on woeva picks event', { status: 200 });
+
+      const { data: cityClub } = await db
+        .from('clubs')
+        .select('id, name')
+        .eq('creator_id', WOEVA_ADMIN_ID)
+        .eq('city', city)
+        .ilike('name', 'Woeva Picks%')
+        .maybeSingle();
+
+      if (!cityClub) return new Response(`skip: no Woeva Picks club for city ${city}`, { status: 200 });
+
+      clubIds = [cityClub.id];
+      clubName = cityClub.name;
+    } else if (record.club_id) {
+      // ── User-created club event ───────────────────────────────────────────────
+      const { data: club } = await db.from('clubs').select('name').eq('id', record.club_id).single();
+      clubIds = [record.club_id];
+      clubName = club?.name ?? 'Klub';
+    } else {
+      // Pure user event with no club — skip
+      return new Response('skip: no source and no club_id', { status: 200 });
     }
-    const { data: club } = await db.from('clubs').select('name').eq('id', record.club_id).single();
-    clubIds = [record.club_id];
-    clubName = club?.name ?? 'Woeva Picks';
 
     // Idempotency: skip if we already sent notifications for this event
     const { count } = await db
@@ -37,21 +61,18 @@ serve(async (req) => {
       return new Response('already notified', { status: 200 });
     }
 
-    // Get approved members from ALL matching clubs (deduped), excluding the creator
-    // city filter: notify members who follow all cities (city IS NULL) or this specific city
+    // Get approved members from the club, excluding the creator
     const { data: members } = await db
       .from('club_members')
-      .select('user_id, city')
+      .select('user_id')
       .in('club_id', clubIds)
       .eq('status', 'approved')
-      .neq('user_id', record.creator_id ?? '')
-      .or(`city.is.null,city.eq.${record.city ?? ''}`);
+      .neq('user_id', record.creator_id ?? '');
 
     if (!members || members.length === 0) {
       return new Response('no members', { status: 200 });
     }
 
-    // Deduplicate user ids
     const userIds = [...new Set(members.map((m: any) => m.user_id))];
 
     const categoryEmoji: Record<string, string> = {
@@ -78,7 +99,7 @@ serve(async (req) => {
       await db.from('notifications').insert(notifications);
     }
 
-    // Push tokens — separate query, treat NULL notifications_enabled as enabled
+    // Push tokens
     const { data: profiles } = await db
       .from('profiles')
       .select('push_token')
@@ -108,7 +129,7 @@ serve(async (req) => {
       });
     }
 
-    return new Response(JSON.stringify({ ok: true, notified: userIds.length }), { status: 200 });
+    return new Response(JSON.stringify({ ok: true, notified: userIds.length, club: clubName }), { status: 200 });
   } catch (err) {
     console.error('notify-club-event error:', err);
     return new Response(JSON.stringify({ error: String(err) }), { status: 500 });

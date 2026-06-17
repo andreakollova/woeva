@@ -7,7 +7,7 @@ import { useRouter } from 'expo-router';
 import { Platform } from 'react-native';
 import MapView, { Marker, PROVIDER_GOOGLE, PROVIDER_DEFAULT } from 'react-native-maps';
 import Animated, { FadeInDown, FadeIn } from 'react-native-reanimated';
-import Svg, { Path, Line } from 'react-native-svg';
+import Svg, { Path, Line, Circle } from 'react-native-svg';
 import { Colors } from '@/constants/colors';
 import { supabase } from '@/lib/supabase';
 import { Event, Club } from '@/types';
@@ -161,7 +161,7 @@ export default function SearchScreen() {
 
   const filteredMapClubs = useCallback(() => {
     return mapClubs.filter(c => {
-      if (selectedTags.length > 0 && !selectedTags.some(tag => c.tags?.includes(tag) || c.category === tag)) return false;
+      if (selectedTags.length > 0 && !c.name?.startsWith('Woeva Picks') && !selectedTags.some(tag => c.tags?.includes(tag) || c.category === tag)) return false;
       return true;
     });
   }, [mapClubs, selectedTags]);
@@ -187,7 +187,7 @@ export default function SearchScreen() {
         .or(`name.ilike.%${q}%,tagline.ilike.%${q}%,category.ilike.%${q}%`)
         .limit(20);
       let filtered = (data ?? []) as ClubWithLocation[];
-      if (selectedTags.length > 0) filtered = filtered.filter(c => selectedTags.some(tag => c.tags?.includes(tag) || c.category === tag));
+      if (selectedTags.length > 0) filtered = filtered.filter(c => c.name?.startsWith('Woeva Picks') || selectedTags.some(tag => c.tags?.includes(tag) || c.category === tag));
       setClubResults(filtered);
     }
     setSearched(true);
@@ -275,11 +275,25 @@ export default function SearchScreen() {
               onPress={() => setShowFilter(true)}
               activeOpacity={0.8}
             >
-              <Svg width={16} height={16} viewBox="0 0 24 24" fill="none">
-                <Line x1="3" y1="6" x2="21" y2="6" stroke={hasActiveFilter ? Colors.black : 'rgba(255,255,255,0.85)'} strokeWidth={2} strokeLinecap="round" />
-                <Line x1="7" y1="12" x2="17" y2="12" stroke={hasActiveFilter ? Colors.black : 'rgba(255,255,255,0.85)'} strokeWidth={2} strokeLinecap="round" />
-                <Line x1="10" y1="18" x2="14" y2="18" stroke={hasActiveFilter ? Colors.black : 'rgba(255,255,255,0.85)'} strokeWidth={2} strokeLinecap="round" />
-              </Svg>
+              {(() => {
+                const ic = hasActiveFilter ? Colors.black : 'rgba(255,255,255,0.85)';
+                return (
+                  <Svg width={16} height={16} viewBox="0 0 16 16" fill="none">
+                    {/* Top line — knob at right */}
+                    <Line x1="0" y1="3" x2="8.3" y2="3" stroke={ic} strokeWidth={1.7} strokeLinecap="round" />
+                    <Line x1="13.7" y1="3" x2="16" y2="3" stroke={ic} strokeWidth={1.7} strokeLinecap="round" />
+                    <Circle cx="11" cy="3" r="2.5" stroke={ic} strokeWidth={1.7} />
+                    {/* Middle line — knob at left */}
+                    <Line x1="0" y1="8" x2="2.3" y2="8" stroke={ic} strokeWidth={1.7} strokeLinecap="round" />
+                    <Line x1="7.7" y1="8" x2="16" y2="8" stroke={ic} strokeWidth={1.7} strokeLinecap="round" />
+                    <Circle cx="5" cy="8" r="2.5" stroke={ic} strokeWidth={1.7} />
+                    {/* Bottom line — knob at right */}
+                    <Line x1="0" y1="13" x2="9.3" y2="13" stroke={ic} strokeWidth={1.7} strokeLinecap="round" />
+                    <Line x1="14.7" y1="13" x2="16" y2="13" stroke={ic} strokeWidth={1.7} strokeLinecap="round" />
+                    <Circle cx="12" cy="13" r="2.5" stroke={ic} strokeWidth={1.7} />
+                  </Svg>
+                );
+              })()}
               {hasActiveFilter && <View style={styles.filterDot} />}
             </TouchableOpacity>
           </View>
@@ -387,8 +401,17 @@ export default function SearchScreen() {
       {/* Filter modal */}
       <Modal visible={showFilter} transparent animationType="slide" onRequestClose={() => setShowFilter(false)}>
         <Pressable style={styles.modalBackdrop} onPress={() => setShowFilter(false)} />
-        <Animated.View entering={FadeIn.duration(180)} style={[styles.filterSheet, { paddingBottom: insets.bottom + 20 }]}>
-          <View style={styles.filterHandle} />
+        <Animated.View
+          entering={FadeIn.duration(180)}
+          style={[styles.filterSheet, { paddingBottom: insets.bottom + 20 }]}
+        >
+          <View
+            onStartShouldSetResponder={() => true}
+            onMoveShouldSetResponder={(_, { dy }) => dy > 5}
+            onResponderRelease={(_, { dy }) => { if (dy > 60) setShowFilter(false); }}
+          >
+            <View style={styles.filterHandle} />
+          </View>
 
           <Text style={styles.filterTitle}>{t.search.filter}</Text>
 

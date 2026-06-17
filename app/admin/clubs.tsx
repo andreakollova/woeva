@@ -51,7 +51,7 @@ export default function AdminClubsScreen() {
     if (!data) { setLoading(false); setRefreshing(false); return; }
     const rows: ClubRow[] = (data as any[]).map(c => ({
       ...c,
-      creator_name: (c.creator as any)?.name ?? '—',
+      creator_name: (c.creator as any)?.name?.split(' ')[0] ?? '—',
       creator_email: (c.creator as any)?.email ?? null,
     }));
     setClubs(rows);

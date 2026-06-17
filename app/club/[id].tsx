@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { setStatusBarStyle } from 'expo-status-bar';
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Image, Alert, Modal, FlatList, Pressable, Share } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Image, Alert, Modal, FlatList, Pressable, Share, TextInput } from 'react-native';
 import { useLocalSearchParams, useRouter, useFocusEffect } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Animated, { FadeInDown, FadeInUp, FadeIn, FadeOut, ZoomIn } from 'react-native-reanimated';
@@ -45,6 +45,11 @@ export default function ClubDetailScreen() {
   const [toast, setToast] = useState(false);
   const [showMembersModal, setShowMembersModal] = useState(false);
   const [showJoinCelebration, setShowJoinCelebration] = useState(false);
+  const [showClubSettings, setShowClubSettings] = useState(false);
+  const [showInviteAdmin, setShowInviteAdmin] = useState(false);
+  const [inviteQuery, setInviteQuery] = useState('');
+  const [inviteResults, setInviteResults] = useState<{ id: string; name: string; avatar_url: string | null; email?: string }[]>([]);
+  const [invitingAdmin, setInvitingAdmin] = useState(false);
 
   useFocusEffect(
     React.useCallback(() => { setStatusBarStyle('light'); loadAll(); }, [id, user, profile?.city])
@@ -72,6 +77,57 @@ export default function ClubDetailScreen() {
       setIsMember(!!me);
       setIsAdmin(me?.role === 'admin');
     }
+  }
+
+  async function searchInvite(q: string) {
+    setInviteQuery(q);
+    if (q.trim().length < 2) { setInviteResults([]); return; }
+    const term = q.trim();
+    const { data } = await supabase.from('profiles').select('id, name, avatar_url, email')
+      .or(`email.ilike.%${term}%,name.ilike.%${term}%`)
+      .neq('id', user!.id)
+      .limit(8);
+    const existingIds = new Set(members.filter(m => m.role === 'admin').map(m => m.user_id));
+    setInviteResults(((data ?? []) as any[]).filter(r => !existingIds.has(r.id)));
+  }
+
+  async function handleInviteAdmin(profileId: string, profileName: string) {
+    if (!club) return;
+    Alert.alert(
+      t.club.confirmInvite(profileName),
+      t.club.confirmInviteMsg,
+      [
+        { text: t.common.cancel, style: 'cancel' },
+        {
+          text: t.club.sendInvite,
+          onPress: async () => {
+            setInvitingAdmin(true);
+            await supabase.from('club_members').upsert(
+              { club_id: id, user_id: profileId, role: 'admin', status: 'pending' },
+              { onConflict: 'club_id,user_id' }
+            );
+            await supabase.from('notifications').insert({
+              user_id: profileId, type: 'admin_invite',
+              title: `Pozvánka: ${club.name}`,
+              body: `Bol/a si pozvaný/á spravovať klub ${club.name}. Klepni pre prijatie alebo odmietnutie.`,
+              data: { club_id: id, action: 'admin_invite' },
+            });
+            notify.adminInvite({
+              inviteeId: profileId,
+              inviteeName: profileName,
+              inviterName: profile?.name ?? user?.email ?? 'Someone',
+              clubName: club.name,
+              clubId: id,
+            });
+            setInvitingAdmin(false);
+            setShowInviteAdmin(false);
+            setInviteQuery('');
+            setInviteResults([]);
+            Alert.alert(t.club.inviteSent, t.club.inviteSentMsg(profileName));
+          },
+        },
+      ]
+    );
   }
 
   async function handleRemoveMember(m: ClubMember) {
@@ -133,7 +189,12 @@ export default function ClubDetailScreen() {
       {/* Members modal */}
       <Modal visible={showMembersModal} animationType="slide" transparent onRequestClose={() => setShowMembersModal(false)}>
         <View style={styles.modalOverlay}>
-          <View style={styles.membersSheet}>
+          <View
+            style={styles.membersSheet}
+            onStartShouldSetResponder={() => true}
+            onMoveShouldSetResponder={(_, { dy }) => dy > 5}
+            onResponderRelease={(_, { dy }) => { if (dy > 60) setShowMembersModal(false); }}
+          >
             <View style={styles.membersSheetHandle} />
             <View style={styles.membersSheetHeader}>
               <Text style={styles.membersSheetTitle}>{t.club.membersCount(memberCount)}</Text>
@@ -161,7 +222,7 @@ export default function ClubDetailScreen() {
                     {m.role === 'admin' && (
                       <View style={styles.adminTag}><Text style={styles.adminTagText}>{t.club.adminRole}</Text></View>
                     )}
-                    {isAdmin && m.user_id !== user?.id && (
+                    {user && m.user_id !== user.id && (club?.creator_id === user.id || (isAdmin && m.role !== 'admin')) && (
                       <TouchableOpacity onPress={() => { setShowMembersModal(false); handleRemoveMember(m); }} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
                         <Text style={styles.removeText}>{t.club.remove}</Text>
                       </TouchableOpacity>
@@ -175,6 +236,149 @@ export default function ClubDetailScreen() {
       </Modal>
 
       {/* Join celebration overlay */}
+      {/* Club Settings Sheet */}
+      <Modal visible={showClubSettings} transparent animationType="slide" onRequestClose={() => setShowClubSettings(false)}>
+        <View style={styles.inviteOverlay}>
+          <Pressable style={StyleSheet.absoluteFill} onPress={() => setShowClubSettings(false)} />
+          <View
+            style={[styles.inviteSheet, { paddingBottom: insets.bottom + 24 }]}
+            onStartShouldSetResponder={() => true}
+            onMoveShouldSetResponder={(_, { dy }) => dy > 5}
+            onResponderRelease={(_, { dy }) => { if (dy > 60) setShowClubSettings(false); }}
+          >
+            <View style={styles.inviteHandle} />
+            <Text style={styles.inviteTitle}>{t.club.clubSettings}</Text>
+
+            {/* Edit club — only creator */}
+            {club?.creator_id === user?.id && (
+              <TouchableOpacity
+                style={styles.settingsOption}
+                activeOpacity={0.7}
+                onPress={() => { setShowClubSettings(false); router.push(`/club/${id}/edit` as any); }}
+              >
+                <View style={styles.settingsOptionIcon}>
+                  <Svg width={18} height={18} viewBox="0 0 24 24" fill="none">
+                    <Path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7" stroke={Colors.black} strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round" />
+                    <Path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z" stroke={Colors.black} strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round" />
+                  </Svg>
+                </View>
+                <View style={{ flex: 1 }}>
+                  <Text style={styles.settingsOptionLabel}>{t.club.editClub}</Text>
+                  <Text style={styles.settingsOptionSub}>{t.club.editClubDetails}</Text>
+                </View>
+                <Svg width={16} height={16} viewBox="0 0 24 24" fill="none">
+                  <Path d="M9 18l6-6-6-6" stroke={Colors.gray} strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" />
+                </Svg>
+              </TouchableOpacity>
+            )}
+
+            {/* Invite admin — only creator */}
+            {club?.creator_id === user?.id && (
+              <TouchableOpacity
+                style={styles.settingsOption}
+                activeOpacity={0.7}
+                onPress={() => { setShowClubSettings(false); setTimeout(() => setShowInviteAdmin(true), 300); }}
+              >
+                <View style={styles.settingsOptionIcon}>
+                  <Svg width={18} height={18} viewBox="0 0 24 24" fill="none">
+                    <Path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2" stroke={Colors.black} strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round" />
+                    <Circle cx="9" cy="7" r="4" stroke={Colors.black} strokeWidth={1.8} />
+                    <Path d="M23 21v-2a4 4 0 0 0-3-3.87M16 3.13a4 4 0 0 1 0 7.75" stroke={Colors.black} strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round" />
+                    <Path d="M19 8v6M22 11h-6" stroke={Colors.black} strokeWidth={1.8} strokeLinecap="round" />
+                  </Svg>
+                </View>
+                <View style={{ flex: 1 }}>
+                  <Text style={styles.settingsOptionLabel}>{t.club.inviteAdmin}</Text>
+                  <Text style={styles.settingsOptionSub}>{lang === 'sk' ? 'Pridaj spolusprávu klubu' : 'Add a co-admin to this club'}</Text>
+                </View>
+                <Svg width={16} height={16} viewBox="0 0 24 24" fill="none">
+                  <Path d="M9 18l6-6-6-6" stroke={Colors.gray} strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" />
+                </Svg>
+              </TouchableOpacity>
+            )}
+
+            {/* Leave club — only co-admin (not creator) */}
+            {isAdmin && club?.creator_id !== user?.id && (
+              <TouchableOpacity
+                style={[styles.settingsOption, { marginTop: 8 }]}
+                activeOpacity={0.7}
+                onPress={() => {
+                  setShowClubSettings(false);
+                  Alert.alert(
+                    lang === 'sk' ? 'Odísť z klubu?' : 'Leave club?',
+                    lang === 'sk' ? 'Stratíš admin práva a prestaneš dostávať novinky z tohto klubu.' : 'You will lose admin rights and stop receiving updates.',
+                    [
+                      { text: lang === 'sk' ? 'Zrušiť' : 'Cancel', style: 'cancel' },
+                      { text: lang === 'sk' ? 'Odísť' : 'Leave', style: 'destructive', onPress: () => handleLeave() },
+                    ]
+                  );
+                }}
+              >
+                <View style={styles.settingsOptionIcon}>
+                  <Svg width={18} height={18} viewBox="0 0 24 24" fill="none">
+                    <Path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4" stroke="#EF4444" strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round" />
+                    <Path d="M16 17l5-5-5-5M21 12H9" stroke="#EF4444" strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round" />
+                  </Svg>
+                </View>
+                <View style={{ flex: 1 }}>
+                  <Text style={[styles.settingsOptionLabel, { color: '#EF4444' }]}>{lang === 'sk' ? 'Odísť z klubu' : 'Leave club'}</Text>
+                  <Text style={styles.settingsOptionSub}>{lang === 'sk' ? 'Vzdáš sa admin práv' : 'You will lose admin rights'}</Text>
+                </View>
+              </TouchableOpacity>
+            )}
+          </View>
+        </View>
+      </Modal>
+
+      {/* Invite Admin Modal */}
+      <Modal visible={showInviteAdmin} transparent animationType="slide" onRequestClose={() => { setShowInviteAdmin(false); setInviteQuery(''); setInviteResults([]); }}>
+        <View style={styles.inviteOverlay}>
+          <Pressable style={StyleSheet.absoluteFill} onPress={() => { setShowInviteAdmin(false); setInviteQuery(''); setInviteResults([]); }} />
+          <View
+            style={[styles.inviteSheet, { paddingBottom: insets.bottom + 16 }]}
+            onStartShouldSetResponder={() => true}
+            onMoveShouldSetResponder={(_, { dy }) => dy > 5}
+            onResponderRelease={(_, { dy }) => { if (dy > 60) { setShowInviteAdmin(false); setInviteQuery(''); setInviteResults([]); } }}
+          >
+            <View style={styles.inviteHandle} />
+            <Text style={styles.inviteTitle}>{t.club.inviteAdmin}</Text>
+            <Text style={styles.inviteSub}>{t.club.inviteAdminSub(club?.name ?? '')}</Text>
+            <TextInput
+              style={styles.inviteInput}
+              value={inviteQuery}
+              onChangeText={searchInvite}
+              placeholder={t.club.inviteEmailPlaceholder}
+              placeholderTextColor={Colors.gray}
+              keyboardType="email-address"
+              autoCapitalize="none"
+              autoFocus
+            />
+            {inviteResults.map((r, i) => (
+              <TouchableOpacity
+                key={r.id}
+                style={[styles.inviteRow, i < inviteResults.length - 1 && { borderBottomWidth: 1, borderColor: Colors.grayBorder }]}
+                onPress={() => handleInviteAdmin(r.id, r.name)}
+                activeOpacity={0.7}
+                disabled={invitingAdmin}
+              >
+                <View style={styles.inviteAvatar}>
+                  {r.avatar_url ? <Image source={{ uri: r.avatar_url }} style={StyleSheet.absoluteFill as any} /> : null}
+                  {!r.avatar_url && <Text style={styles.inviteAvatarInitial}>{r.name.charAt(0).toUpperCase()}</Text>}
+                </View>
+                <View style={{ flex: 1 }}>
+                  <Text style={styles.inviteRowName}>{r.name}</Text>
+                  {r.email && <Text style={styles.inviteRowEmail}>{r.email}</Text>}
+                </View>
+                <Text style={styles.inviteRowAction}>{t.club.addArrow}</Text>
+              </TouchableOpacity>
+            ))}
+            {inviteQuery.length >= 2 && inviteResults.length === 0 && (
+              <Text style={styles.inviteEmpty}>{t.club.notFound}</Text>
+            )}
+          </View>
+        </View>
+      </Modal>
+
       <Modal visible={showJoinCelebration} transparent animationType="none" statusBarTranslucent>
         <Animated.View entering={FadeIn.duration(300)} exiting={FadeOut.duration(400)} style={styles.celebrationOverlay}>
           <Animated.View entering={ZoomIn.delay(100).springify()} style={styles.celebrationContent}>
@@ -185,7 +389,7 @@ export default function ClubDetailScreen() {
                 <Text style={styles.celebrationLogoInitial}>{initial}</Text>
               </View>
             )}
-            <Text style={styles.celebrationEmoji}>🎉</Text>
+            <Text style={styles.celebrationEmoji}>✓</Text>
             <Text style={styles.celebrationTitle}>{t.club.youreIn}</Text>
             <Text style={styles.celebrationSub}>{t.club.welcomeTo(club.name)}</Text>
           </Animated.View>
@@ -213,10 +417,10 @@ export default function ClubDetailScreen() {
           {isAdmin && (
             <TouchableOpacity
               style={[styles.adminBadge, { top: insets.top + 14 }]}
-              onPress={() => router.push(`/club/${id}/edit` as any)}
+              onPress={() => setShowClubSettings(true)}
               activeOpacity={0.8}
             >
-              <Text style={styles.adminText}>{t.club.editBadge}</Text>
+              <Text style={styles.adminText}>{t.club.clubSettings.toUpperCase()}</Text>
             </TouchableOpacity>
           )}
         </View>
@@ -542,6 +746,27 @@ const styles = StyleSheet.create({
   removeText: { fontSize: 13, color: '#FF4444', fontWeight: '600', fontFamily: Fonts.semibold },
 
   footer: { paddingHorizontal: 20, paddingTop: 12, borderTopWidth: 1, borderColor: Colors.grayBorder, backgroundColor: Colors.white },
+
+  // Club settings sheet options
+  settingsOption: { flexDirection: 'row', alignItems: 'center', gap: 14, paddingVertical: 14, borderBottomWidth: 1, borderBottomColor: Colors.grayBorder },
+  settingsOptionIcon: { width: 38, height: 38, borderRadius: 12, backgroundColor: Colors.grayLight, alignItems: 'center', justifyContent: 'center' },
+  settingsOptionLabel: { fontSize: 15, fontWeight: '600', color: Colors.black, fontFamily: Fonts.semibold },
+  settingsOptionSub: { fontSize: 12, color: Colors.gray, fontFamily: Fonts.regular, marginTop: 1 },
+
+  // Invite admin modal
+  inviteOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.4)', justifyContent: 'flex-end' },
+  inviteSheet: { backgroundColor: Colors.white, borderTopLeftRadius: 28, borderTopRightRadius: 28, paddingHorizontal: 20, paddingTop: 16 },
+  inviteHandle: { width: 36, height: 4, borderRadius: 2, backgroundColor: Colors.grayBorder, alignSelf: 'center', marginBottom: 16 },
+  inviteTitle: { fontSize: 18, fontWeight: '700', color: Colors.black, fontFamily: Fonts.bold, marginBottom: 4 },
+  inviteSub: { fontSize: 13, color: Colors.gray, fontFamily: Fonts.regular, marginBottom: 14 },
+  inviteInput: { borderWidth: 1, borderColor: Colors.grayBorder, borderRadius: 12, paddingHorizontal: 14, paddingVertical: 11, fontSize: 15, color: Colors.black, fontFamily: Fonts.regular, marginBottom: 12 },
+  inviteRow: { flexDirection: 'row', alignItems: 'center', gap: 12, paddingVertical: 12 },
+  inviteAvatar: { width: 40, height: 40, borderRadius: 20, backgroundColor: Colors.lime, alignItems: 'center', justifyContent: 'center', overflow: 'hidden' },
+  inviteAvatarInitial: { fontSize: 16, fontWeight: '700', color: Colors.black },
+  inviteRowName: { fontSize: 15, fontWeight: '600', color: Colors.black, fontFamily: Fonts.semibold },
+  inviteRowEmail: { fontSize: 12, color: Colors.gray, fontFamily: Fonts.regular },
+  inviteRowAction: { fontSize: 13, color: Colors.gray, fontFamily: Fonts.regular },
+  inviteEmpty: { fontSize: 14, color: Colors.gray, fontFamily: Fonts.regular, marginTop: 12, textAlign: 'center' },
 
   // Join celebration
   celebrationOverlay: { flex: 1, backgroundColor: '#0a0a0a', alignItems: 'center', justifyContent: 'center' },

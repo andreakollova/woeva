@@ -616,15 +616,14 @@ export const translations = {
     // ── About ─────────────────────────────────────────────────────
     about: {
       about: 'About',
-      appTagline: 'Your people are already out.',
+      appTagline: 'Developed by DRIXTON s.r.o. | AK, NF',
       privacyPolicy: 'Privacy Policy',
       termsOfService: 'Terms of Service',
       contactUs: 'Contact us',
-      rateWoeva: 'Rate Woeva',
-      followInstagram: 'Follow @woevaapp',
+      followInstagram: 'Follow @letsdowoeva',
       cancellationPolicy: 'Cancellation & Refund Policy',
       cancellationText: "If a paid event is cancelled by the organiser 48 hours or more before it starts, all attendees receive a full automatic refund to their original payment method.\n\nIf the event is cancelled less than 48 hours before the start time, no refund is issued.\n\nRefunds are processed via Stripe and may take 5-10 business days to appear on your statement.",
-      madeBy: 'Made by people for people.',
+      madeBy: "Let's do it! Whatever.",
     },
 
     // ── Delete Account ────────────────────────────────────────────
@@ -1273,15 +1272,14 @@ export const translations = {
 
     about: {
       about: 'O aplikácii',
-      appTagline: 'Tvoji ľudia sú už vonku.',
+      appTagline: 'Developed by DRIXTON s.r.o. | AK, NF',
       privacyPolicy: 'Zásady ochrany súkromia',
       termsOfService: 'Podmienky používania',
       contactUs: 'Kontaktovať nás',
-      rateWoeva: 'Ohodnotiť Woeva',
-      followInstagram: 'Sledovať @woevaapp',
+      followInstagram: 'Sledovať @letsdowoeva',
       cancellationPolicy: 'Storno a refundačná politika',
       cancellationText: 'Ak organizátor zruší platenú udalosť 48 hodín alebo viac pred jej začiatkom, všetci účastníci dostanú automatický plný refund na pôvodnú platobnú metódu.\n\nAk je udalosť zrušená menej ako 48 hodín pred začiatkom, refund sa neposkytuje.\n\nRefundy sú spracované cez Stripe a môžu trvať 5-10 pracovných dní.',
-      madeBy: 'Ľuďmi pre ľudí.',
+      madeBy: "Let's do it! Whatever.",
     },
 
     deleteAccount: {

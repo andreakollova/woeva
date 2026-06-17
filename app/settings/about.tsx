@@ -1,10 +1,9 @@
 import { BackButton } from '@/components/ui/BackButton';
 import React from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, ScrollView, Linking, Platform } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, ScrollView, Linking, Image } from 'react-native';
 import { useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Colors } from '@/constants/colors';
-import { WMark } from '@/components/ui/WMark';
 import { useTranslations } from '@/context/LanguageContext';
 
 export default function AboutScreen() {
@@ -12,27 +11,14 @@ export default function AboutScreen() {
   const insets = useSafeAreaInsets();
   const { t } = useTranslations();
 
-  const APP_STORE_ID = ''; // fill in after first App Store submission
-  const PLAY_STORE_ID = 'com.woeva.app';
-
   const LEGAL_ITEMS = [
     { label: t.about.privacyPolicy, onPress: () => Linking.openURL('https://woeva.com/privacy').catch(() => {}) },
     { label: t.about.termsOfService, onPress: () => router.push('/settings/legal?type=terms' as any) },
-    { label: t.about.contactUs, onPress: () => Linking.openURL('mailto:hello@woeva.app').catch(() => {}) },
+    { label: t.about.contactUs, onPress: () => Linking.openURL('mailto:admin@woeva.com').catch(() => {}) },
   ];
 
   const MORE_ITEMS = [
-    {
-      label: t.about.rateWoeva,
-      onPress: () => {
-        if (Platform.OS === 'ios' && APP_STORE_ID) {
-          Linking.openURL(`https://apps.apple.com/app/id${APP_STORE_ID}?action=write-review`).catch(() => {});
-        } else if (Platform.OS === 'android') {
-          Linking.openURL(`https://play.google.com/store/apps/details?id=${PLAY_STORE_ID}`).catch(() => {});
-        }
-      },
-    },
-    { label: t.about.followInstagram, onPress: () => Linking.openURL('https://instagram.com/woevaapp').catch(() => {}) },
+    { label: t.about.followInstagram, onPress: () => Linking.openURL('https://www.instagram.com/letsdowoeva/').catch(() => {}) },
   ];
 
   return (
@@ -45,11 +31,9 @@ export default function AboutScreen() {
       <ScrollView contentContainerStyle={[styles.scroll, { paddingBottom: insets.bottom + 40 }]}>
         {/* App icon */}
         <View style={styles.appCard}>
-          <View style={styles.iconBox}>
-            <WMark size={40} color={Colors.black} />
-          </View>
+          <Image source={require('../../assets/app-icon-logo.png')} style={styles.iconBox} />
           <Text style={styles.appName}>Woeva</Text>
-          <Text style={styles.appVersion}>Version 1.0.0 · build 1</Text>
+          <Text style={styles.appVersion}>Version 1.2.0 · build 40</Text>
           <Text style={styles.appTagline}>{t.about.appTagline}</Text>
         </View>
 
@@ -101,7 +85,7 @@ const styles = StyleSheet.create({
   title: { fontSize: 20, fontWeight: '700', color: Colors.black },
   scroll: { paddingHorizontal: 20 },
   appCard: { alignItems: 'center', paddingVertical: 24, gap: 6, marginBottom: 24 },
-  iconBox: { width: 72, height: 72, borderRadius: 16, backgroundColor: Colors.lime, alignItems: 'center', justifyContent: 'center', marginBottom: 8 },
+  iconBox: { width: 72, height: 72, borderRadius: 16, marginBottom: 8 },
   appName: { fontSize: 22, fontWeight: '700', color: Colors.black },
   appVersion: { fontSize: 13, color: Colors.gray },
   appTagline: { fontSize: 14, color: Colors.gray, marginTop: 4 },

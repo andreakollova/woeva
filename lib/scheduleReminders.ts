@@ -15,8 +15,18 @@ async function saveMap(map: Record<string, string[]>) {
 }
 
 /**
+ * Derive a deterministic 0–50 minute offset from the eventId so that
+ * multiple events scheduled for the same evening don't all fire at once.
+ * Maps to one of 6 slots: 0, 10, 20, 30, 40, 50 minutes.
+ */
+function eveningSlotMinute(eventId: string): number {
+  const hex = eventId.replace(/-/g, '').slice(0, 8);
+  return (parseInt(hex, 16) % 6) * 10;
+}
+
+/**
  * Schedule local push reminders when user joins an event.
- * - Evening before at 19:19
+ * - Evening before at 19:00–19:50 (slot derived from eventId, 10-min spacing)
  * - 2 hours before (only if event starts at 10:00 or later)
  */
 export async function scheduleEventReminders(
@@ -33,8 +43,9 @@ export async function scheduleEventReminders(
   const now = new Date();
   const ids: string[] = [];
 
-  // 1. Evening before at 19:19
-  const dayBefore = new Date(y, mo - 1, d - 1, 19, 19, 0);
+  // 1. Evening before — staggered by eventId slot to avoid notification bursts
+  const slotMinute = eveningSlotMinute(eventId);
+  const dayBefore = new Date(y, mo - 1, d - 1, 19, slotMinute, 0);
   if (dayBefore > now) {
     try {
       const id = await Notifications.scheduleNotificationAsync({

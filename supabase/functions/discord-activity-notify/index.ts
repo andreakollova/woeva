@@ -152,7 +152,7 @@ serve(async (req) => {
         ...(record.cover_url ? { image: { url: record.cover_url } } : {}),
         fields: [
           { name: 'Názov', value: record.name ?? '—', inline: false },
-          { name: 'Zakladateľ', value: creator?.name ?? '—', inline: true },
+          { name: 'Zakladateľ', value: creator?.name?.split(' ')[0] ?? '—', inline: true },
           { name: 'Email', value: creator?.email ?? '—', inline: true },
           { name: 'Mesto', value: record.city ?? '—', inline: true },
           { name: 'Kategória', value: record.category ?? '—', inline: true },
