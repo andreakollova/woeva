@@ -11,7 +11,7 @@ serve(async (req) => {
     // Find events where registration just opened and notification hasn't been sent yet
     const { data: events, error } = await db
       .from('events')
-      .select('id, title, club_id, creator_id, category')
+      .select('id, title, club_id, creator_id, category, is_recurring, recurring_end_date, registration_opens_at')
       .lte('registration_opens_at', new Date().toISOString())
       .eq('registration_notified', false)
       .not('registration_opens_at', 'is', null);
@@ -94,6 +94,23 @@ serve(async (req) => {
       }
 
       totalNotified += userIds.length;
+
+      // For recurring events: advance registration_opens_at by 7 days and reset flag
+      if (event.is_recurring && event.registration_opens_at) {
+        const nextOpen = new Date(event.registration_opens_at);
+        nextOpen.setDate(nextOpen.getDate() + 7);
+
+        const endDate = event.recurring_end_date ? new Date(event.recurring_end_date) : null;
+        if (!endDate || nextOpen <= endDate) {
+          await db
+            .from('events')
+            .update({
+              registration_opens_at: nextOpen.toISOString(),
+              registration_notified: false,
+            })
+            .eq('id', event.id);
+        }
+      }
     }
 
     return new Response(JSON.stringify({ ok: true, processed: events.length, notified: totalNotified }), { status: 200 });

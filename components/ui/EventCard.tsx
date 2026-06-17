@@ -207,11 +207,14 @@ function GoingAvatars({ count, attendees, attending, userProfile, userId }: {
         const zIdx = 3 - i;
         // First slot: user's avatar if attending
         if (i === 0 && isAttending) {
-          const initial = (userProfile?.name ?? '?').charAt(0).toUpperCase();
+          // Prefer the attendee record from the DB (has avatar_url reliably)
+          const meFromList = (attendees ?? []).find((a: any) => a?.profile?.id === userId);
+          const myProfile = meFromList?.profile ?? userProfile;
+          const initial = (myProfile?.name ?? (userProfile?.name ?? '?')).charAt(0).toUpperCase();
           return (
             <View key="me" style={{ width: 18, height: 18, borderRadius: 9, borderWidth: 1.5, borderColor: Colors.white, backgroundColor: Colors.lime, alignItems: 'center', justifyContent: 'center', marginLeft: ml, zIndex: zIdx, overflow: 'hidden' }}>
               <Text style={{ fontSize: 7, fontWeight: '400', color: Colors.black }}>{initial}</Text>
-              {userProfile?.avatar_url ? <Image source={{ uri: userProfile.avatar_url }} style={StyleSheet.absoluteFill as ImageStyle} /> : null}
+              {myProfile?.avatar_url ? <Image source={{ uri: myProfile.avatar_url }} style={StyleSheet.absoluteFill as ImageStyle} /> : null}
             </View>
           );
         }

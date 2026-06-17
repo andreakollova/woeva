@@ -180,10 +180,11 @@ function CarouselCard({ event, attending, onPress, lang, userProfile, sharpCorne
           <View style={cS.rightRow}>
             {(() => {
               const BOT_ID = '00000000-0000-0000-0000-000000000001';
-              const others = (event.attendees ?? [])
-                .map((a: any) => a.profile ?? a)
-                .filter((p: any) => p?.id && p.id !== userProfile?.id && p.id !== BOT_ID);
-              const meFirst = attending && userProfile ? [userProfile, ...others] : others;
+              const allProfiles = (event.attendees ?? []).map((a: any) => a.profile ?? a);
+              const others = allProfiles.filter((p: any) => p?.id && p.id !== userProfile?.id && p.id !== BOT_ID);
+              const meFromList = allProfiles.find((p: any) => p?.id === userProfile?.id);
+              const myProfile = meFromList ?? userProfile;
+              const meFirst = attending && myProfile ? [myProfile, ...others] : others;
               const visible = meFirst.slice(0, 3);
               return visible.length > 0 ? (
                 <View style={cS.avatarStack}>

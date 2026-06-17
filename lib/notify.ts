@@ -103,8 +103,8 @@ export const notify = {
     await Promise.all([
       params.attendeeTokens.length && sendPush(
         params.attendeeTokens,
-        `${params.eventTitle} was cancelled`,
-        `Sorry — ${params.creatorName} had to cancel this event.`,
+        'Event bol zruseny',
+        `${params.creatorName} zrusil/a ${params.eventTitle}`,
         { event_id: params.eventId }
       ),
       params.attendeeEmails.length && sendEmail(

@@ -180,7 +180,7 @@ function isUpcoming(e: EventRow) {
   return new Date(`${e.date}T${e.time ?? '00:00'}`) >= new Date();
 }
 
-function expandDashboardRows(rows: EventRow[]): EventRow[] {
+function expandDashboardRows(rows: EventRow[], occurrenceCounts?: Record<string, number>): EventRow[] {
   const result: EventRow[] = [];
   const today = new Date(); today.setHours(0, 0, 0, 0);
   const maxDate = new Date(); maxDate.setMonth(maxDate.getMonth() + 3);
@@ -193,7 +193,11 @@ function expandDashboardRows(rows: EventRow[]): EventRow[] {
     while (current < today) current.setDate(current.getDate() + 7);
     while (current <= cap) {
       const dateStr = `${current.getFullYear()}-${String(current.getMonth() + 1).padStart(2, '0')}-${String(current.getDate()).padStart(2, '0')}`;
-      result.push({ ...row, id: `${row.id}_${dateStr}`, date: dateStr, _startDate: row.date });
+      const syntheticId = `${row.id}_${dateStr}`;
+      const occCount = occurrenceCounts
+        ? (occurrenceCounts[syntheticId] ?? occurrenceCounts[`${row.id}_${dateStr}`] ?? 0)
+        : row.going_count;
+      result.push({ ...row, id: syntheticId, date: dateStr, _startDate: row.date, going_count: occCount });
       current = new Date(current);
       current.setDate(current.getDate() + 7);
     }
@@ -336,6 +340,7 @@ export default function DashboardScreen() {
   const [attendeesEvent, setAttendeesEvent] = useState<EventRow | null>(null);
   const [attendees, setAttendees] = useState<{ id: string; name: string; avatar_url: string | null }[]>([]);
   const [loadingAttendees, setLoadingAttendees] = useState(false);
+  const [occurrenceCounts, setOccurrenceCounts] = useState<Record<string, number>>({});
 
   // Payouts intro gate — auto-open setup if arrived via tab=payouts param
   const [showPayoutsSetup, setShowPayoutsSetup] = useState(tabParam === 'payouts');
@@ -582,7 +587,7 @@ export default function DashboardScreen() {
     const BOT_ID = '00000000-0000-0000-0000-000000000001';
     if (eventsData && eventsData.length > 0) {
       const { data: allAtts } = await supabase
-        .from('event_attendees').select('event_id, user_id, payment_intent_id, paid')
+        .from('event_attendees').select('event_id, user_id, payment_intent_id, paid, occurrence_date')
         .in('event_id', eventsData.map(e => e.id));
 
       // Build a map of creator_id per event for fast lookup
@@ -592,11 +597,15 @@ export default function DashboardScreen() {
       const onlineCounts: Record<string, number> = {};
       const doorCounts: Record<string, number> = {};
       const totalCounts: Record<string, number> = {};
+      const newOccurrenceCounts: Record<string, number> = {};
       (allAtts ?? []).forEach((a: any) => {
         // Exclude creator auto-join and bot
         if (a.user_id === creatorMap[a.event_id]) return;
         if (a.user_id === BOT_ID) return;
         totalCounts[a.event_id] = (totalCounts[a.event_id] ?? 0) + 1;
+        // Per-occurrence count for recurring events
+        const occKey = a.occurrence_date ? `${a.event_id}_${a.occurrence_date}` : a.event_id;
+        newOccurrenceCounts[occKey] = (newOccurrenceCounts[occKey] ?? 0) + 1;
         if (a.paid) {
           if (a.payment_intent_id) {
             onlineCounts[a.event_id] = (onlineCounts[a.event_id] ?? 0) + 1;
@@ -605,6 +614,7 @@ export default function DashboardScreen() {
           }
         }
       });
+      setOccurrenceCounts(newOccurrenceCounts);
 
       const { data: checkInsData } = await supabase
         .from('check_ins').select('event_id, user_id')
@@ -710,9 +720,20 @@ export default function DashboardScreen() {
   async function openAttendees(event: EventRow) {
     setAttendeesEvent(event);
     setLoadingAttendees(true);
+    // For recurring events the id is synthetic: "realUUID_YYYY-MM-DD"
+    // UUIDs contain only hyphens, so the first underscore separates uuid from date
+    const underIdx = event.id.indexOf('_');
+    const realId = underIdx > 0 ? event.id.slice(0, underIdx) : event.id;
+    const occurrenceDate = underIdx > 0 ? event.id.slice(underIdx + 1) : null;
+
+    let attQuery = supabase.from('event_attendees').select('user_id').eq('event_id', realId);
+    if (occurrenceDate) {
+      attQuery = (attQuery as any).or(`occurrence_date.eq.${occurrenceDate},occurrence_date.is.null`);
+    }
+
     const [{ data: attData }, { data: ciData }] = await Promise.all([
-      supabase.from('event_attendees').select('user_id').eq('event_id', event.id),
-      supabase.from('check_ins').select('user_id').eq('event_id', event.id),
+      attQuery,
+      supabase.from('check_ins').select('user_id').eq('event_id', realId),
     ]);
     const userIds = (attData ?? []).map((a: any) => a.user_id).filter(Boolean);
     if (userIds.length > 0) {
@@ -841,7 +862,7 @@ export default function DashboardScreen() {
   }, [viewEvents, lang]);
 
   const rawUpcoming = viewEvents.filter(e => isUpcoming(e) && e.status !== 'cancelled');
-  const upcomingEvents = expandDashboardRows(rawUpcoming);
+  const upcomingEvents = expandDashboardRows(rawUpcoming, occurrenceCounts);
   const pastEvents = viewEvents.filter(e => !isUpcoming(e) && e.status !== 'cancelled');
   const cancelledEvents = viewEvents.filter(e => e.status === 'cancelled');
   const displayedEvents = eventsFilter === 'upcoming' ? upcomingEvents : eventsFilter === 'past' ? pastEvents : cancelledEvents;
