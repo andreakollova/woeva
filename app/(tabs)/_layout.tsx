@@ -138,7 +138,7 @@ function TabBar({ state, descriptors, navigation }: any) {
                 </TouchableOpacity>
               )}
               {myClubs.length === 1 && (
-                <TouchableOpacity style={styles.menuSecondaryItem} onPress={() => { setShowMenu(false); router.push(`/club/${myClubs[0].id}` as any); }} activeOpacity={0.7}>
+                <TouchableOpacity style={styles.menuSecondaryItem} onPress={() => { setShowMenu(false); setTimeout(() => router.push(`/club/${myClubs[0].id}` as any), 150); }} activeOpacity={0.7}>
                   <Svg width={16} height={16} viewBox="0 0 24 24" fill="none">
                     <Path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2" stroke={Colors.gray} strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round" />
                     <Circle cx={9} cy={7} r={4} stroke={Colors.gray} strokeWidth={1.8} />

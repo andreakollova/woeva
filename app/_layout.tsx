@@ -71,6 +71,11 @@ export default function RootLayout() {
             <Stack.Screen name="event/[id]/payment" options={{ animation: 'slide_from_bottom', presentation: 'modal' }} />
             <Stack.Screen name="event/create/step1" options={{ animation: 'slide_from_bottom', presentation: 'modal' }} />
             <Stack.Screen name="event/create/published" options={{ animation: 'fade', gestureEnabled: false }} />
+            <Stack.Screen name="club/[id]" options={{ animation: 'slide_from_right' }} />
+            <Stack.Screen name="club/[id]/settings" options={{ animation: 'slide_from_right' }} />
+            <Stack.Screen name="club/[id]/edit" options={{ animation: 'slide_from_right' }} />
+            <Stack.Screen name="club/[id]/members" options={{ animation: 'slide_from_right' }} />
+            <Stack.Screen name="club/create" options={{ animation: 'slide_from_right' }} />
           </Stack>
         </StripeProvider>
         </AuthProvider>

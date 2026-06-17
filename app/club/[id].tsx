@@ -1,6 +1,6 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useRef } from 'react';
 import { setStatusBarStyle } from 'expo-status-bar';
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Image, Alert, Modal, FlatList, Pressable, Share, TextInput } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Image, Alert, Modal, FlatList, Pressable, Share, TextInput, Animated as RNAnimated, PanResponder } from 'react-native';
 import { useLocalSearchParams, useRouter, useFocusEffect } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Animated, { FadeInDown, FadeInUp, FadeIn, FadeOut, ZoomIn } from 'react-native-reanimated';
@@ -45,6 +45,37 @@ export default function ClubDetailScreen() {
   const [toast, setToast] = useState(false);
   const [showMembersModal, setShowMembersModal] = useState(false);
   const [showJoinCelebration, setShowJoinCelebration] = useState(false);
+
+  const sheetY = useRef(new RNAnimated.Value(800)).current;
+  const panResponder = useRef(PanResponder.create({
+    onStartShouldSetPanResponder: () => false,
+    onMoveShouldSetPanResponder: (_, { dy }) => dy > 8,
+    onPanResponderMove: (_, { dy }) => { if (dy > 0) sheetY.setValue(dy); },
+    onPanResponderRelease: (_, { dy, vy }) => {
+      if (dy > 120 || vy > 0.8) {
+        RNAnimated.timing(sheetY, { toValue: 800, duration: 220, useNativeDriver: true }).start(() => {
+          setShowMembersModal(false);
+          sheetY.setValue(800);
+        });
+      } else {
+        RNAnimated.spring(sheetY, { toValue: 0, useNativeDriver: true }).start();
+      }
+    },
+  })).current;
+
+  useEffect(() => {
+    if (showMembersModal) {
+      sheetY.setValue(800);
+      RNAnimated.spring(sheetY, { toValue: 0, useNativeDriver: true, tension: 65, friction: 11 } as any).start();
+    }
+  }, [showMembersModal]);
+
+  function closeSheet() {
+    RNAnimated.timing(sheetY, { toValue: 800, duration: 220, useNativeDriver: true }).start(() => {
+      setShowMembersModal(false);
+      sheetY.setValue(800);
+    });
+  }
 
   useFocusEffect(
     React.useCallback(() => { setStatusBarStyle('light'); loadAll(); }, [id, user, profile?.city])
@@ -131,20 +162,18 @@ export default function ClubDetailScreen() {
       <Toast visible={toast} title={t.club.youreIn} subtitle={t.club.welcomeTo(club.name)} onHide={() => setToast(false)} />
 
       {/* Members modal */}
-      <Modal visible={showMembersModal} animationType="slide" transparent onRequestClose={() => setShowMembersModal(false)}>
+      <Modal visible={showMembersModal} animationType="none" transparent onRequestClose={closeSheet}>
         <View style={styles.modalOverlay}>
-          <View
-            style={styles.membersSheet}
-            onStartShouldSetResponder={() => true}
-            onMoveShouldSetResponder={(_, { dy }) => dy > 5}
-            onResponderRelease={(_, { dy }) => { if (dy > 60) setShowMembersModal(false); }}
-          >
-            <View style={styles.membersSheetHandle} />
-            <View style={styles.membersSheetHeader}>
-              <Text style={styles.membersSheetTitle}>{t.club.membersCount(memberCount)}</Text>
-              <TouchableOpacity onPress={() => setShowMembersModal(false)} hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}>
-                <Text style={styles.membersSheetClose}>✕</Text>
-              </TouchableOpacity>
+          <RNAnimated.View style={[styles.membersSheet, { transform: [{ translateY: sheetY }] }]}>
+            {/* Draggable zone — handle + header */}
+            <View {...panResponder.panHandlers}>
+              <View style={styles.membersSheetHandle} />
+              <View style={styles.membersSheetHeader}>
+                <Text style={styles.membersSheetTitle}>{t.club.membersCount(memberCount)}</Text>
+                <TouchableOpacity onPress={closeSheet} hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}>
+                  <Text style={styles.membersSheetClose}>✕</Text>
+                </TouchableOpacity>
+              </View>
             </View>
             <FlatList
               data={members}
@@ -167,7 +196,7 @@ export default function ClubDetailScreen() {
                       <View style={styles.adminTag}><Text style={styles.adminTagText}>{t.club.adminRole}</Text></View>
                     )}
                     {user && m.user_id !== user.id && (club?.creator_id === user.id || (isAdmin && m.role !== 'admin')) && (
-                      <TouchableOpacity onPress={() => { setShowMembersModal(false); handleRemoveMember(m); }} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
+                      <TouchableOpacity onPress={() => { closeSheet(); handleRemoveMember(m); }} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
                         <Text style={styles.removeText}>{t.club.remove}</Text>
                       </TouchableOpacity>
                     )}
@@ -175,7 +204,7 @@ export default function ClubDetailScreen() {
                 );
               }}
             />
-          </View>
+          </RNAnimated.View>
         </View>
       </Modal>
 
