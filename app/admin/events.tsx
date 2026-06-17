@@ -170,8 +170,8 @@ export default function AdminEventsScreen() {
                 (attendees ?? []).map((a: any) => ({
                   user_id: a.user_id,
                   type: 'event_cancelled',
-                  title: `${selected.title} was cancelled`,
-                  body: cancelReason.trim() || 'This event has been cancelled by Woeva Admin.',
+                  title: `Event bol zrušený: ${selected.title}`,
+                  body: cancelReason.trim() || 'Tento event bol zrušený administrátorom Woeva.',
                   data: { event_id: selected.id },
                 }))
               );

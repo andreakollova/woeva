@@ -458,8 +458,8 @@ export default function DashboardScreen() {
             }, { onConflict: 'club_id,user_id' });
             await supabase.from('notifications').insert({
               user_id: profileId, type: 'admin_invite',
-              title: `Admin invite: ${targetClub.name}`,
-              body: `You've been invited to co-manage ${targetClub.name}. Tap to accept or decline.`,
+              title: `Pozvánka: ${targetClub.name}`,
+              body: `Bol/a si pozvaný/á spravovať klub ${targetClub.name}. Klepni pre prijatie alebo odmietnutie.`,
               data: { club_id: targetClub.id, action: 'admin_invite' },
             });
             notify.adminInvite({

@@ -152,7 +152,7 @@ export const notify = {
     const invitee = await getProfile(params.inviteeId);
 
     await Promise.all([
-      invitee?.push_token && sendPush([invitee.push_token], `Admin invite: ${params.clubName}`, `${params.inviterName} invited you to co-manage ${params.clubName}.`, { club_id: params.clubId }),
+      invitee?.push_token && sendPush([invitee.push_token], `Pozvánka: ${params.clubName}`, `${params.inviterName} ťa pozval/a spravovať klub ${params.clubName}.`, { club_id: params.clubId }),
       invitee?.email && sendEmail(invitee.email, `You're invited to manage ${params.clubName}`,
         emailTemplates.adminInvite({ inviterName: params.inviterName, clubName: params.clubName })
       ),
@@ -168,7 +168,7 @@ export const notify = {
     const emails = params.affectedUsers.filter(u => u.email).map(u => u.email) as string[];
 
     await Promise.all([
-      tokens.length && sendPush(tokens, `${params.clubName} was deleted`, 'The club and all its events have been removed.'),
+      tokens.length && sendPush(tokens, `Klub bol vymazaný: ${params.clubName}`, 'Klub a všetky jeho eventy boli odstránené.'),
       ...params.affectedUsers.filter(u => u.email).map(u =>
         sendEmail(u.email!, `Club deleted: ${params.clubName}`,
           emailTemplates.clubDeleted({ clubName: params.clubName, eventTitle: u.eventTitle })
@@ -265,7 +265,7 @@ export const notify = {
     await sendPush(
       tokens,
       params.eventTitle,
-      `${params.senderName}: new message in chat`,
+      `${params.senderName}: nová správa`,
       { room_id: params.roomId, event_id: params.eventId, type: 'event_chat' }
     );
   },

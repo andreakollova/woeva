@@ -158,8 +158,8 @@ export default function ClubEditScreen() {
             attendees.map(a => ({
               user_id: a.user_id,
               type: 'event_cancelled',
-              title: 'Club deleted',
-              body: `"${name}" was deleted. Your spot at "${eventTitles[a.event_id] ?? 'an event'}" has been cancelled.`,
+              title: `Klub bol vymazaný: ${name}`,
+              body: `Tvoja rezervácia na "${eventTitles[a.event_id] ?? 'event'}" bola zrušená.`,
               data: { event_id: a.event_id },
               read: false,
             }))
