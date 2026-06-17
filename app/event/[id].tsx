@@ -192,21 +192,9 @@ export default function EventDetailScreen() {
         scheduleEventReminders(id, event.date, event.time, event.title).catch(() => {});
       }
       if (event?.creator_id && event.creator_id !== user.id) {
-        await supabase.from('notifications').insert({
-          user_id: event.creator_id, type: 'join',
-          title: `Nový účastník: ${event.title}`,
-          body: `${profile?.name?.split(' ')[0] ?? 'Niekto'} sa prihlásil/a na tvoj event.`,
-          data: { event_id: id },
-        });
-        const d = new Date(event.date + 'T00:00:00');
-        notify.joinedEvent({
-          creatorId: event.creator_id,
-          attendeeName: profile?.name?.split(' ')[0] ?? 'Someone',
-          eventTitle: event.title,
-          eventDate: d.toLocaleDateString('en-US', { weekday: 'short', day: 'numeric', month: 'short' }),
-          eventTime: event.time ?? undefined,
-          eventId: id,
-        });
+        supabase.functions.invoke('notify-creator', {
+          body: { type: 'event_join', eventId: id, attendeeName: profile?.name?.split(' ')[0] ?? 'Niekto' },
+        }).catch(() => {});
       }
       setIsAttending(true); setLoading(false); setToast(true); load();
     } else {
@@ -660,14 +648,9 @@ export default function EventDetailScreen() {
               {isAttending && user ? (
                 <View style={{ alignItems: 'center', gap: 1 }}>
                   <TouchableOpacity
-                    style={[s.inlinQR, (isFree || isWoevaEvent) && { opacity: 0.35 }]}
+                    style={[s.inlinQR, isWoevaEvent && { opacity: 0.35 }]}
                     onPress={() => {
-                      if (isFree) {
-                        Alert.alert(
-                          lang === 'sk' ? 'Zadarmo' : 'Free event',
-                          lang === 'sk' ? 'Tento event je zadarmo — QR kód nepotrebuješ.' : 'This event is free — no ticket needed at the door.',
-                        );
-                      } else if (!isWoevaEvent) {
+                      if (!isWoevaEvent) {
                         setQrModal(true);
                       }
                     }}
@@ -738,7 +721,7 @@ export default function EventDetailScreen() {
                     : user
                       ? <TouchableOpacity style={s.joinPillFollow} onPress={async (e) => {
                           e.stopPropagation?.();
-                          await supabase.from('club_members').insert({ club_id: event.club!.id, user_id: user.id, role: 'member', status: 'approved' });
+                          await supabase.from('club_members').insert({ club_id: event.club!.id, user_id: user.id, role: 'member', status: 'approved', city: event.city ?? null });
                           setIsMember(true);
                         }}><Text style={s.joinPillFollowText}>+ {t.event.joinPlus}</Text></TouchableOpacity>
                       : <Svg width={16} height={16} viewBox="0 0 24 24" fill="none"><Path d="M9 18l6-6-6-6" stroke={Colors.gray} strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" /></Svg>

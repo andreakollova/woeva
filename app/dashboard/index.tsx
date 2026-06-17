@@ -358,18 +358,29 @@ export default function DashboardScreen() {
 
   function markCheckedIn(eventId: string, userId: string) {
     setCheckedIn(prev => {
-      if (prev[eventId]?.has(userId)) return prev; // already checked in
+      if (prev[eventId]?.has(userId)) return prev;
       const s = new Set(prev[eventId] ?? []);
       s.add(userId);
       return { ...prev, [eventId]: s };
     });
-    // Update scan_count in local events list
     setEvents(prev => prev.map(e =>
       e.id === eventId && !(checkedIn[eventId]?.has(userId))
         ? { ...e, scan_count: (e.scan_count ?? 0) + 1 }
         : e
     ));
     supabase.from('check_ins').upsert({ event_id: eventId, user_id: userId }).then(() => {});
+  }
+
+  function unmarkCheckedIn(eventId: string, userId: string) {
+    setCheckedIn(prev => {
+      const s = new Set(prev[eventId] ?? []);
+      s.delete(userId);
+      return { ...prev, [eventId]: s };
+    });
+    setEvents(prev => prev.map(e =>
+      e.id === eventId ? { ...e, scan_count: Math.max(0, (e.scan_count ?? 1) - 1) } : e
+    ));
+    supabase.from('check_ins').delete().eq('event_id', eventId).eq('user_id', userId).then(() => {});
   }
 
   // Reload members when selected club changes
@@ -568,11 +579,11 @@ export default function DashboardScreen() {
     const firstClubId = allClubs[0]?.id;
     if (firstClubId) await loadMembers(firstClubId);
 
+    const BOT_ID = '00000000-0000-0000-0000-000000000001';
     if (eventsData && eventsData.length > 0) {
-      const { data: paidAtts } = await supabase
-        .from('event_attendees').select('event_id, user_id, payment_intent_id')
-        .in('event_id', eventsData.map(e => e.id))
-        .eq('paid', true);
+      const { data: allAtts } = await supabase
+        .from('event_attendees').select('event_id, user_id, payment_intent_id, paid')
+        .in('event_id', eventsData.map(e => e.id));
 
       // Build a map of creator_id per event for fast lookup
       const creatorMap: Record<string, string> = {};
@@ -580,13 +591,18 @@ export default function DashboardScreen() {
 
       const onlineCounts: Record<string, number> = {};
       const doorCounts: Record<string, number> = {};
-      (paidAtts ?? []).forEach((a: any) => {
-        // Exclude creator auto-join: creator row with no payment = free/manual join
+      const totalCounts: Record<string, number> = {};
+      (allAtts ?? []).forEach((a: any) => {
+        // Exclude creator auto-join and bot
         if (a.user_id === creatorMap[a.event_id]) return;
-        if (a.payment_intent_id) {
-          onlineCounts[a.event_id] = (onlineCounts[a.event_id] ?? 0) + 1;
-        } else {
-          doorCounts[a.event_id] = (doorCounts[a.event_id] ?? 0) + 1;
+        if (a.user_id === BOT_ID) return;
+        totalCounts[a.event_id] = (totalCounts[a.event_id] ?? 0) + 1;
+        if (a.paid) {
+          if (a.payment_intent_id) {
+            onlineCounts[a.event_id] = (onlineCounts[a.event_id] ?? 0) + 1;
+          } else {
+            doorCounts[a.event_id] = (doorCounts[a.event_id] ?? 0) + 1;
+          }
         }
       });
 
@@ -605,9 +621,11 @@ export default function DashboardScreen() {
       setCheckedIn(initCheckedIn);
 
       setEvents(eventsData.map(e => {
-        const oc = e.is_free ? 0 : (onlineCounts[e.id] ?? 0);
-        const dc = e.is_free ? 0 : (doorCounts[e.id] ?? 0);
-        return { ...e, paid_count: oc + dc, online_count: oc, door_count: dc, scan_count: scanCounts[e.id] ?? 0, ...calcRevenue(e.price ?? 0, oc, dc) };
+        const isFree = e.is_free || (e.price ?? 0) === 0;
+        const oc = isFree ? 0 : (onlineCounts[e.id] ?? 0);
+        const dc = isFree ? 0 : (doorCounts[e.id] ?? 0);
+        const tc = totalCounts[e.id] ?? 0;
+        return { ...e, going_count: isFree ? tc : e.going_count, paid_count: oc + dc, online_count: oc, door_count: dc, scan_count: scanCounts[e.id] ?? 0, ...calcRevenue(e.price ?? 0, oc, dc) };
       }) as EventRow[]);
     } else {
       setEvents([]);
@@ -706,13 +724,11 @@ export default function DashboardScreen() {
     }
     // Merge DB check-ins into local state
     const dbCheckedIn = new Set((ciData ?? []).map((c: any) => c.user_id));
-    if (dbCheckedIn.size > 0) {
-      setCheckedIn(prev => {
-        const existing = new Set(prev[event.id] ?? []);
-        dbCheckedIn.forEach(id => existing.add(id));
-        return { ...prev, [event.id]: existing };
-      });
-    }
+    setCheckedIn(prev => {
+      const existing = new Set(prev[event.id] ?? []);
+      dbCheckedIn.forEach(id => existing.add(id));
+      return { ...prev, [event.id]: existing };
+    });
     setLoadingAttendees(false);
   }
 
@@ -722,7 +738,7 @@ export default function DashboardScreen() {
     try {
       const parts = qrData.split(':');
       if (parts.length < 4 || parts[0] !== 'woeva' || parts[1] !== 'event') {
-        setScannedTicket({ eventTitle: 'Invalid QR', userName: '', avatar_url: null, valid: false, eventId: '', userId: '' });
+        setScannedTicket({ eventTitle: 'Neplatný QR kód', userName: '', avatar_url: null, valid: false, eventId: '', userId: '' });
         return;
       }
       const eventId = parts[2];
@@ -1145,7 +1161,7 @@ export default function DashboardScreen() {
                           </View>
                           <TouchableOpacity
                             style={s.shareBtn}
-                            onPress={() => Clipboard.setStringAsync(`https://woeva.com/share-event?id=${e.id}`)}
+                            onPress={() => Share.share({ url: `https://woeva.com/share-event?id=${e.id}`, message: `https://woeva.com/share-event?id=${e.id}` })}
                             hitSlop={8}
                           >
                             <Svg width={15} height={15} viewBox="0 0 24 24" fill="none">
@@ -1229,7 +1245,7 @@ export default function DashboardScreen() {
                           </View>
                           <TouchableOpacity
                             style={s.shareBtn}
-                            onPress={() => Clipboard.setStringAsync(`https://woeva.com/share-event?id=${e.id}`)}
+                            onPress={() => Share.share({ url: `https://woeva.com/share-event?id=${e.id}`, message: `https://woeva.com/share-event?id=${e.id}` })}
                             hitSlop={8}
                           >
                             <Svg width={15} height={15} viewBox="0 0 24 24" fill="none">
@@ -1862,7 +1878,7 @@ export default function DashboardScreen() {
                       onPress={() => markCheckedIn(scannedTicket.eventId, scannedTicket.userId)}
                       activeOpacity={0.8}
                     >
-                      <Text style={[s.scanCheckInBtnText, checkedIn[scannedTicket.eventId]?.has(scannedTicket.userId) && { color: Colors.black }]}>
+                      <Text style={s.scanCheckInBtnText}>
                         {checkedIn[scannedTicket.eventId]?.has(scannedTicket.userId) ? t.dashboard.checkedIn : t.dashboard.confirmArrival}
                       </Text>
                     </TouchableOpacity>
@@ -1998,7 +2014,14 @@ export default function DashboardScreen() {
                         {isMe
                           ? <View style={s.meBadge}><Text style={s.meBadgeText}>me</Text></View>
                           : isIn
-                            ? <View style={s.checkedInBadge}><Text style={s.checkedInBadgeText}>{t.dashboard.checkedIn}</Text></View>
+                            ? <TouchableOpacity style={s.checkedInBadge} activeOpacity={0.7} onPress={() => {
+                                Alert.alert(t.dashboard.checkedIn, t.dashboard.undoCheckInConfirm ?? 'Zrušiť potvrdenie príchodu?', [
+                                  { text: t.auth.cancel, style: 'cancel' },
+                                  { text: 'Zrušiť', style: 'destructive', onPress: () => unmarkCheckedIn(attendeesEvent!.id, item.id) },
+                                ]);
+                              }}>
+                                <Text style={s.checkedInBadgeText}>{t.dashboard.checkedIn}</Text>
+                              </TouchableOpacity>
                             : <TouchableOpacity style={s.checkInBtn} onPress={() => markCheckedIn(attendeesEvent!.id, item.id)} activeOpacity={0.7}>
                                 <Text style={s.checkInBtnText}>{t.dashboard.checkIn}</Text>
                               </TouchableOpacity>
@@ -2374,7 +2397,7 @@ const s = StyleSheet.create({
   scanResultStatus: { fontSize: 13, fontWeight: '700', fontFamily: Fonts.semibold, marginTop: 4 },
   scanResultClose: { padding: 8 },
   scanCheckInBtn: { backgroundColor: Colors.black, borderRadius: 50, paddingVertical: 13, alignItems: 'center' },
-  scanCheckInBtnDone: { backgroundColor: Colors.lime },
+  scanCheckInBtnDone: { backgroundColor: Colors.black },
   scanCheckInBtnText: { fontSize: 15, fontWeight: '700', color: Colors.white, fontFamily: Fonts.bold },
 
   // Attendees check-in

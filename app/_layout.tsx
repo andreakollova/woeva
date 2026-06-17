@@ -9,6 +9,14 @@ import { LanguageProvider } from '@/context/LanguageContext';
 import * as Notifications from 'expo-notifications';
 import { useEffect } from 'react';
 import { Platform } from 'react-native';
+
+Notifications.setNotificationHandler({
+  handleNotification: async () => ({
+    shouldShowAlert: true,
+    shouldPlaySound: true,
+    shouldSetBadge: false,
+  }),
+});
 import {
   useFonts,
   Inter_400Regular,

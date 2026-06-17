@@ -6,6 +6,7 @@ import {
 import { useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useTranslations } from '@/context/LanguageContext';
+import { useAuth } from '@/context/AuthContext';
 import * as ImagePicker from 'expo-image-picker';
 import { Colors } from '@/constants/colors';
 import { Fonts } from '@/constants/fonts';
@@ -17,6 +18,7 @@ export default function ProfileSetupScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const { t } = useTranslations();
+  const { refetchProfile } = useAuth();
   const [avatar, setAvatar] = useState<string | null>(null);
   const [googleAvatar, setGoogleAvatar] = useState<string | null>(null);
   const [name, setName] = useState('');
@@ -70,6 +72,7 @@ export default function ProfileSetupScreen() {
         else if (googleAvatar) patch.avatar_url = googleAvatar;
         if (bio.trim()) patch.bio = bio.trim();
         await supabase.from('profiles').upsert(patch);
+        refetchProfile();
       }
     } finally {
       setLoading(false);

@@ -43,12 +43,92 @@ serve(async (req) => {
     // 1. Get all event IDs for events the user created
     const { data: userEvents } = await adminClient
       .from('events')
-      .select('id')
+      .select('id, title, date, is_free')
       .eq('creator_id', userId);
 
     const eventIds = (userEvents ?? []).map((e: any) => e.id);
 
-    // 1b. Count attendees on user's events (before deletion for Discord notification)
+    // Fetch profile name early — needed in notification messages below
+    const { data: profileData } = await adminClient
+      .from('profiles')
+      .select('name')
+      .eq('id', userId)
+      .single();
+
+    // 1b. Notify attendees of creator's upcoming events + refund paid tickets
+    const BOT_ID = '00000000-0000-0000-0000-000000000001';
+    const today = new Date().toISOString().split('T')[0];
+    const upcomingCreatorEvents = (userEvents ?? []).filter((e: any) => e.date >= today);
+
+    for (const ev of upcomingCreatorEvents) {
+      const { data: attendees } = await adminClient
+        .from('event_attendees')
+        .select('user_id, paid, payment_intent_id')
+        .eq('event_id', ev.id)
+        .neq('user_id', BOT_ID);
+
+      if (!attendees?.length) continue;
+
+      const attendeeUserIds = [...new Set(attendees.map((a: any) => a.user_id))];
+
+      // In-app notifications
+      await adminClient.from('notifications').insert(
+        attendeeUserIds.map((uid: string) => ({
+          user_id: uid,
+          type: 'event_cancelled',
+          title: `Event bol zrušený: ${ev.title}`,
+          body: 'Organizátor zmazal svoj účet. Ľutujeme za nepríjemnosti.',
+          data: { event_id: ev.id },
+        }))
+      );
+
+      // Push
+      const { data: attProfiles } = await adminClient
+        .from('profiles')
+        .select('push_token')
+        .in('id', attendeeUserIds)
+        .neq('notifications_enabled', false)
+        .not('push_token', 'is', null);
+
+      const attTokens = (attProfiles ?? [])
+        .map((p: any) => p.push_token)
+        .filter((t: any) => t?.startsWith('ExponentPushToken['));
+
+      if (attTokens.length > 0) {
+        await fetch(`${Deno.env.get('SUPABASE_URL')}/functions/v1/send-push`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')}`,
+          },
+          body: JSON.stringify({
+            tokens: attTokens,
+            title: `Event bol zrušený: ${ev.title}`,
+            body: 'Organizátor zmazal svoj účet. Ľutujeme za nepríjemnosti.',
+            data: { event_id: ev.id },
+          }),
+        });
+      }
+
+      // Refund paid attendees
+      const hasPaid = attendees.some((a: any) => a.paid && a.payment_intent_id);
+      if (!ev.is_free && hasPaid) {
+        try {
+          await fetch(`${Deno.env.get('SUPABASE_URL')}/functions/v1/refund-event`, {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              'Authorization': `Bearer ${Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')}`,
+            },
+            body: JSON.stringify({ eventId: ev.id }),
+          });
+        } catch (refundErr) {
+          console.error('Refund failed for event', ev.id, refundErr);
+        }
+      }
+    }
+
+    // 1c. Count attendees on user's events (before deletion for Discord notification)
     let totalAttendeeCount = 0;
     if (eventIds.length > 0) {
       const { count } = await adminClient
@@ -58,12 +138,51 @@ serve(async (req) => {
       totalAttendeeCount = count ?? 0;
     }
 
-    // 1c. Fetch profile name for Discord notification
-    const { data: profileData } = await adminClient
-      .from('profiles')
-      .select('name')
-      .eq('id', userId)
-      .single();
+    // 1d. Notify creators of upcoming events the user was attending (before deleting)
+    const { data: upcomingAttendances } = await adminClient
+      .from('event_attendees')
+      .select('event_id, events(title, creator_id, date)')
+      .eq('user_id', userId);
+
+    const futureAttended = (upcomingAttendances ?? []).filter((a: any) =>
+      a.events?.date >= today && a.events?.creator_id && a.events.creator_id !== userId
+    );
+
+    for (const att of futureAttended) {
+      const ev = att.events as any;
+      const leaveBody = `${profileData?.name ?? 'Účastník'} zmazal/a účet a opustil/a tvoj event.`;
+
+      await adminClient.from('notifications').insert({
+        user_id: ev.creator_id,
+        type: 'leave',
+        title: ev.title,
+        body: leaveBody,
+        data: { event_id: att.event_id },
+      });
+
+      const { data: creatorProfile } = await adminClient
+        .from('profiles').select('push_token')
+        .eq('id', ev.creator_id)
+        .or('notifications_enabled.is.null,notifications_enabled.eq.true')
+        .not('push_token', 'is', null)
+        .single();
+
+      if (creatorProfile?.push_token?.startsWith('ExponentPushToken[')) {
+        await fetch(`${Deno.env.get('SUPABASE_URL')}/functions/v1/send-push`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')}`,
+          },
+          body: JSON.stringify({
+            tokens: [creatorProfile.push_token],
+            title: ev.title,
+            body: leaveBody,
+            data: { event_id: att.event_id },
+          }),
+        });
+      }
+    }
 
     // 2. Delete event_attendees for user's events + user's own attendances
     if (eventIds.length > 0) {

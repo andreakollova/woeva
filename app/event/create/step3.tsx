@@ -80,6 +80,18 @@ export default function CreateStep3Screen() {
   const [showPublishAtTime, setShowPublishAtTime] = useState(false);
   const [publishAtWeekday, setPublishAtWeekday] = useState<number | null>(null); // 0=Sun..6=Sat, for recurring
 
+  const [hasRegistrationOpens, setHasRegistrationOpens] = useState(draft3.hasRegistrationOpens);
+  const [registrationOpensDate, setRegistrationOpensDate] = useState<Date>(() => {
+    if (draft3.registrationOpensDate) return draft3.registrationOpensDate;
+    const d = new Date(); d.setDate(d.getDate() + 1); d.setHours(10, 0, 0, 0); return d;
+  });
+  const [registrationOpensTime, setRegistrationOpensTime] = useState<Date>(() => {
+    if (draft3.registrationOpensTime) return draft3.registrationOpensTime;
+    const d = new Date(); d.setHours(10, 0, 0, 0); return d;
+  });
+  const [showRegOpensDate, setShowRegOpensDate] = useState(false);
+  const [showRegOpensTime, setShowRegOpensTime] = useState(false);
+
   useFocusEffect(useCallback(() => {
     if (!user) return;
     supabase
@@ -181,7 +193,10 @@ export default function CreateStep3Screen() {
     draft3.isRecurring = isRecurring; draft3.recurringEndDate = recurringEndDate;
     draft3.extraCovers = extraCovers;
     draft3.hasCapacity = hasCapacity; draft3.capacity = capacity;
-  }, [date, time, endTime, venue, venueLat, venueLng, price, payAtDoor, isRecurring, recurringEndDate, extraCovers, hasCapacity, capacity]);
+    draft3.hasRegistrationOpens = hasRegistrationOpens;
+    draft3.registrationOpensDate = registrationOpensDate;
+    draft3.registrationOpensTime = registrationOpensTime;
+  }, [date, time, endTime, venue, venueLat, venueLng, price, payAtDoor, isRecurring, recurringEndDate, extraCovers, hasCapacity, capacity, hasRegistrationOpens, registrationOpensDate, registrationOpensTime]);
 
   async function handleShare() {
     if (!venue.trim()) { Alert.alert(t.event.missingVenue, t.event.missingVenueMsg); return; }
@@ -307,6 +322,12 @@ export default function CreateStep3Screen() {
       })() : null,
       recurring_open_weekday: isRecurring && hasPublishAt && publishAtWeekday !== null ? publishAtWeekday : null,
       recurring_open_time: isRecurring && hasPublishAt && publishAtWeekday !== null ? `${publishAtTime.getHours().toString().padStart(2, '0')}:${publishAtTime.getMinutes().toString().padStart(2, '0')}` : null,
+      registration_opens_at: hasRegistrationOpens ? (() => {
+        const d = new Date(registrationOpensDate);
+        d.setHours(registrationOpensTime.getHours(), registrationOpensTime.getMinutes(), 0, 0);
+        return d.toISOString();
+      })() : null,
+      registration_notified: false,
     }).select().single();
 
     if (!error && data) {
@@ -339,8 +360,8 @@ export default function CreateStep3Screen() {
         // In-app notifications (deduplicated)
         const inAppNotifs = dedupedMembers.map((m: any) => ({
           user_id: m.user_id, type: 'club_event',
-          title: `Nový event v ${clubData.name ?? 'tvojom klube'}`,
-          body: String(params.title),
+          title: `${clubData.name ?? 'Tvoj klub'} zdieľa nový event!`,
+          body: `${String(params.title)} 🎉`,
           data: { event_id: data.id },
         }));
         if (inAppNotifs.length > 0) {
@@ -711,6 +732,83 @@ export default function CreateStep3Screen() {
                           />
                           {Platform.OS === 'ios' && (
                             <TouchableOpacity style={styles.calendarDone} onPress={() => setShowPublishAtTime(false)} activeOpacity={0.8}>
+                              <Text style={styles.calendarDoneText}>Hotovo</Text>
+                            </TouchableOpacity>
+                          )}
+                        </Pressable>
+                      </Pressable>
+                    </Modal>
+                  </View>
+                )}
+
+                {/* Registration opens toggle */}
+                <TouchableOpacity style={styles.recurringRow} onPress={() => setHasRegistrationOpens(v => !v)} activeOpacity={0.7}>
+                  <View style={styles.recurringText}>
+                    <Text style={styles.recurringTitle}>Otvorenie prihlasovania</Text>
+                    <Text style={styles.recurringSub}>Členovia klubu dostanú push notifikáciu keď sa otvorí prihlasovanie.</Text>
+                  </View>
+                  <View style={[styles.toggle, hasRegistrationOpens && styles.toggleOn]}>
+                    <View style={[styles.toggleThumb, hasRegistrationOpens && styles.toggleThumbOn]} />
+                  </View>
+                </TouchableOpacity>
+
+                {hasRegistrationOpens && (
+                  <View style={styles.publishAtBox}>
+                    <Text style={styles.publishAtLabel}>Prihlasovanie sa otvorí:</Text>
+                    <View style={styles.publishAtRow}>
+                      <TouchableOpacity style={[styles.field, styles.publishAtField]} onPress={() => setShowRegOpensDate(true)} activeOpacity={0.7}>
+                        <Text style={styles.fieldValue}>{registrationOpensDate.toLocaleDateString('sk-SK', { weekday: 'short', day: 'numeric', month: 'short' })}</Text>
+                      </TouchableOpacity>
+                      <TouchableOpacity style={[styles.field, styles.publishAtField]} onPress={() => setShowRegOpensTime(true)} activeOpacity={0.7}>
+                        <Text style={styles.fieldValue}>{`${registrationOpensTime.getHours().toString().padStart(2,'0')}:${registrationOpensTime.getMinutes().toString().padStart(2,'0')}`}</Text>
+                      </TouchableOpacity>
+                    </View>
+                    <Text style={styles.publishAtHint}>V tento čas dostanú členovia klubu notifikáciu 🎟️</Text>
+
+                    <Modal visible={showRegOpensDate} transparent animationType="slide" onRequestClose={() => setShowRegOpensDate(false)}>
+                      <Pressable style={styles.modalOverlay} onPress={() => setShowRegOpensDate(false)}>
+                        <Pressable style={styles.calendarSheet} onPress={() => {}}>
+                          <View style={styles.calendarHandle} />
+                          <Text style={styles.durationSheetTitle}>Dátum otvorenia</Text>
+                          <DateTimePicker
+                            value={registrationOpensDate}
+                            mode="date"
+                            display={Platform.OS === 'ios' ? 'inline' : 'default'}
+                            maximumDate={date}
+                            onChange={(_, d) => {
+                              if (Platform.OS === 'android') setShowRegOpensDate(false);
+                              if (d) setRegistrationOpensDate(d);
+                            }}
+                            style={Platform.OS === 'ios' ? { alignSelf: 'center' } : undefined}
+                            themeVariant="light"
+                            accentColor={Colors.black}
+                          />
+                          {Platform.OS === 'ios' && (
+                            <TouchableOpacity style={styles.calendarDone} onPress={() => setShowRegOpensDate(false)} activeOpacity={0.8}>
+                              <Text style={styles.calendarDoneText}>Hotovo</Text>
+                            </TouchableOpacity>
+                          )}
+                        </Pressable>
+                      </Pressable>
+                    </Modal>
+
+                    <Modal visible={showRegOpensTime} transparent animationType="slide" onRequestClose={() => setShowRegOpensTime(false)}>
+                      <Pressable style={styles.modalOverlay} onPress={() => setShowRegOpensTime(false)}>
+                        <Pressable style={styles.calendarSheet} onPress={() => {}}>
+                          <View style={styles.calendarHandle} />
+                          <Text style={styles.durationSheetTitle}>Čas otvorenia</Text>
+                          <DateTimePicker
+                            value={registrationOpensTime}
+                            mode="time"
+                            display={Platform.OS === 'ios' ? 'spinner' : 'default'}
+                            onChange={(_, t) => {
+                              if (Platform.OS === 'android') setShowRegOpensTime(false);
+                              if (t) setRegistrationOpensTime(t);
+                            }}
+                            themeVariant="light"
+                          />
+                          {Platform.OS === 'ios' && (
+                            <TouchableOpacity style={styles.calendarDone} onPress={() => setShowRegOpensTime(false)} activeOpacity={0.8}>
                               <Text style={styles.calendarDoneText}>Hotovo</Text>
                             </TouchableOpacity>
                           )}

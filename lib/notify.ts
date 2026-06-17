@@ -84,7 +84,7 @@ export const notify = {
   }) {
     const creator = await getProfile(params.creatorId);
     await Promise.all([
-      creator?.push_token && sendPush([creator.push_token], `${params.attendeeName} cancelled`, `They left ${params.eventTitle}.`, { event_id: params.eventId }),
+      creator?.push_token && sendPush([creator.push_token], params.eventTitle, `${params.attendeeName} zrušil/a svoju účasť.`, { event_id: params.eventId }),
       creator?.email && sendEmail(creator.email, `Attendee cancelled — ${params.eventTitle}`,
         emailTemplates.leftEvent({ attendeeName: params.attendeeName, eventTitle: params.eventTitle })
       ),
@@ -129,8 +129,8 @@ export const notify = {
     await Promise.all([
       params.memberTokens.length && sendPush(
         params.memberTokens,
-        `Nový event od ${params.clubName}`,
-        params.eventTitle,
+        `${params.clubName} zdieľa nový event!`,
+        `${params.eventTitle} 🎉`,
         { event_id: params.eventId }
       ),
       params.memberEmails.length && sendEmail(

@@ -111,7 +111,55 @@ serve(async (req) => {
       net,
     });
 
+    // Build invoice PDF link
+    const invoiceUrl = `https://ticket.woeva.com/api/invoice?event_id=${eventId}&token=${encodeURIComponent(authHeader?.replace('Bearer ', '') ?? '')}`;
+
     // Send via Resend
+    const emailHtml = `<!DOCTYPE html>
+<html lang="sk">
+<head><meta charset="UTF-8"/><meta name="viewport" content="width=device-width,initial-scale=1"/>
+<style>
+  body{font-family:-apple-system,Helvetica,Arial,sans-serif;margin:0;padding:0;background:#f5f5f5;color:#0a0a0a;}
+  .wrap{max-width:520px;margin:40px auto;background:#fff;border-radius:16px;overflow:hidden;box-shadow:0 2px 16px rgba(0,0,0,0.07);}
+  .header{background:#0a0a0a;padding:28px 36px;display:flex;align-items:center;}
+  .header img{height:28px;}
+  .body{padding:36px;}
+  h1{font-size:22px;font-weight:800;margin:0 0 8px;letter-spacing:-0.4px;}
+  .sub{color:#888;font-size:14px;margin-bottom:28px;}
+  .event-box{background:#f7f7f7;border-radius:12px;padding:20px;margin-bottom:28px;}
+  .event-name{font-size:17px;font-weight:700;margin-bottom:4px;}
+  .event-meta{font-size:13px;color:#666;}
+  .amount{font-size:28px;font-weight:800;color:#0a0a0a;margin-bottom:4px;}
+  .amount-sub{font-size:13px;color:#888;margin-bottom:28px;}
+  .btn{display:block;background:#B9FF00;color:#0a0a0a;font-size:15px;font-weight:700;text-align:center;padding:16px 24px;border-radius:50px;text-decoration:none;margin-bottom:16px;}
+  .footer{padding:24px 36px;border-top:1px solid #f0f0f0;font-size:12px;color:#aaa;text-align:center;}
+  .footer a{color:#aaa;text-decoration:none;}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="header">
+    <img src="https://woeva.com/LogoWoeva.png" alt="Woeva"/>
+  </div>
+  <div class="body">
+    <h1>Potvrdenie o rezervácii</h1>
+    <p class="sub">Ďakujeme za tvoju rezerváciu. Nižšie nájdeš faktúru v PDF.</p>
+    <div class="event-box">
+      <div class="event-name">${event.title}</div>
+      <div class="event-meta">${new Date(event.date + 'T00:00:00').toLocaleDateString('sk-SK', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })}${event.venue ? ' · ' + event.venue : ''}</div>
+    </div>
+    <div class="amount">€${totalAmount.toFixed(2)}</div>
+    <div class="amount-sub">Platba prebehla úspešne</div>
+    <a class="btn" href="${invoiceUrl}">Stiahnuť faktúru (PDF)</a>
+    <p style="font-size:12px;color:#aaa;text-align:center;margin:0;">Faktúra je vystavená spoločnosťou Sportqo s.r.o. v mene platformy Woeva.</p>
+  </div>
+  <div class="footer">
+    <a href="https://woeva.com">woeva.com</a> &nbsp;·&nbsp; <a href="mailto:admin@woeva.com">admin@woeva.com</a>
+  </div>
+</div>
+</body>
+</html>`;
+
     const res = await fetch('https://api.resend.com/emails', {
       method: 'POST',
       headers: {
@@ -121,8 +169,8 @@ serve(async (req) => {
       body: JSON.stringify({
         from: 'Woeva <noreply@woeva.com>',
         to: [user.email!],
-        subject: `Potvrdenie — ${event.title}`,
-        html: finalHtml,
+        subject: `Potvrdenie o rezervácii | WOEVA`,
+        html: emailHtml,
       }),
     });
 

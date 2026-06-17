@@ -1,5 +1,5 @@
 import { BackButton } from '@/components/ui/BackButton';
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import { View, Text, StyleSheet, TextInput, TouchableOpacity } from 'react-native';
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -19,7 +19,14 @@ export default function OtpScreen() {
   const [error, setError] = useState('');
   const [resendLoading, setResendLoading] = useState(false);
   const [resendSent, setResendSent] = useState(false);
+  const [resendTimer, setResendTimer] = useState(60);
   const inputs = useRef<TextInput[]>([]);
+
+  useEffect(() => {
+    if (resendTimer <= 0) return;
+    const interval = setInterval(() => setResendTimer(t => t - 1), 1000);
+    return () => clearInterval(interval);
+  }, [resendTimer]);
 
   function handleChange(text: string, index: number) {
     const newOtp = [...otp];
@@ -62,6 +69,7 @@ export default function OtpScreen() {
     }
     setResendLoading(false);
     setResendSent(true);
+    setResendTimer(60);
     setOtp(['', '', '', '', '', '']);
     setTimeout(() => setResendSent(false), 8000);
   }
@@ -101,7 +109,10 @@ export default function OtpScreen() {
 
       <View style={styles.bottom}>
         <Button label={t.auth.verify} onPress={handleVerify} loading={loading} variant="black" />
-        <Button label={resendLoading ? 'Odosielam...' : t.auth.resendCode} onPress={handleResend} variant="ghost" disabled={resendLoading} />
+        {resendTimer > 0
+          ? <Text style={styles.resendTimer}>Znovu odoslať za <Text style={styles.resendTimerBold}>{resendTimer}s</Text></Text>
+          : <Button label={resendLoading ? 'Odosielam...' : t.auth.resendCode} onPress={handleResend} variant="ghost" disabled={resendLoading} />
+        }
       </View>
     </View>
   );
@@ -131,4 +142,6 @@ const styles = StyleSheet.create({
   bottom: { gap: 12 },
   resendSuccess: { alignSelf: 'flex-start', backgroundColor: Colors.black, borderRadius: 20, paddingHorizontal: 14, paddingVertical: 8, marginTop: 10 },
   resendSuccessText: { fontSize: 13, color: Colors.lime, fontWeight: '700' },
+  resendTimer: { textAlign: 'center', fontSize: 14, color: Colors.gray },
+  resendTimerBold: { fontWeight: '700', color: Colors.black },
 });

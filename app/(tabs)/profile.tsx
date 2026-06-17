@@ -1,6 +1,6 @@
 import React, { useState, useCallback } from 'react';
 import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Image, Alert, Share } from 'react-native';
-import { StatusBar } from 'expo-status-bar';
+import { StatusBar, setStatusBarStyle } from 'expo-status-bar';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useRouter, useFocusEffect } from 'expo-router';
 import Svg, { Path } from 'react-native-svg';
@@ -33,6 +33,7 @@ export default function ProfileScreen() {
   const [showAllEvents, setShowAllEvents] = useState(false);
 
   useFocusEffect(useCallback(() => {
+    setStatusBarStyle('light');
     if (!user) return;
     supabase.from('event_attendees').select('id', { count: 'exact' }).eq('user_id', user.id).then(({ count }) => setEventsCount(count ?? 0));
     supabase.from('club_members').select('id, club:clubs(id, name, cover_url, logo_url, category)').eq('user_id', user.id).eq('status', 'approved').then(({ data }) => {
@@ -224,6 +225,10 @@ export default function ProfileScreen() {
             </View>
           )}
 
+          <TouchableOpacity style={styles.dashboardBtn} onPress={() => router.push('/dashboard' as any)} activeOpacity={0.85}>
+            <Text style={styles.dashboardBtnText}>Dashboard</Text>
+          </TouchableOpacity>
+
           {profile?.is_admin && (
             <TouchableOpacity style={styles.adminBtn} onPress={() => router.push('/admin' as any)} activeOpacity={0.85}>
               <Text style={styles.adminBtnText}>⚡ Admin Panel</Text>
@@ -380,6 +385,8 @@ const styles = StyleSheet.create({
   showMore: { paddingVertical: 12, alignItems: 'center' },
   showMoreText: { fontSize: 13, color: Colors.gray, fontFamily: Fonts.semibold },
 
+  dashboardBtn: { marginTop: 8, marginBottom: 4, backgroundColor: Colors.black, borderRadius: 16, padding: 16, alignItems: 'center' },
+  dashboardBtnText: { color: Colors.white, fontSize: 15, fontWeight: '700', fontFamily: Fonts.bold },
   adminBtn: { marginTop: 8, marginBottom: 12, backgroundColor: Colors.black, borderRadius: 16, padding: 16, alignItems: 'center' },
   adminBtnText: { color: Colors.lime, fontSize: 15, fontWeight: '700', fontFamily: Fonts.bold },
 });

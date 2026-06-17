@@ -63,6 +63,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       }
       if (finalStatus !== 'granted') return;
       const token = (await Notifications.getExpoPushTokenAsync({ projectId: '8eddd0fa-6bb8-47a2-bb21-5eaa63f470a2' })).data;
+      // Clear this token from any other profiles (same device, different accounts)
+      await supabase.from('profiles').update({ push_token: null }).eq('push_token', token).neq('id', userId);
       await supabase.from('profiles').update({ push_token: token }).eq('id', userId);
     } catch (_) {}
   }

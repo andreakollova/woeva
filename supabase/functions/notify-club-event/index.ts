@@ -38,12 +38,14 @@ serve(async (req) => {
     }
 
     // Get approved members from ALL matching clubs (deduped), excluding the creator
+    // city filter: notify members who follow all cities (city IS NULL) or this specific city
     const { data: members } = await db
       .from('club_members')
-      .select('user_id')
+      .select('user_id, city')
       .in('club_id', clubIds)
       .eq('status', 'approved')
-      .neq('user_id', record.creator_id ?? '');
+      .neq('user_id', record.creator_id ?? '')
+      .or(`city.is.null,city.eq.${record.city ?? ''}`);
 
     if (!members || members.length === 0) {
       return new Response('no members', { status: 200 });
@@ -62,14 +64,14 @@ serve(async (req) => {
       'Community & Belonging': '🤝',
     };
     const emoji = categoryEmoji[record.category as string] ?? '🎉';
-    const pushTitle = `Nový event od ${clubName} ${emoji}`;
+    const pushTitle = `${clubName} zdieľa nový event!`;
 
     // In-app notifications
     const notifications = userIds.map((uid: string) => ({
       user_id: uid,
       type: 'club_event',
       title: pushTitle,
-      body: record.title,
+      body: `${record.title} ${emoji}`,
       data: { event_id: record.id },
     }));
     if (notifications.length > 0) {
@@ -100,7 +102,7 @@ serve(async (req) => {
         body: JSON.stringify({
           tokens,
           title: pushTitle,
-          body: record.title,
+          body: `${record.title} ${emoji}`,
           data: { event_id: record.id },
         }),
       });

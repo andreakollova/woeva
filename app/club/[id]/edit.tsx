@@ -17,6 +17,7 @@ import { uploadImage } from '@/lib/uploadImage';
 import { VenueInput } from '@/components/ui/VenueInput';
 import { useCategories } from '@/hooks/useCategories';
 import { useTranslations } from '@/context/LanguageContext';
+import { CATEGORY_SK } from '@/types';
 
 export default function ClubEditScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
@@ -314,13 +315,13 @@ export default function ClubEditScreen() {
                     }}
                     activeOpacity={0.7}
                   >
-                    <Text style={[styles.chipText, active && styles.chipTextActive]}>{cat}</Text>
+                    <Text style={[styles.chipText, active && styles.chipTextActive]}>{CATEGORY_SK[cat] ?? cat}</Text>
                   </TouchableOpacity>
                 );
               })}
             </View>
           </View>
-          <View style={{ gap: 8, paddingTop: 8, paddingBottom: insets.bottom + 24 }}>
+          <View style={{ gap: 8, paddingBottom: insets.bottom + 16 }}>
             <Button label={t.common.cancel} onPress={() => router.back()} variant="ghost" />
             <TouchableOpacity style={styles.deleteBtn} onPress={() => setShowDeleteModal(true)}>
               <Text style={styles.deleteBtnText}>{t.club.deleteClub}</Text>

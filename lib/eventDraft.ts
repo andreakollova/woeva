@@ -12,12 +12,14 @@ export const draft3: {
   isRecurring: boolean; recurringEndDate: Date | null;
   extraCovers: string[];
   hasCapacity: boolean; capacity: string;
+  hasRegistrationOpens: boolean; registrationOpensDate: Date | null; registrationOpensTime: Date | null;
 } = {
   date: null, time: null, endTime: null,
   venue: '', price: '0', payAtDoor: false,
   isRecurring: false, recurringEndDate: null,
   extraCovers: [],
   hasCapacity: false, capacity: '',
+  hasRegistrationOpens: false, registrationOpensDate: null, registrationOpensTime: null,
 };
 
 export function clearDrafts() {
@@ -29,4 +31,5 @@ export function clearDrafts() {
   draft3.isRecurring = false; draft3.recurringEndDate = null;
   draft3.extraCovers = [];
   draft3.hasCapacity = false; draft3.capacity = '';
+  draft3.hasRegistrationOpens = false; draft3.registrationOpensDate = null; draft3.registrationOpensTime = null;
 }

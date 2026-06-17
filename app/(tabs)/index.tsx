@@ -476,7 +476,11 @@ export default function HomeScreen() {
   function goToEvent(id: string) { router.push(`/event/${id}` as any); }
 
   // Derived sections
-  const isKino = (e: any) => e.title?.includes('LETNÉ KINO');
+  const isKino = (e: any) => {
+    const titleMatch = e.title?.toLowerCase().includes('letné kino') || e.title?.toLowerCase().includes('letne kino');
+    const tagMatch = Array.isArray(e.tags) && e.tags.some((t: string) => t?.toLowerCase().includes('letné kino') || t?.toLowerCase().includes('letne kino'));
+    return titleMatch || tagMatch;
+  };
   const kinoEvents = events.filter(isKino).slice(0, 10);
   const nonKinoEvents = events.filter((e: any) => !isKino(e));
   const heroEvents = nonKinoEvents.slice(0, 5);

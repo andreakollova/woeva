@@ -1,8 +1,9 @@
 import { BackButton } from '@/components/ui/BackButton';
-import React from 'react';
+import React, { useCallback } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, ScrollView, Alert } from 'react-native';
 import Svg, { Path, Rect, Circle, Line } from 'react-native-svg';
-import { useRouter } from 'expo-router';
+import { useRouter, useFocusEffect } from 'expo-router';
+import { setStatusBarStyle } from 'expo-status-bar';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Colors } from '@/constants/colors';
 import { Fonts } from '@/constants/fonts';
@@ -38,6 +39,7 @@ export default function SettingsScreen() {
   const insets = useSafeAreaInsets();
   const { signOut } = useAuth();
   const { t, lang, setLang } = useTranslations();
+  useFocusEffect(useCallback(() => { setStatusBarStyle('dark'); }, []));
 
   const SECTIONS = [
     {
@@ -126,10 +128,10 @@ export default function SettingsScreen() {
           <View style={styles.list}>
             <TouchableOpacity style={styles.row} onPress={handleSignOut} activeOpacity={0.6}>
               <View style={styles.rowLeft}>
-                <View style={[styles.rowIconWrap, styles.rowIconWrapRed]}>
-                  <Icon name="logout" color="#FF3B30" />
+                <View style={styles.rowIconWrap}>
+                  <Icon name="logout" color={Colors.black} />
                 </View>
-                <Text style={[styles.rowLabel, styles.rowLabelRed]}>{t.settings.signOut}</Text>
+                <Text style={styles.rowLabel}>{t.settings.signOut}</Text>
               </View>
             </TouchableOpacity>
             <TouchableOpacity style={[styles.row, styles.rowLast]} onPress={() => router.push('/settings/delete-account')} activeOpacity={0.6}>

@@ -45,33 +45,49 @@ async function buildPass(supabase: any, userId: string, event_id: string): Promi
 
   const venueLabel = [event.venue, event.city].filter(Boolean).join(', ');
 
-  const dateFormatted = event.date
-    ? new Date(event.date + 'T00:00:00').toLocaleDateString('sk-SK', {
-        weekday: 'long', day: 'numeric', month: 'long', year: 'numeric',
-      })
-    : null;
+  // Format date as YYYY-MM-DD regardless of how it comes from the DB
+  let dateValue = event.date as string | undefined;
+  if (dateValue) {
+    const d = new Date(dateValue);
+    if (!isNaN(d.getTime())) {
+      const y = d.getUTCFullYear();
+      const m = String(d.getUTCMonth() + 1).padStart(2, '0');
+      const day = String(d.getUTCDate()).padStart(2, '0');
+      dateValue = `${y}-${m}-${day}`;
+    }
+  }
 
-  const passJson = {
+  // Try to fetch event strip image
+  let stripBytes: Uint8Array | null = null;
+  if (event.image_url) {
+    try {
+      const imgRes = await fetch(event.image_url);
+      if (imgRes.ok) stripBytes = new Uint8Array(await imgRes.arrayBuffer());
+    } catch (_) { /* skip if unavailable */ }
+  }
+
+  const passJson: any = {
     formatVersion: 1,
     passTypeIdentifier: passTypeId,
     serialNumber: attendee.id,
     teamIdentifier: teamId,
     organizationName: 'Woeva',
     description: event.title,
-    foregroundColor: 'rgb(10, 10, 10)',
-    backgroundColor: 'rgb(201, 255, 71)',
-    labelColor: 'rgb(80, 80, 80)',
+    foregroundColor: 'rgb(255, 255, 255)',
+    backgroundColor: 'rgb(10, 10, 10)',
+    labelColor: 'rgb(150, 150, 150)',
     eventTicket: {
       headerFields: [
         ...(event.price > 0 ? [{ key: 'price', label: 'CENA', value: `€${Number(event.price).toFixed(2)}` }] : []),
       ],
-      primaryFields: [{ key: 'event', label: 'PODUJATIE', value: event.title }],
+      primaryFields: [{ key: 'event', label: 'EVENT', value: event.title }],
       secondaryFields: [
-        ...(dateFormatted ? [{ key: 'date', label: 'DATE', value: dateFormatted }] : []),
-        ...(event.time ? [{ key: 'time', label: 'TIME', value: event.time }] : []),
-        ...(venueLabel ? [{ key: 'venue', label: 'LOCATION', value: venueLabel }] : []),
+        ...(dateValue ? [{ key: 'date', label: 'DATE', value: dateValue }] : []),
+        ...(event.time ? [{ key: 'time', label: 'TIME', value: event.time, textAlignment: 'PKTextAlignmentRight' }] : []),
       ],
-      auxiliaryFields: [],
+      auxiliaryFields: [
+        ...(venueLabel ? [{ key: 'venue', label: 'VENUE', value: venueLabel }] : []),
+      ],
       backFields: [
         { key: 'ticketId', label: 'ID LÍSTKA', value: attendee.id },
         { key: 'holder', label: 'DRŽITEĽ LÍSTKA', value: '' },
@@ -89,13 +105,17 @@ async function buildPass(supabase: any, userId: string, event_id: string): Promi
   const iconBytes = b64ToBytes(ICON_B64);
   const icon2xBytes = b64ToBytes(ICON_2X_B64);
 
-  const manifest = {
+  const manifest: Record<string, string> = {
     'pass.json': sha1Hex(passJsonBytes),
     'logo.png': sha1Hex(logoBytes),
     'logo@2x.png': sha1Hex(logo2xBytes),
     'icon.png': sha1Hex(iconBytes),
     'icon@2x.png': sha1Hex(icon2xBytes),
   };
+  if (stripBytes) {
+    manifest['strip.png'] = sha1Hex(stripBytes);
+    manifest['strip@2x.png'] = sha1Hex(stripBytes);
+  }
   const manifestBytes = new TextEncoder().encode(JSON.stringify(manifest));
 
   const cert = forge.pki.certificateFromPem(Deno.env.get('PASS_CERT')!);
@@ -128,6 +148,10 @@ async function buildPass(supabase: any, userId: string, event_id: string): Promi
   zip.file('logo@2x.png', logo2xBytes);
   zip.file('icon.png', iconBytes);
   zip.file('icon@2x.png', icon2xBytes);
+  if (stripBytes) {
+    zip.file('strip.png', stripBytes);
+    zip.file('strip@2x.png', stripBytes);
+  }
 
   return await zip.generateAsync({ type: 'uint8array', compression: 'DEFLATE' });
 }

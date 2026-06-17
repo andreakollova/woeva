@@ -126,8 +126,8 @@ export default function BookedScreen() {
                 if (event.creator_id && user && event.creator_id !== user.id) {
                   supabase.from('notifications').insert({
                     user_id: event.creator_id, type: 'leave',
-                    title: `Someone left ${event.title}`,
-                    body: `${profile?.name ?? 'An attendee'} cancelled their spot.`,
+                    title: event.title,
+                    body: `${profile?.name ?? 'Účastník'} zrušil/a svoju účasť.`,
                     data: { event_id: event.id },
                   }).then(() => {});
                   notify.leftEvent({
@@ -184,7 +184,7 @@ export default function BookedScreen() {
 
   return (
     <View style={[styles.container, { paddingTop: insets.top }]}>
-      <StatusBar style="light" />
+      <StatusBar style="dark" />
       <View style={styles.topBar}>
         <TouchableOpacity onPress={() => router.push('/(tabs)')} activeOpacity={0.7}>
           <WMark size={90} color={Colors.lime} style={{ marginVertical: -10 }} />
@@ -284,7 +284,7 @@ function TicketCard({ event, userId, userAvatar, userName, isPast, onPress, onDe
   const locale = lang === 'sk' ? 'sk-SK' : 'en-US';
   const dayName = d.toLocaleDateString(locale, { weekday: 'long' }).replace(/^\w/, c => c.toUpperCase());
   const dateStr = `${d.getDate()} ${d.toLocaleDateString(locale, { month: 'long' })} ${d.getFullYear()}`;
-  const qrValue = `woeva:ticket:${event.attendee_id ?? event.id}:${userId}`;
+  const qrValue = `woeva:event:${event.id}:${userId}`;
   const isFree = event.is_free || event.price === 0;
   const priceLabel = isFree ? t.tickets.free : `€${event.price}`;
   const hostName: string | null = (event as any).club?.name ?? (event as any).creator?.name ?? null;
@@ -310,7 +310,7 @@ function TicketCard({ event, userId, userAvatar, userName, isPast, onPress, onDe
     setLoadingWallet(true);
     try {
       const { data: { session } } = await supabase.auth.getSession();
-      const passUrl = `https://woeva-oscar.vercel.app/api/wallet-pass?event_id=${event.id}&token=${session?.access_token}`;
+      const passUrl = `https://ticket.woeva.com/wallet?event_id=${event.id}&token=${encodeURIComponent(session?.access_token ?? '')}`;
       await Linking.openURL(passUrl);
     } catch (e: any) {
       Alert.alert('Error', e?.message || 'Could not open Wallet. Try again.');
@@ -334,22 +334,6 @@ function TicketCard({ event, userId, userAvatar, userName, isPast, onPress, onDe
             <View style={styles.optionsHandle} />
             <Text style={styles.optionsTitle}>{event.title}</Text>
 
-            {!isPast && onLeave && (
-              <TouchableOpacity style={[styles.optionsRow, styles.optionsRowDestructive]} onPress={() => { setOptionsModal(false); onLeave(); }} activeOpacity={0.7}>
-                <View style={[styles.optionsIconBox, { backgroundColor: '#FFF0F0' }]}>
-                  <Svg width={18} height={18} viewBox="0 0 24 24" fill="none">
-                    <Path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4" stroke="#FF3B30" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" />
-                    <Path d="M16 17l5-5-5-5" stroke="#FF3B30" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" />
-                    <Path d="M21 12H9" stroke="#FF3B30" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" />
-                  </Svg>
-                </View>
-                <View style={styles.optionsRowBody}>
-                  <Text style={[styles.optionsRowLabel, styles.optionsRowLabelDestructive]}>{t.tickets.leaveEvent}</Text>
-                  <Text style={styles.optionsRowSub}>{t.tickets.leaveEventSub}</Text>
-                </View>
-              </TouchableOpacity>
-            )}
-
             {event.venue ? (
               <TouchableOpacity style={styles.optionsRow} onPress={() => { setOptionsModal(false); handleDirections(); }} activeOpacity={0.7}>
                 <View style={styles.optionsIconBox}>
@@ -364,6 +348,22 @@ function TicketCard({ event, userId, userAvatar, userName, isPast, onPress, onDe
                 </View>
               </TouchableOpacity>
             ) : null}
+
+            {!isPast && onLeave && isFree && (
+              <TouchableOpacity style={styles.optionsRow} onPress={() => { setOptionsModal(false); onLeave(); }} activeOpacity={0.7}>
+                <View style={styles.optionsIconBox}>
+                  <Svg width={18} height={18} viewBox="0 0 24 24" fill="none">
+                    <Path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4" stroke={Colors.black} strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" />
+                    <Path d="M16 17l5-5-5-5" stroke={Colors.black} strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" />
+                    <Path d="M21 12H9" stroke={Colors.black} strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" />
+                  </Svg>
+                </View>
+                <View style={styles.optionsRowBody}>
+                  <Text style={styles.optionsRowLabel}>{t.tickets.leaveEvent}</Text>
+                  <Text style={styles.optionsRowSub}>{t.tickets.leaveEventSub}</Text>
+                </View>
+              </TouchableOpacity>
+            )}
 
           </View>
         </TouchableOpacity>

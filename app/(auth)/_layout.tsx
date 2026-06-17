@@ -1,7 +1,13 @@
-import { Stack } from 'expo-router';
-import { StatusBar } from 'expo-status-bar';
+import { Stack, useFocusEffect } from 'expo-router';
+import { StatusBar, setStatusBarStyle } from 'expo-status-bar';
+import { useCallback } from 'react';
 
 export default function AuthLayout() {
+  useFocusEffect(useCallback(() => {
+    setStatusBarStyle('dark');
+    return () => setStatusBarStyle('light');
+  }, []));
+
   return (
     <>
       <StatusBar style="dark" />

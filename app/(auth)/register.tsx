@@ -87,6 +87,23 @@ export default function RegisterScreen() {
       }
       return;
     }
+    // If identities is empty, email already exists but is unconfirmed — treat as existing user
+    if (!data.user?.identities?.length) {
+      const { data: signInData, error: signInError } = await supabase.auth.signInWithPassword({ email, password });
+      setLoading(false);
+      if (!signInError && signInData.user) {
+        const { data: existingProfile } = await supabase.from('profiles').select('interests').eq('id', signInData.user.id).single();
+        router.replace(!existingProfile?.interests?.length ? '/(auth)/profile-setup' : '/(tabs)');
+      } else {
+        setErrors({ email: t.auth.emailAlreadyRegistered });
+        Alert.alert(t.auth.accountExists, t.auth.accountExistsMsg, [
+          { text: t.auth.cancel, style: 'cancel' },
+          { text: t.auth.signInAction, onPress: () => router.replace('/(auth)/login') },
+        ]);
+      }
+      return;
+    }
+
     // Send email OTP for verification
     await supabase.auth.signInWithOtp({ email, options: { shouldCreateUser: false } });
     setLoading(false);

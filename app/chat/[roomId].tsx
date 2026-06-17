@@ -7,14 +7,13 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Colors } from '@/constants/colors';
 import { Fonts } from '@/constants/fonts';
 import { supabase } from '@/lib/supabase';
-import { containsBlockedContent } from '@/lib/moderation';
 import { Message } from '@/types';
 import { useAuth } from '@/context/AuthContext';
 import { useTranslations } from '@/context/LanguageContext';
 
 type ProfileCache = Record<string, { name: string; avatar_url: string | null }>;
 
-const QUICK_EMOJIS = ['☕', '👍', '🙌', '😂', '🏃', '🚀', '❤️'];
+const QUICK_EMOJIS = ['☕', '👍', '🙌', '😂', '🏃', '🚀', '❤️', '🔥', '🎉', '😍', '💪', '👏', '😎', '🥳', '✨'];
 
 export default function ChatScreen() {
   const { roomId } = useLocalSearchParams<{ roomId: string }>();
@@ -144,14 +143,6 @@ export default function ChatScreen() {
     const msg = (content ?? text).trim();
     if (!msg || !user) return;
 
-    if (containsBlockedContent(msg)) {
-      Alert.alert(
-        'Správa nebola odoslaná',
-        'Táto správa obsahuje nevhodný obsah a nemôže byť odoslaná.',
-        [{ text: 'OK' }]
-      );
-      return;
-    }
 
     if (!content) setText('');
 

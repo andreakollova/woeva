@@ -90,44 +90,12 @@ export default function ClubDetailScreen() {
   async function handleJoin() {
     if (!user) { router.push('/(auth)/login'); return; }
     setLoading(true);
-    await supabase.from('club_members').insert({ club_id: id, user_id: user.id, role: 'member', status: 'approved' });
+    await supabase.from('club_members').insert({ club_id: id, user_id: user.id, role: 'member', status: 'approved', city: profile?.city ?? null });
     await supabase.from('clubs').update({ member_count: (club?.member_count ?? 0) + 1 }).eq('id', id);
-    // Notify all club admins (creator + members with role='admin') except the joiner
-    {
-      const firstName = profile?.name?.split(' ')[0] ?? 'Niekto';
-      const notifTitle = `Nový člen: ${club?.name ?? ''}`;
-      const notifBody = `${firstName} začal/a sledovať tvoj klub.`;
-
-      // Collect admin user IDs: creator + approved admins
-      const adminIds = new Set<string>();
-      if (club?.creator_id && club.creator_id !== user.id) adminIds.add(club.creator_id);
-      const { data: adminMembers } = await supabase
-        .from('club_members')
-        .select('user_id')
-        .eq('club_id', id)
-        .eq('role', 'admin')
-        .eq('status', 'approved')
-        .neq('user_id', user.id);
-      (adminMembers ?? []).forEach((m: any) => adminIds.add(m.user_id));
-
-      if (adminIds.size > 0) {
-        const ids = [...adminIds];
-        // In-app notifications
-        await supabase.from('notifications').insert(
-          ids.map(uid => ({ user_id: uid, type: 'join', title: notifTitle, body: notifBody, data: { club_id: id } }))
-        );
-        // Push
-        const { data: adminProfiles } = await supabase
-          .from('profiles').select('push_token').in('id', ids)
-          .neq('notifications_enabled', false).not('push_token', 'is', null);
-        const tokens = (adminProfiles ?? []).map((p: any) => p.push_token).filter(Boolean);
-        if (tokens.length > 0) {
-          supabase.functions.invoke('send-push', {
-            body: { tokens, title: notifTitle, body: notifBody, data: { club_id: id, type: 'club_join' } },
-          }).then(() => {});
-        }
-      }
-    }
+    // Notify all club admins via server-side edge function (service role bypasses RLS)
+    supabase.functions.invoke('notify-creator', {
+      body: { type: 'club_join', clubId: id, attendeeName: profile?.name?.split(' ')[0] ?? 'Niekto' },
+    }).catch(() => {});
     setIsMember(true);
     setLoading(false);
     setShowJoinCelebration(true);
@@ -353,8 +321,7 @@ export default function ClubDetailScreen() {
             </TouchableOpacity>
             {!isAdmin && isMember && (
               <TouchableOpacity style={styles.memberStatusBadge} onPress={handleLeave} activeOpacity={0.8}>
-                <Text style={[styles.memberStatusText, { color: Colors.lime }]}>✓ </Text>
-                <Text style={styles.memberStatusText}>{lang === 'sk' ? 'Sledované' : 'Following'}</Text>
+                <Text style={styles.memberStatusText}>✓ {lang === 'sk' ? 'Sledované' : 'Following'}</Text>
               </TouchableOpacity>
             )}
             {!isAdmin && !isMember && user && (
@@ -386,7 +353,7 @@ export default function ClubDetailScreen() {
                 {events.map((event, i) => (
                   <Animated.View key={event.id} entering={FadeInDown.delay(i * 60)}>
                     <EventCard event={event} />
-                    {i < events.length - 1 && <View style={{ height: 10 }} />}
+                    {i < events.length - 1 && <View style={{ height: 4 }} />}
                   </Animated.View>
                 ))}
               </View>
@@ -512,8 +479,8 @@ const styles = StyleSheet.create({
 
   // Members bubbles row
   membersBubbleRow: { flexDirection: 'row', alignItems: 'center', marginBottom: 4, gap: 10 },
-  memberStatusBadge: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 12, paddingVertical: 6, borderRadius: 50, borderWidth: 1.5, borderColor: '#16A34A' },
-  memberStatusText: { fontSize: 13, fontWeight: '700', color: '#16A34A', fontFamily: Fonts.bold },
+  memberStatusBadge: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 12, paddingVertical: 6, borderRadius: 50, borderWidth: 1.5, borderColor: Colors.black },
+  memberStatusText: { fontSize: 13, fontWeight: '700', color: Colors.black, fontFamily: Fonts.bold },
   memberJoinBtn: { paddingHorizontal: 14, paddingVertical: 7, borderRadius: 50, backgroundColor: Colors.black },
   memberJoinText: { fontSize: 13, fontWeight: '700', color: Colors.white, fontFamily: Fonts.bold },
   memberBubble: {
