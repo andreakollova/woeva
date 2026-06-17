@@ -1,10 +1,9 @@
 import React, { useEffect, useState } from 'react';
 import {
   View, Text, StyleSheet, ScrollView, TouchableOpacity,
-  KeyboardAvoidingView, Platform, Alert, Image, TextInput, Modal, ActivityIndicator,
+  KeyboardAvoidingView, Platform, Alert, Image, TextInput,
 } from 'react-native';
-import { useLocalSearchParams, useRouter, useNavigation } from 'expo-router';
-import { StackActions } from '@react-navigation/native';
+import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import * as ImagePicker from 'expo-image-picker';
 import { Colors } from '@/constants/colors';
@@ -23,7 +22,6 @@ export default function ClubEditScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const insets = useSafeAreaInsets();
   const router = useRouter();
-  const navigation = useNavigation();
   const { t } = useTranslations();
   const { categories } = useCategories();
 
@@ -41,9 +39,6 @@ export default function ClubEditScreen() {
   const [orig, setOrig] = useState({ name: '', tagline: '', description: '', tags: [] as string[], address: '' });
   const [showCategories, setShowCategories] = useState(false);
   const [loading, setLoading] = useState(false);
-  const [showDeleteModal, setShowDeleteModal] = useState(false);
-  const [deleting, setDeleting] = useState(false);
-
   useEffect(() => {
     supabase.from('clubs').select('name, tagline, description, category, tags, cover_url, logo_url, address, lat, lng').eq('id', id).single()
       .then(({ data }) => {
@@ -128,113 +123,12 @@ export default function ClubEditScreen() {
     router.back();
   }
 
-  async function confirmDelete() {
-    setDeleting(true);
-
-    // 1. Get ALL events for this club (past + upcoming)
-    const { data: allEvents } = await supabase
-      .from('events')
-      .select('id, title, date')
-      .eq('club_id', id);
-
-    const allEventIds = (allEvents ?? []).map(e => e.id);
-
-    if (allEventIds.length > 0) {
-      // 2. Notify attendees of upcoming events
-      const now = new Date().toISOString().slice(0, 10);
-      const upcomingEvents = (allEvents ?? []).filter(e => e.date >= now);
-      const upcomingIds = upcomingEvents.map(e => e.id);
-
-      if (upcomingIds.length > 0) {
-        const { data: attendees } = await supabase
-          .from('event_attendees')
-          .select('user_id, event_id')
-          .in('event_id', upcomingIds);
-
-        if (attendees && attendees.length > 0) {
-          const eventTitles: Record<string, string> = {};
-          upcomingEvents.forEach(e => { eventTitles[e.id] = e.title; });
-          await supabase.from('notifications').insert(
-            attendees.map(a => ({
-              user_id: a.user_id,
-              type: 'event_cancelled',
-              title: `Klub bol vymazaný: ${name}`,
-              body: `Tvoja rezervácia na "${eventTitles[a.event_id] ?? 'event'}" bola zrušená.`,
-              data: { event_id: a.event_id },
-              read: false,
-            }))
-          );
-        }
-      }
-
-      // 3. Delete event_attendees for all club events
-      await supabase.from('event_attendees').delete().in('event_id', allEventIds);
-
-      // 4. Delete messages (chat) for all club events
-      await supabase.from('messages').delete().in('room_id', allEventIds);
-
-      // 5. Delete the events themselves
-      await supabase.from('events').delete().eq('club_id', id);
-    }
-
-    // 6. Delete club members
-    await supabase.from('club_members').delete().eq('club_id', id);
-
-    // 7. Delete the club
-    await supabase.from('clubs').delete().eq('id', id);
-
-    setDeleting(false);
-    setShowDeleteModal(false);
-    navigation.dispatch(StackActions.pop(2));
-  }
-
   const coverSource = cover ?? existingCoverUrl;
   const logoSource = logo ?? existingLogoUrl;
   const initial = name.charAt(0).toUpperCase() || '?';
 
   return (
     <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
-      <Modal visible={showDeleteModal} animationType="slide" transparent onRequestClose={() => setShowDeleteModal(false)}>
-        <View style={styles.modalOverlay}>
-          <View
-            style={styles.deleteSheet}
-            onStartShouldSetResponder={() => true}
-            onMoveShouldSetResponder={(_, { dy }) => dy > 5}
-            onResponderRelease={(_, { dy }) => { if (dy > 60) setShowDeleteModal(false); }}
-          >
-            <View style={styles.deleteSheetHandle} />
-            <View style={styles.deleteWarningIcon}>
-              <Text style={styles.deleteWarningEmoji}>⚠️</Text>
-            </View>
-            <Text style={styles.deleteSheetTitle}>{t.club.deleteTitle(name)}</Text>
-            <Text style={styles.deleteSheetBody}>
-              {t.club.deleteBodyIntro}{'\n\n'}{t.club.deleteBody}
-            </Text>
-            <View style={styles.deleteSheetActions}>
-              {deleting
-                ? <ActivityIndicator color={Colors.black} style={{ marginVertical: 16 }} />
-                : <>
-                    <TouchableOpacity style={styles.deleteConfirmBtn} onPress={() => {
-                      Alert.alert(
-                        t.club.deleteWarning,
-                        t.club.deleteLastWarning(name),
-                        [
-                          { text: t.club.noKeepIt, style: 'cancel' },
-                          { text: t.club.deleteForever, style: 'destructive', onPress: confirmDelete },
-                        ]
-                      );
-                    }}>
-                      <Text style={styles.deleteConfirmText}>{t.club.yesDeleteClub}</Text>
-                    </TouchableOpacity>
-                    <TouchableOpacity style={styles.deleteCancelBtn} onPress={() => setShowDeleteModal(false)}>
-                      <Text style={styles.deleteCancelText}>{t.club.keepClub}</Text>
-                    </TouchableOpacity>
-                  </>
-              }
-            </View>
-          </View>
-        </View>
-      </Modal>
       <ScrollView
         style={styles.container}
         contentContainerStyle={[styles.scroll, { paddingTop: insets.top + 16, paddingBottom: insets.bottom + 100 }]}
@@ -328,9 +222,6 @@ export default function ClubEditScreen() {
           </View>
           <View style={{ gap: 8, paddingBottom: insets.bottom + 16 }}>
             <Button label={t.common.cancel} onPress={() => router.back()} variant="ghost" />
-            <TouchableOpacity style={styles.deleteBtn} onPress={() => setShowDeleteModal(true)}>
-              <Text style={styles.deleteBtnText}>{t.club.deleteClub}</Text>
-            </TouchableOpacity>
           </View>
         </View>
       </ScrollView>
@@ -379,20 +270,6 @@ const styles = StyleSheet.create({
   coverPreview: { width: '100%', height: '100%' },
   coverEmpty: { flex: 1, alignItems: 'center', justifyContent: 'center', gap: 4 },
   coverHint: { fontSize: 11, color: Colors.gray },
-  deleteBtn: { alignItems: 'center', paddingVertical: 10 },
-  deleteBtnText: { fontSize: 14, fontWeight: '600', color: '#CC3333' },
-  modalOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'flex-end' },
-  deleteSheet: { backgroundColor: Colors.white, borderTopLeftRadius: 28, borderTopRightRadius: 28, padding: 24, paddingBottom: 40, gap: 12 },
-  deleteSheetHandle: { width: 36, height: 4, borderRadius: 2, backgroundColor: Colors.grayBorder, alignSelf: 'center', marginBottom: 8 },
-  deleteWarningIcon: { alignSelf: 'center', marginBottom: 4 },
-  deleteWarningEmoji: { fontSize: 40 },
-  deleteSheetTitle: { fontSize: 20, fontWeight: '800', color: Colors.black, fontFamily: Fonts.bold, textAlign: 'center' },
-  deleteSheetBody: { fontSize: 14, color: '#555', fontFamily: Fonts.regular, lineHeight: 22, textAlign: 'left', backgroundColor: '#FFF5F5', borderRadius: 12, padding: 16 },
-  deleteSheetActions: { gap: 10, marginTop: 4 },
-  deleteConfirmBtn: { backgroundColor: '#CC3333', borderRadius: 14, paddingVertical: 15, alignItems: 'center' },
-  deleteConfirmText: { fontSize: 15, fontWeight: '700', color: Colors.white, fontFamily: Fonts.bold },
-  deleteCancelBtn: { backgroundColor: Colors.grayLight, borderRadius: 14, paddingVertical: 15, alignItems: 'center' },
-  deleteCancelText: { fontSize: 15, fontWeight: '600', color: Colors.black, fontFamily: Fonts.semibold },
   stickyFooter: {
     position: 'absolute', bottom: 0, left: 0, right: 0,
     paddingHorizontal: 24, paddingTop: 12,
