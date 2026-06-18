@@ -107,15 +107,16 @@ export default function ClubDetailScreen() {
         const clubIds = (siblingClubs ?? []).map((c: any) => c.id as string);
         const ids = clubIds.length > 0 ? clubIds : [id as string];
 
+        const evSel = '*, club:clubs(id, name, cover_url), attendees:event_attendees(profile:profiles(id,name,avatar_url))';
         const [{ data: byClub }, { data: byCity }] = await Promise.all([
           supabase.from('events')
-            .select('*, club:clubs(id, name, cover_url)')
+            .select(evSel)
             .in('club_id', ids)
             .gte('date', today)
             .order('date', { ascending: true })
             .limit(20),
           supabase.from('events')
-            .select('*, club:clubs(id, name, cover_url)')
+            .select(evSel)
             .ilike('city', `%${clubCity}%`)
             .not('source', 'is', null)
             .gte('date', today)
@@ -132,7 +133,7 @@ export default function ClubDetailScreen() {
           .slice(0, 20);
       } else {
         const { data } = await supabase.from('events')
-          .select('*, club:clubs(id, name, cover_url)')
+          .select('*, club:clubs(id, name, cover_url), attendees:event_attendees(profile:profiles(id,name,avatar_url))')
           .eq('club_id', id)
           .gte('date', today)
           .order('date', { ascending: true })
