@@ -476,8 +476,8 @@ export default function DashboardScreen() {
     setInviteQuery(q);
     if (q.trim().length < 2) { setInviteResults([]); return; }
     const term = q.trim();
-    const { data } = await supabase.from('profiles').select('id, name, avatar_url, email')
-      .or(`email.ilike.%${term}%,name.ilike.%${term}%`)
+    const { data } = await supabase.from('profiles').select('id, name, avatar_url')
+      .ilike('name', `%${term}%`)
       .neq('id', user!.id)
       .limit(8);
     // exclude already-admins

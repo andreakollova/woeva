@@ -83,7 +83,7 @@ export default function ClubSettingsScreen() {
   async function searchInvite(q: string) {
     setInviteQuery(q);
     if (q.trim().length < 2) { setInviteResults([]); return; }
-    const { data } = await supabase.from('profiles').select('id, name, avatar_url, email').or(`name.ilike.%${q.trim()}%,email.ilike.%${q.trim()}%`).neq('id', user!.id).limit(6);
+    const { data } = await supabase.from('profiles').select('id, name, avatar_url').or(`name.ilike.%${q.trim()}%`).neq('id', user!.id).limit(6);
     const existingIds = new Set(admins.map(a => a.user_id));
     setInviteResults(((data ?? []) as any[]).filter(r => !existingIds.has(r.id)));
   }
@@ -162,6 +162,21 @@ export default function ClubSettingsScreen() {
   async function confirmDelete() {
     if (!club) return;
     setDeleting(true);
+
+    // Notify co-admins that club is being deleted
+    const coAdmins = admins.filter(a => a.user_id !== club.creator_id);
+    if (coAdmins.length > 0) {
+      await supabase.from('notifications').insert(
+        coAdmins.map(a => ({
+          user_id: a.user_id,
+          type: 'club_deleted',
+          title: `Klub bol vymazaný: ${club.name}`,
+          body: 'Vlastník vymazal klub. Tvoje admin práva zanikli.',
+          data: { club_id: id },
+          read: false,
+        }))
+      );
+    }
 
     const { data: allEvents } = await supabase.from('events').select('id, title, date').eq('club_id', id);
     const allEventIds = (allEvents ?? []).map(e => e.id);
