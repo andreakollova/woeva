@@ -1051,7 +1051,7 @@ export default function DashboardScreen() {
   if (loading) {
     return (
       <View style={[s.container, { paddingTop: insets.top }]}>
-        <View style={s.topBar}><BackButton /><Text style={s.pageTitle}>{t.dashboard.dashboard}</Text><View style={{ width: 36 }} /></View>
+        <View style={[s.topBar, { paddingHorizontal: 20 }]}><BackButton /><Text style={s.pageTitle}>{t.dashboard.dashboard}</Text><View style={{ width: 36 }} /></View>
         <ActivityIndicator style={{ marginTop: 80 }} color={Colors.black} />
       </View>
     );
