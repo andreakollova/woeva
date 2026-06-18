@@ -7,7 +7,7 @@ import { Fonts } from '@/constants/fonts';
 import { Event } from '@/types';
 import { useAuth } from '@/context/AuthContext';
 import { useTranslations } from '@/context/LanguageContext';
-import { formatVenue } from '@/lib/formatVenue';
+import { formatVenue, clubDisplayName } from '@/lib/formatVenue';
 
 interface EventCardProps {
   event: Event;
@@ -32,7 +32,7 @@ export function EventCard({ event, featured, attending }: EventCardProps) {
   const isPayAtDoor = !!(event as any).pay_at_door;
   const isFree = !isPayAtDoor && (event.is_free || event.price === 0);
   const priceLabel = isPayAtDoor ? `€${event.price} ${lang === 'sk' ? 'na mieste' : 'at door'}` : (isFree ? t.event.freeLabel : `€${event.price}`);
-  const clubName = event.club?.name ?? (event as any).creator?.name ?? null;
+  const clubName = clubDisplayName(event.club?.name) || (event as any).creator?.name || null;
   // Use attendees length as fallback if going_count is stale/0
   const goingCount = Math.max(event.going_count ?? 0, event.attendees?.length ?? 0, attending ? 1 : 0);
 

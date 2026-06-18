@@ -299,7 +299,7 @@ function ClubCard({ club, onPress }: { club: any; onPress: () => void }) {
         : <View style={[klS.logo, { backgroundColor: Colors.lime, alignItems:'center', justifyContent:'center' }]}>
             <Text style={{ fontWeight:'800', fontSize:18, color:Colors.black }}>{(club.name ?? '?').charAt(0)}</Text>
           </View>}
-      <Text style={klS.name} numberOfLines={2}>{clubDisplayName(club.name)}</Text>
+      <Text style={klS.name} numberOfLines={1}>{clubDisplayName(club.name)}</Text>
     </TouchableOpacity>
   );
 }
@@ -957,7 +957,7 @@ const cS = StyleSheet.create({
 const klS = StyleSheet.create({
   card: { alignItems:'center', width:72, gap:6 },
   logo: { width:60, height:60, borderRadius:16, backgroundColor:Colors.grayLight },
-  name: { fontSize:11, color:Colors.black, fontFamily:Fonts.regular, textAlign:'center', fontWeight:'500' },
+  name: { fontSize:10, color:Colors.black, fontFamily:Fonts.regular, textAlign:'center', fontWeight:'500' },
 });
 
 const styles = StyleSheet.create({

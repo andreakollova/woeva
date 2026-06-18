@@ -13,7 +13,8 @@ export function clubDisplayName(name: string | null | undefined): string {
  * into readable "Rybničná 5944/7A"
  * Handles Slovak address numbers: 5944/7A, 10/A, 123B etc. (start with a digit)
  */
-export function formatVenue(venue: string): string {
+export function formatVenue(venue: string | null | undefined): string {
+  if (!venue) return '';
   const parts = venue.split(',').map(p => p.trim()).filter(Boolean);
   if (parts.length === 1) return parts[0];
 
