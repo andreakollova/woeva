@@ -380,13 +380,22 @@ export default function DashboardScreen() {
     onStartShouldSetPanResponderCapture: () => false,
     // Capture phase: intercept downward swipe only when list is scrolled to the top
     onMoveShouldSetPanResponderCapture: (_, { dy, dx }) =>
-      attendeesListOffset.current <= 0 && dy > 10 && Math.abs(dy) > Math.abs(dx),
+      attendeesListOffset.current <= 0 && dy > 5 && Math.abs(dy) > Math.abs(dx),
     onMoveShouldSetPanResponder: (_, { dy, dx }) =>
-      attendeesListOffset.current <= 0 && dy > 10 && Math.abs(dy) > Math.abs(dx),
+      attendeesListOffset.current <= 0 && dy > 5 && Math.abs(dy) > Math.abs(dx),
     onPanResponderMove: (_, { dy }) => { if (dy > 0) attendeesSheetY.setValue(dy); },
     onPanResponderRelease: (_, { dy, vy }) => {
       if (dy > 80 || vy > 0.8) { sheetClose(attendeesSheetY, () => setAttendeesEvent(null)); }
       else { sheetSnap(attendeesSheetY); }
+    },
+  })).current;
+  // Dedicated handle pan — starts immediately so the drag pill always works
+  const attendeesHandlePan = useRef(PanResponder.create({
+    onStartShouldSetPanResponder: () => true,
+    onPanResponderMove: (_, { dy }) => { if (dy > 0) attendeesSheetY.setValue(dy); },
+    onPanResponderRelease: (_, { dy, vy }) => {
+      if (dy > 80 || vy > 0.8) sheetClose(attendeesSheetY, () => setAttendeesEvent(null));
+      else sheetSnap(attendeesSheetY);
     },
   })).current;
 
@@ -1219,7 +1228,7 @@ export default function DashboardScreen() {
           <View style={{ flex: 1, justifyContent: 'flex-end' }}>
             <Pressable style={[StyleSheet.absoluteFill, { backgroundColor: 'rgba(0,0,0,0.5)' }]} onPress={closeAttendees} />
             <RNAnimated.View style={[s.attendeesSheet, { paddingBottom: insets.bottom + 16, transform: [{ translateY: attendeesSheetY }] }]} {...attendeesPan.panHandlers}>
-              <View style={{ paddingTop: 12, paddingBottom: 16, alignItems: 'center' }}><View style={s.billingSheetHandle} /></View>
+              <View {...attendeesHandlePan.panHandlers} style={{ paddingTop: 12, paddingBottom: 16, alignItems: 'center' }}><View style={s.billingSheetHandle} /></View>
               <View style={{ flexDirection: 'row', alignItems: 'flex-start', justifyContent: 'space-between', marginBottom: 4 }}>
                 <View style={{ flex: 1, marginRight: 12 }}>
                   <Text style={s.billingSheetTitle}>{attendeesEvent?.title}</Text>
@@ -1234,6 +1243,8 @@ export default function DashboardScreen() {
                       data={[...attendees].sort((a, b) => (b.id === user?.id ? 1 : 0) - (a.id === user?.id ? 1 : 0))}
                       keyExtractor={i => i.id}
                       style={{ marginTop: 4 }}
+                      onScroll={e => { attendeesListOffset.current = e.nativeEvent.contentOffset.y; }}
+                      scrollEventThrottle={16}
                       renderItem={({ item, index }) => {
                         const isIn = checkedIn[attendeesEvent?.id ?? '']?.has(item.id);
                         const isMe = item.id === user?.id;
@@ -2256,7 +2267,7 @@ export default function DashboardScreen() {
           <Pressable style={[StyleSheet.absoluteFill, { backgroundColor: 'rgba(0,0,0,0.5)' }]} onPress={closeAttendees} />
           <RNAnimated.View style={[s.attendeesSheet, { paddingBottom: insets.bottom + 16, transform: [{ translateY: attendeesSheetY }] }]} {...attendeesPan.panHandlers}>
             {/* Handle */}
-            <View style={{ paddingTop: 12, paddingBottom: 16, alignItems: 'center' }}>
+            <View {...attendeesHandlePan.panHandlers} style={{ paddingTop: 12, paddingBottom: 16, alignItems: 'center' }}>
               <View style={s.billingSheetHandle} />
             </View>
             {/* Title — full width */}
@@ -2722,8 +2733,8 @@ const s = StyleSheet.create({
 
   // Attendees modal
   attendeesSheet: { backgroundColor: Colors.white, borderTopLeftRadius: 28, borderTopRightRadius: 28, paddingHorizontal: 24, paddingTop: 0, maxHeight: '85%', flex: 1 },
-  attendeeRow: { flexDirection: 'row', alignItems: 'center', gap: 10, paddingVertical: 11, marginLeft: -4 },
-  attendeeIndex: { fontSize: 12, color: Colors.gray, fontFamily: Fonts.regular, width: 18, textAlign: 'left' },
+  attendeeRow: { flexDirection: 'row', alignItems: 'center', gap: 10, paddingVertical: 11 },
+  attendeeIndex: { fontSize: 12, color: Colors.gray, fontFamily: Fonts.regular, width: 20, textAlign: 'right' },
   exportBtn: { flexDirection: 'row', alignItems: 'center', gap: 5, backgroundColor: Colors.grayLight, borderRadius: 20, paddingHorizontal: 12, paddingVertical: 7 },
   exportBtnText: { fontSize: 12, fontWeight: '700', color: Colors.black, fontFamily: Fonts.bold },
   attendeeAvatar: { width: 40, height: 40, borderRadius: 20, backgroundColor: Colors.lime, alignItems: 'center', justifyContent: 'center', overflow: 'hidden' },
