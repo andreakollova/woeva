@@ -350,7 +350,7 @@ export default function DashboardScreen() {
   const [clubAdmins, setClubAdmins] = useState<{ user_id: string; name: string; avatar_url: string | null }[]>([]);
   const [notifJoin, setNotifJoin] = useState(true);
   const [notifLeave, setNotifLeave] = useState(true);
-  const [notifChat, setNotifChat] = useState(false);
+  const [notifChat, setNotifChat] = useState(profile?.notif_chat ?? true);
 
   // Invite admin
   const [showInviteAdmin, setShowInviteAdmin] = useState(false);
@@ -1887,7 +1887,7 @@ export default function DashboardScreen() {
                   }
                 </View>
               ))}
-              <TouchableOpacity style={s.settingsRow} onPress={() => { setShowInviteAdmin(true); }} activeOpacity={0.7}>
+              <TouchableOpacity style={s.settingsRow} onPress={() => { closeClubSettings(); setTimeout(() => setShowInviteAdmin(true), 280); }} activeOpacity={0.7}>
                 <Text style={[s.settingsRowLabel, { color: Colors.black, fontWeight: '600' }]}>{t.dashboard.inviteAdminPlus}</Text>
               </TouchableOpacity>
             </View>
@@ -1898,7 +1898,11 @@ export default function DashboardScreen() {
               {[
                 { label: t.dashboard.someoneJoins, val: notifJoin, set: setNotifJoin },
                 { label: t.dashboard.someoneLeaves, val: notifLeave, set: setNotifLeave },
-                { label: t.dashboard.newChatMessages, val: notifChat, set: setNotifChat },
+                { label: t.dashboard.newChatMessages, val: notifChat, set: (v: boolean | ((prev: boolean) => boolean)) => {
+                    const next = typeof v === 'function' ? v(notifChat) : v;
+                    setNotifChat(next);
+                    if (user) supabase.from('profiles').update({ notif_chat: next }).eq('id', user.id);
+                  }},
               ].map(item => (
                 <View key={item.label} style={s.settingsToggleRow}>
                   <Text style={s.settingsRowLabel}>{item.label}</Text>

@@ -177,7 +177,7 @@ export default function ProfileScreen() {
                   }
                   <View style={{ flex: 1 }}>
                     <Text style={styles.rowTitle} numberOfLines={1}>{clubDisplayName(club.name)}</Text>
-                    {club.category ? <Text style={styles.rowSub}>{club.category}</Text> : null}
+                    {club.category ? <Text style={styles.rowSub}>{lang === 'sk' ? (CATEGORY_SK[club.category] ?? club.category) : club.category}</Text> : null}
                   </View>
                   <ChevronIcon />
                 </TouchableOpacity>

@@ -40,7 +40,7 @@ serve(async (req) => {
       if (!cityClub) return new Response(`skip: no Woeva Picks club for city ${city}`, { status: 200 });
 
       clubIds = [cityClub.id];
-      clubName = cityClub.name;
+      clubName = cityClub.name?.toLowerCase().startsWith('woeva picks') ? 'Woeva Picks' : cityClub.name;
     } else if (record.club_id) {
       // ── User-created club event ───────────────────────────────────────────────
       const { data: club } = await db.from('clubs').select('name').eq('id', record.club_id).single();
