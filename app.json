@@ -19,7 +19,7 @@
       "config": {
         "googleMapsApiKey": "AIzaSyDhtj5z-Us7Ic01tHuaJxC_mLTZPG3moj0"
       },
-      "buildNumber": "40",
+      "buildNumber": "41",
       "entitlements": {
         "com.apple.developer.in-app-payments": [
           "merchant.com.woeva.app"
