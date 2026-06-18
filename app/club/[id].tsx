@@ -83,26 +83,30 @@ export default function ClubDetailScreen() {
   );
 
   async function loadAll() {
-    const [{ data: clubData }, { data: membersData }] = await Promise.all([
-      supabase.from('clubs').select('*').eq('id', id).single(),
-      supabase.from('club_members').select('*, profile:profiles(name, avatar_url)').eq('club_id', id).eq('status', 'approved'),
-    ]);
+    try {
+      const [{ data: clubData }, { data: membersData }] = await Promise.all([
+        supabase.from('clubs').select('*').eq('id', id).single(),
+        supabase.from('club_members').select('*, profile:profiles(name, avatar_url)').eq('club_id', id).eq('status', 'approved'),
+      ]);
 
-    const today = new Date().toISOString().slice(0, 10);
-    const clubCity = clubData?.city;
-    const base = supabase.from('events').select('*, club:clubs(id, name, cover_url)')
-      .eq('club_id', id).gte('date', today);
-    const { data: eventsData } = await (clubCity ? base.ilike('city', `%${clubCity}%`) : base)
-      .order('date', { ascending: true }).limit(100);
+      const today = new Date().toISOString().slice(0, 10);
+      const clubCity = clubData?.city;
+      const base = supabase.from('events').select('*, club:clubs(id, name, cover_url)')
+        .eq('club_id', id).gte('date', today);
+      const { data: eventsData } = await (clubCity ? base.ilike('city', `%${clubCity}%`) : base)
+        .order('date', { ascending: true }).limit(50);
 
-    setClub(clubData);
-    setMembers(membersData ?? []);
-    setEvents(eventsData ?? []);
+      setClub(clubData);
+      setMembers(membersData ?? []);
+      setEvents((eventsData ?? []).filter((e: any) => e?.id && e?.date));
 
-    if (user) {
-      const me = (membersData ?? []).find((m: ClubMember) => m.user_id === user.id);
-      setIsMember(!!me);
-      setIsAdmin(me?.role === 'admin');
+      if (user) {
+        const me = (membersData ?? []).find((m: ClubMember) => m.user_id === user.id);
+        setIsMember(!!me);
+        setIsAdmin(me?.role === 'admin');
+      }
+    } catch (err) {
+      console.error('Club loadAll error:', err);
     }
   }
 
@@ -154,7 +158,7 @@ export default function ClubDetailScreen() {
 
   if (!club) return <View style={{ flex: 1, backgroundColor: Colors.white }} />;
 
-  const initial = club.name.charAt(0).toUpperCase();
+  const initial = (club.name ?? '?').charAt(0).toUpperCase();
   const visibleMembers = members.slice(0, 4);
   const memberCount = members.length || club.member_count || 0;
 

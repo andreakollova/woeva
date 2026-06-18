@@ -475,7 +475,15 @@ export default function HomeScreen() {
       const scoreB = (b.member_count ?? 0) + Math.random() * 6;
       return scoreB - scoreA;
     });
-    setClubs(sortedClubs);
+    // Deduplicate clubs with the same display name (e.g. "Woeva Picks BA" + "Woeva Picks" both show as "Woeva Picks")
+    const seenNames = new Set<string>();
+    const dedupedClubs = sortedClubs.filter((c: any) => {
+      const dn = clubDisplayName(c.name) || c.name || '';
+      if (seenNames.has(dn)) return false;
+      seenNames.add(dn);
+      return true;
+    });
+    setClubs(dedupedClubs);
 
     if (user) {
       const { data: att } = await supabase
