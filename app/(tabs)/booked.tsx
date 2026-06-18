@@ -123,7 +123,7 @@ export default function BookedScreen() {
                 await supabase.from('event_attendees').delete().eq('id', event.attendee_id!);
                 cancelEventReminders(event.id).catch(() => {});
                 setEvents(prev => prev.filter(e => e.id !== event.id));
-                if (event.creator_id && user && event.creator_id !== user.id) {
+                if (event.creator_id) {
                   supabase.from('notifications').insert({
                     user_id: event.creator_id, type: 'leave',
                     title: event.title,
@@ -136,6 +136,8 @@ export default function BookedScreen() {
                     attendeeName: profile?.name ?? 'An attendee',
                     eventTitle: event.title,
                     eventId: event.id,
+                    clubId: (event as any).club_id ?? undefined,
+                    leavingUserId: user?.id,
                   });
                 }
               },

@@ -32,11 +32,11 @@ async function getProfile(userId: string): Promise<{ email: string | null; push_
   return data ? { name: data.name ?? '', push_token: data.push_token ?? null, email: data.email ?? null } : null;
 }
 
-async function getProfilesForUsers(userIds: string[]): Promise<{ id: string; name: string; push_token: string | null }[]> {
+async function getProfilesForUsers(userIds: string[]): Promise<{ id: string; name: string; push_token: string | null; email: string | null }[]> {
   if (!userIds.length) return [];
   const { data } = await supabase
     .from('profiles')
-    .select('id, name, push_token')
+    .select('id, name, push_token, email')
     .in('id', userIds);
   return (data ?? []) as any[];
 }
@@ -74,18 +74,40 @@ export const notify = {
     ]);
   },
 
-  /** User left an event — notify creator */
+  /** User left an event — notify creator and club admins */
   async leftEvent(params: {
     creatorId: string;
     creatorEmail: string;
     attendeeName: string;
     eventTitle: string;
     eventId: string;
+    clubId?: string;
+    leavingUserId?: string;
   }) {
-    const creator = await getProfile(params.creatorId);
+    // Collect all recipients: creator + club admins (deduped)
+    const recipientIds = new Set<string>();
+    recipientIds.add(params.creatorId);
+
+    if (params.clubId) {
+      const { data: admins } = await supabase
+        .from('club_members')
+        .select('user_id')
+        .eq('club_id', params.clubId)
+        .eq('role', 'admin')
+        .eq('status', 'approved');
+      (admins ?? []).forEach((a: any) => recipientIds.add(a.user_id));
+    }
+
+    // Exclude the person who is leaving
+    if (params.leavingUserId) recipientIds.delete(params.leavingUserId);
+
+    const profiles = await getProfilesForUsers(Array.from(recipientIds));
+    const tokens = profiles.map(p => p.push_token).filter(Boolean) as string[];
+    const emails = profiles.map(p => (p as any).email).filter(Boolean) as string[];
+
     await Promise.all([
-      creator?.push_token && sendPush([creator.push_token], params.eventTitle, `${params.attendeeName} zrušil/a svoju účasť.`, { event_id: params.eventId }),
-      creator?.email && sendEmail(creator.email, `Attendee cancelled — ${params.eventTitle}`,
+      tokens.length && sendPush(tokens, params.eventTitle, `${params.attendeeName} zrušil/a svoju účasť.`, { event_id: params.eventId }),
+      emails.length && sendEmail(emails, `Attendee cancelled — ${params.eventTitle}`,
         emailTemplates.leftEvent({ attendeeName: params.attendeeName, eventTitle: params.eventTitle })
       ),
     ]);
