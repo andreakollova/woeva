@@ -29,6 +29,21 @@ serve(async (req) => {
     console.log('discord-activity-notify body:', JSON.stringify(body));
 
     // Direct call (e.g. from delete-account) — has a `type` field at root
+    if (body.type === 'category_request') {
+      const { category_name, club_name, user_name } = body;
+      await sendEmbed({
+        title: '🏷️ Požiadavka na novú kategóriu',
+        color: 0x6366F1,
+        fields: [
+          { name: 'Kategória', value: category_name ?? '—', inline: false },
+          ...(club_name ? [{ name: 'Klub', value: club_name, inline: true }] : []),
+          { name: 'Používateľ', value: user_name ?? '—', inline: true },
+        ],
+        timestamp: new Date().toISOString(),
+      });
+      return new Response('ok');
+    }
+
     if (body.type === 'co_admin_delete_attempt') {
       const { admin_name, club_name, creator_name } = body;
       await sendEmbed({

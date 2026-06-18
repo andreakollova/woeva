@@ -91,11 +91,20 @@ export default function CreateStep2Screen() {
 
   async function handleCategoryRequest() {
     if (!catRequestName.trim()) return;
-    await supabase.from('category_requests').insert({
-      category_name: catRequestName.trim(),
-      club_name: catRequestClub.trim() || null,
-      user_id: user?.id ?? null,
-    });
+    const [, profileRes] = await Promise.all([
+      supabase.from('category_requests').insert({
+        category_name: catRequestName.trim(),
+        club_name: catRequestClub.trim() || null,
+        user_id: user?.id ?? null,
+      }),
+      user?.id ? supabase.from('profiles').select('name').eq('id', user.id).single() : Promise.resolve({ data: null }),
+    ]);
+    const userName = (profileRes as any)?.data?.name ?? user?.email ?? '—';
+    fetch(`${process.env.EXPO_PUBLIC_SUPABASE_URL}/functions/v1/discord-activity-notify`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY}` },
+      body: JSON.stringify({ type: 'category_request', category_name: catRequestName.trim(), club_name: catRequestClub.trim() || null, user_name: userName }),
+    }).catch(() => {});
     setCatRequestSent(true);
   }
 
