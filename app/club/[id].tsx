@@ -113,14 +113,14 @@ export default function ClubDetailScreen() {
             .in('club_id', ids)
             .gte('date', today)
             .order('date', { ascending: true })
-            .limit(50),
+            .limit(20),
           supabase.from('events')
             .select('*, club:clubs(id, name, cover_url)')
             .ilike('city', `%${clubCity}%`)
             .not('source', 'is', null)
             .gte('date', today)
             .order('date', { ascending: true })
-            .limit(50),
+            .limit(20),
         ]);
 
         // Merge + deduplicate + sort
@@ -129,7 +129,7 @@ export default function ClubDetailScreen() {
         eventsData = merged
           .filter(e => { if (seen.has(e.id)) return false; seen.add(e.id); return true; })
           .sort((a, b) => (a.date ?? '').localeCompare(b.date ?? ''))
-          .slice(0, 50);
+          .slice(0, 20);
       } else {
         const { data } = await supabase.from('events')
           .select('*, club:clubs(id, name, cover_url)')
@@ -436,10 +436,10 @@ export default function ClubDetailScreen() {
               <Text style={styles.sectionTitle}>{t.club.upcomingEvents}</Text>
               <View style={styles.eventsList}>
                 {events.map((event, i) => (
-                  <Animated.View key={event.id} entering={FadeInDown.delay(i * 60)}>
+                  <View key={event.id}>
                     <EventCard event={event} />
                     {i < events.length - 1 && <View style={{ height: 4 }} />}
-                  </Animated.View>
+                  </View>
                 ))}
               </View>
             </>
