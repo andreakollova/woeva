@@ -522,6 +522,34 @@ export default function DashboardScreen() {
     Alert.alert('Koordinátor pridaný', profileName);
   }
 
+  async function shareCoordFromAttendees() {
+    if (!attendeesEvent || !user) return;
+    const clubId = attendeesEvent.club_id;
+    if (!clubId) return;
+    const clubName = clubs.find(c => c.id === clubId)?.name ?? '';
+    try {
+      const { data: myProfile } = await supabase.from('profiles').select('name').eq('id', user.id).single();
+      const { data } = await supabase.from('pending_invites').insert({
+        club_id: clubId,
+        role: 'coordinator',
+        event_id: null,
+        invited_by: user.id,
+        club_name: clubName,
+        inviter_name: myProfile?.name ?? '',
+      }).select('token').single();
+      if (!data?.token) throw new Error('no token');
+      const url = `https://woeva.com/invite?token=${data.token}`;
+      await Share.share({
+        message: lang === 'sk'
+          ? `${myProfile?.name ?? 'Niekto'} ťa pozýva ako koordinátora pre klub "${clubName}" vo Woeva. Prijmi pozvánku: ${url}`
+          : `${myProfile?.name ?? 'Someone'} invited you as a coordinator for "${clubName}" on Woeva: ${url}`,
+        url,
+      });
+    } catch {
+      Alert.alert(lang === 'sk' ? 'Chyba' : 'Error', lang === 'sk' ? 'Nepodarilo sa vytvoriť pozvánku.' : 'Failed to create invite.');
+    }
+  }
+
   async function searchInvite(q: string) {
     setInviteQuery(q);
     if (q.trim().length < 2) { setInviteResults([]); return; }
@@ -2293,7 +2321,7 @@ export default function DashboardScreen() {
               <>
                 <View style={{ height: 1, backgroundColor: Colors.grayLight, marginTop: 8 }} />
                 <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingVertical: 14 }}>
-                  <TouchableOpacity onPress={openCoordInvite} style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }} activeOpacity={0.7}>
+                  <TouchableOpacity onPress={shareCoordFromAttendees} style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }} activeOpacity={0.7}>
                     <View style={{ width: 28, height: 28, borderRadius: 14, backgroundColor: Colors.grayLight, alignItems: 'center', justifyContent: 'center' }}>
                       <Svg width={14} height={14} viewBox="0 0 24 24" fill="none">
                         <Path d="M12 5v14M5 12h14" stroke={Colors.black} strokeWidth={2} strokeLinecap="round" />
