@@ -92,20 +92,57 @@ export default function ClubDetailScreen() {
       const today = new Date().toISOString().slice(0, 10);
       const clubCity = clubData?.city;
       const WOEVA_ADMIN = 'ceeafc86-7da8-442d-ac22-2e06ce363973';
-      const isWoevaClub = clubData?.creator_id === WOEVA_ADMIN && clubCity;
+      const isWoevaClub = clubData?.creator_id === WOEVA_ADMIN
+        && clubCity
+        && (clubData?.name ?? '').startsWith('Woeva Picks');
 
-      let evQuery = supabase.from('events').select('*, club:clubs(id, name, cover_url)').gte('date', today);
+      let eventsData: any[] = [];
       if (isWoevaClub) {
-        // Woeva Picks: show events explicitly assigned to this club OR any event by Woeva admin for this city
-        evQuery = evQuery.or(`club_id.eq.${id},and(creator_id.eq.${WOEVA_ADMIN},city.ilike.*${clubCity}*)`);
+        // Woeva Picks: get events from all sibling city clubs (Woeva Picks tool events)
+        // AND scraped events by city (source IS NOT NULL, may not have club_id yet)
+        const { data: siblingClubs } = await supabase.from('clubs')
+          .select('id')
+          .eq('creator_id', WOEVA_ADMIN)
+          .ilike('city', `%${clubCity}%`);
+        const clubIds = (siblingClubs ?? []).map((c: any) => c.id as string);
+        const ids = clubIds.length > 0 ? clubIds : [id as string];
+
+        const [{ data: byClub }, { data: byCity }] = await Promise.all([
+          supabase.from('events')
+            .select('*, club:clubs(id, name, cover_url)')
+            .in('club_id', ids)
+            .gte('date', today)
+            .order('date', { ascending: true })
+            .limit(50),
+          supabase.from('events')
+            .select('*, club:clubs(id, name, cover_url)')
+            .ilike('city', `%${clubCity}%`)
+            .not('source', 'is', null)
+            .gte('date', today)
+            .order('date', { ascending: true })
+            .limit(50),
+        ]);
+
+        // Merge + deduplicate + sort
+        const merged = [...(byClub ?? []), ...(byCity ?? [])];
+        const seen = new Set<string>();
+        eventsData = merged
+          .filter(e => { if (seen.has(e.id)) return false; seen.add(e.id); return true; })
+          .sort((a, b) => a.date.localeCompare(b.date))
+          .slice(0, 50);
       } else {
-        evQuery = evQuery.eq('club_id', id);
+        const { data } = await supabase.from('events')
+          .select('*, club:clubs(id, name, cover_url)')
+          .eq('club_id', id)
+          .gte('date', today)
+          .order('date', { ascending: true })
+          .limit(50);
+        eventsData = data ?? [];
       }
-      const { data: eventsData } = await evQuery.order('date', { ascending: true }).limit(50);
 
       setClub(clubData);
       setMembers(membersData ?? []);
-      setEvents((eventsData ?? []).filter((e: any) => e?.id && e?.date));
+      setEvents(eventsData.filter((e: any) => e?.id && e?.date));
 
       if (user) {
         const me = (membersData ?? []).find((m: ClubMember) => m.user_id === user.id);
