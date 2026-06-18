@@ -373,8 +373,8 @@ export default function DashboardScreen() {
 
   const clubSettingsSheetY = useRef(new RNAnimated.Value(600)).current;
   const clubSettingsPan = useRef(PanResponder.create({
-    onStartShouldSetPanResponder: () => true,
-    onMoveShouldSetPanResponder: () => true,
+    onStartShouldSetPanResponder: () => false,
+    onMoveShouldSetPanResponder: (_, { dy, dx }) => dy > 8 && Math.abs(dy) > Math.abs(dx),
     onPanResponderMove: (_, { dy }) => { if (dy > 0) clubSettingsSheetY.setValue(dy); },
     onPanResponderRelease: (_, { dy, vy }) => {
       if (dy > 80 || vy > 0.8) {
@@ -1860,11 +1860,8 @@ export default function DashboardScreen() {
       <Modal visible={showClubSettings} transparent animationType="none" onRequestClose={closeClubSettings}>
         <View style={{ flex: 1, justifyContent: 'flex-end' }}>
           <Pressable style={[StyleSheet.absoluteFill, { backgroundColor: 'rgba(0,0,0,0.5)' }]} onPress={closeClubSettings} />
-          <RNAnimated.View style={[s.attendeesSheet, { paddingBottom: insets.bottom + 24, transform: [{ translateY: clubSettingsSheetY }] }]}>
-            <View
-              {...clubSettingsPan.panHandlers}
-              style={{ paddingTop: 12, paddingBottom: 16, alignItems: 'center' }}
-            >
+          <RNAnimated.View style={[s.attendeesSheet, { paddingBottom: insets.bottom + 24, transform: [{ translateY: clubSettingsSheetY }] }]} {...clubSettingsPan.panHandlers}>
+            <View style={{ paddingTop: 12, paddingBottom: 16, alignItems: 'center' }}>
               <View style={s.billingSheetHandle} />
             </View>
             <Text style={s.billingSheetTitle}>{t.dashboard.clubSettings}</Text>
