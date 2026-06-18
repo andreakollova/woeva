@@ -1041,7 +1041,7 @@ export default function DashboardScreen() {
           }
           <Text style={s.pageTitle} pointerEvents="none">{activeTab === 'scan' ? t.dashboard.scanQR : t.dashboard.dashboard}</Text>
           <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
-            {clubs.some(c => c.creator_id === user?.id) && activeTab !== 'scan' && (
+            {clubs.length > 0 && activeTab !== 'scan' && (
               <TouchableOpacity style={s.bellBtn} onPress={() => { const club = selectedClub ?? clubs[0]; if (club) router.push(`/club/${club.id}/settings` as any); }}>
                 <Svg width={20} height={20} viewBox="0 0 24 24" fill="none">
                   <Path d="M12 15a3 3 0 1 0 0-6 3 3 0 0 0 0 6z" stroke={Colors.black} strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round" />

@@ -227,7 +227,7 @@ export default function ClubSettingsScreen() {
                     {!a.avatar_url && <Text style={styles.adminInitial}>{(a.name || '?').charAt(0).toUpperCase()}</Text>}
                   </View>
                   <Text style={[styles.rowLabel, { flex: 1 }]}>{a.name.split(' ')[0]}</Text>
-                  {a.user_id === user?.id
+                  {a.user_id === club?.creator_id
                     ? <Text style={styles.ownerBadge}>{lang === 'sk' ? 'Vlastník' : 'Owner'}</Text>
                     : <TouchableOpacity onPress={() => removeAdmin(a.user_id)} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
                         <Text style={styles.removeText}>{lang === 'sk' ? 'Odstrániť' : 'Remove'}</Text>
