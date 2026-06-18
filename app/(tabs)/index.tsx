@@ -166,7 +166,7 @@ function CarouselCard({ event, attending, onPress, lang, userProfile, sharpCorne
           : <View style={[cS.img, { backgroundColor: Colors.grayLight }, imgTopOverride]} />}
         {catLabel ? (
           <View style={[cS.catPill, attending && { backgroundColor: Colors.lime }]}>
-            <Text style={[cS.catPillText, attending && { color: Colors.black }]}>{catLabel.charAt(0).toUpperCase() + catLabel.slice(1).toLowerCase()}</Text>
+            <Text style={[cS.catPillText, attending && { color: Colors.black }]}>{catLabel}</Text>
           </View>
         ) : null}
         {attending ? <View style={cS.goingDot}><Text style={cS.goingDotText}>✓</Text></View> : null}
@@ -231,7 +231,7 @@ function SquareCard({ event, attending, onPress, lang, sharpCorner }: { event: a
         </View>
         {catLabel ? (
           <View style={[sqS.catPill, attending && { backgroundColor: Colors.lime }]}>
-            <Text style={[sqS.catPillText, attending && { color: Colors.black }]}>{catLabel.charAt(0).toUpperCase() + catLabel.slice(1).toLowerCase()}</Text>
+            <Text style={[sqS.catPillText, attending && { color: Colors.black }]}>{catLabel}</Text>
           </View>
         ) : null}
         {attending ? <View style={sqS.goingDot}><Text style={sqS.goingDotText}>✓</Text></View> : null}
@@ -511,7 +511,8 @@ export default function HomeScreen() {
   const isKino = (e: any) => {
     const titleMatch = e.title?.toLowerCase().includes('letné kino') || e.title?.toLowerCase().includes('letne kino');
     const tagMatch = Array.isArray(e.tags) && e.tags.some((t: string) => t?.toLowerCase().includes('letné kino') || t?.toLowerCase().includes('letne kino'));
-    return titleMatch || tagMatch;
+    const taglineMatch = e.tagline?.toLowerCase().includes('letné kino') || e.tagline?.toLowerCase().includes('letne kino');
+    return titleMatch || tagMatch || taglineMatch;
   };
   const kinoEvents = events.filter(isKino).slice(0, 10);
   const nonKinoEvents = events.filter((e: any) => !isKino(e));
@@ -753,7 +754,7 @@ export default function HomeScreen() {
         {!loading && kinoEvents.length > 0 && (
           <View style={styles.section}>
             <SectionHeader title="🎬 Letné kino" />
-            <EventCarousel events={kinoEvents} attendingIds={attendingIds} onPress={goToEvent} lang={lang} userProfile={profile} sharpCorner="topLeft" forcedTag="Letné kino" />
+            <EventCarousel events={kinoEvents} attendingIds={attendingIds} onPress={goToEvent} lang={lang} userProfile={profile} sharpCorner="topLeft" forcedTag="LETNÉ KINO" />
           </View>
         )}
 
