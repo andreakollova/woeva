@@ -525,6 +525,7 @@ export default function EventDetailScreen() {
         scrollEventThrottle={16}
         contentContainerStyle={{ paddingBottom: insets.bottom + 110 }}
         showsVerticalScrollIndicator={false}
+        bounces={false}
       >
         {/* ── Cover with parallax ── */}
         <View style={[s.coverWrap, { height: COVER_HEIGHT }]}>
@@ -850,7 +851,7 @@ export default function EventDetailScreen() {
 
 const s = StyleSheet.create({
   outerWrap: { flex: 1, backgroundColor: Colors.black },
-  container: { flex: 1, backgroundColor: Colors.black },
+  container: { flex: 1, backgroundColor: Colors.white },
 
   // Cover
   coverWrap: { overflow: 'hidden', backgroundColor: '#111' },

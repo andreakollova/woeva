@@ -242,6 +242,7 @@ export default function ClubDetailScreen() {
       <ScrollView
         contentContainerStyle={{ paddingBottom: insets.bottom + 120 }}
         showsVerticalScrollIndicator={false}
+        bounces={false}
       >
         {/* Cover */}
         <View style={styles.cover}>
@@ -467,7 +468,7 @@ const manageStyles = StyleSheet.create({
 });
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: Colors.black },
+  container: { flex: 1, backgroundColor: Colors.white },
 
   // Cover
   cover: { height: COVER_HEIGHT, position: 'relative' },
