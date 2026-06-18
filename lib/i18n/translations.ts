@@ -616,7 +616,7 @@ export const translations = {
     // ── About ─────────────────────────────────────────────────────
     about: {
       about: 'About',
-      appTagline: 'Developed by DRIXTON s.r.o. | AK, NF',
+      appTagline: 'Developed by DRIXTON s.r.o. | AK NF',
       privacyPolicy: 'Privacy Policy',
       termsOfService: 'Terms of Service',
       contactUs: 'Contact us',
@@ -1272,7 +1272,7 @@ export const translations = {
 
     about: {
       about: 'O aplikácii',
-      appTagline: 'Developed by DRIXTON s.r.o. | AK, NF',
+      appTagline: 'Developed by DRIXTON s.r.o. | AK NF',
       privacyPolicy: 'Zásady ochrany súkromia',
       termsOfService: 'Podmienky používania',
       contactUs: 'Kontaktovať nás',
