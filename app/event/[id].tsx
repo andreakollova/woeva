@@ -750,25 +750,25 @@ export default function EventDetailScreen() {
           {/* ── Chat ── */}
           <View style={s.hairline} />
           <TouchableOpacity
-            style={[s.chatRow, !isAttending && { opacity: 0.4 }]}
-            onPress={() => { if (!isAttending) return; setUnreadCount(0); router.push(`/chat/${id}`); }}
-            activeOpacity={isAttending ? 0.7 : 1}
+            style={[s.chatRow, !isAttending && !isCreator && { opacity: 0.4 }]}
+            onPress={() => { if (!isAttending && !isCreator) return; setUnreadCount(0); router.push(`/chat/${id}`); }}
+            activeOpacity={isAttending || isCreator ? 0.7 : 1}
           >
-            <View style={[s.chatIconBox, !isAttending && { backgroundColor: Colors.grayLight }]}>
+            <View style={[s.chatIconBox, !isAttending && !isCreator && { backgroundColor: Colors.grayLight }]}>
               <Svg width={15} height={15} viewBox="0 0 24 24" fill="none">
-                <Path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" stroke={isAttending ? Colors.black : Colors.gray} strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" />
+                <Path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" stroke={isAttending || isCreator ? Colors.black : Colors.gray} strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" />
               </Svg>
             </View>
             <View style={{ flex: 1 }}>
-              <Text style={[s.chatLabel, !isAttending && { color: Colors.gray }]}>{t.chat.groupChat}</Text>
+              <Text style={[s.chatLabel, !isAttending && !isCreator && { color: Colors.gray }]}>{t.chat.groupChat}</Text>
               <Text style={s.chatSub}>
-                {isAttending
+                {isAttending || isCreator
                   ? (unreadCount > 0 ? t.event.newMessages(unreadCount) : t.event.chatTapToOpen)
                   : t.event.chatJoinToUnlock}
               </Text>
             </View>
-            {isAttending && unreadCount > 0 && <View style={s.unreadBadge}><Text style={s.unreadBadgeText}>{unreadCount > 99 ? '99+' : unreadCount}</Text></View>}
-            {isAttending && <Svg width={14} height={14} viewBox="0 0 24 24" fill="none">
+            {(isAttending || isCreator) && unreadCount > 0 && <View style={s.unreadBadge}><Text style={s.unreadBadgeText}>{unreadCount > 99 ? '99+' : unreadCount}</Text></View>}
+            {(isAttending || isCreator) && <Svg width={14} height={14} viewBox="0 0 24 24" fill="none">
               <Path d="M9 18l6-6-6-6" stroke={Colors.gray} strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" />
             </Svg>}
           </TouchableOpacity>

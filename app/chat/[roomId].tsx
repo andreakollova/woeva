@@ -206,7 +206,6 @@ export default function ChatScreen() {
         .select('push_token, muted_chats')
         .in('id', adminIdList)
         .neq('id', user.id)
-        .neq('notifications_enabled', false)
         .not('push_token', 'is', null);
 
       const adminTokens = (adminProfiles ?? [])
