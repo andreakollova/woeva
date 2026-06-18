@@ -11,6 +11,7 @@ import { supabase } from '@/lib/supabase';
 import { useAuth } from '@/context/AuthContext';
 import { useTranslations } from '@/context/LanguageContext';
 import { CATEGORY_SK, CATEGORY_EN } from '@/types';
+import { clubDisplayName } from '@/lib/formatVenue';
 
 function ChevronIcon() {
   return (
@@ -175,7 +176,7 @@ export default function ProfileScreen() {
                       </View>
                   }
                   <View style={{ flex: 1 }}>
-                    <Text style={styles.rowTitle} numberOfLines={1}>{club.name}</Text>
+                    <Text style={styles.rowTitle} numberOfLines={1}>{clubDisplayName(club.name)}</Text>
                     {club.category ? <Text style={styles.rowSub}>{club.category}</Text> : null}
                   </View>
                   <ChevronIcon />

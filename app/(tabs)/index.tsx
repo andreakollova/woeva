@@ -22,6 +22,7 @@ import { Event, CATEGORY_SK } from '@/types';
 import { useAuth } from '@/context/AuthContext';
 import { useTranslations } from '@/context/LanguageContext';
 import { expandRecurringEvents } from '@/lib/expandRecurring';
+import { clubDisplayName } from '@/lib/formatVenue';
 
 const { width: SW } = Dimensions.get('window');
 const HERO_W = SW - 40;
@@ -298,7 +299,7 @@ function ClubCard({ club, onPress }: { club: any; onPress: () => void }) {
         : <View style={[klS.logo, { backgroundColor: Colors.lime, alignItems:'center', justifyContent:'center' }]}>
             <Text style={{ fontWeight:'800', fontSize:18, color:Colors.black }}>{(club.name ?? '?').charAt(0)}</Text>
           </View>}
-      <Text style={klS.name} numberOfLines={2}>{club.name}</Text>
+      <Text style={klS.name} numberOfLines={2}>{clubDisplayName(club.name)}</Text>
     </TouchableOpacity>
   );
 }

@@ -23,7 +23,7 @@ import { useAuth } from '@/context/AuthContext';
 import { notify } from '@/lib/notify';
 import { scheduleEventReminders } from '@/lib/scheduleReminders';
 import { useTranslations } from '@/context/LanguageContext';
-import { formatVenue } from '@/lib/formatVenue';
+import { formatVenue, clubDisplayName } from '@/lib/formatVenue';
 
 const { height: SCREEN_H } = Dimensions.get('window');
 const COVER_HEIGHT = Math.round(SCREEN_H * 0.48);
@@ -321,7 +321,7 @@ export default function EventDetailScreen() {
   const eventEnd = new Date(eventStart.getTime() + eventDurationH * 60 * 60 * 1000);
   const eventPast = eventStart < new Date();
   const eventOver = eventEnd < new Date();
-  const hostName = event.club?.name ?? creator?.name ?? '';
+  const hostName = clubDisplayName(event.club?.name) || creator?.name || '';
   const hostInitial = hostName.charAt(0).toUpperCase();
   // Use DB going_count minus bot adjustment as source of truth
   const goingCount = Math.max((event.going_count ?? 0) - botGoingAdjust, attendees.length);

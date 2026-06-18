@@ -1,4 +1,14 @@
 /**
+ * Returns the display name for a club.
+ * "Woeva Picks KE", "Woeva Picks BA", etc. → "Woeva Picks"
+ */
+export function clubDisplayName(name: string | null | undefined): string {
+  if (!name) return '';
+  if (name.toLowerCase().startsWith('woeva picks')) return 'Woeva Picks';
+  return name;
+}
+
+/**
  * Cleans geocoded venue strings like "5944/7A, Rybničná, Bratislava"
  * into readable "Rybničná 5944/7A"
  * Handles Slovak address numbers: 5944/7A, 10/A, 123B etc. (start with a digit)

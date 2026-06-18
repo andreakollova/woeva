@@ -6,6 +6,7 @@ import { BackButton } from '@/components/ui/BackButton';
 import { Colors } from '@/constants/colors';
 import { Fonts } from '@/constants/fonts';
 import { supabase } from '@/lib/supabase';
+import { clubDisplayName } from '@/lib/formatVenue';
 
 export default function AllClubsScreen() {
   const insets = useSafeAreaInsets();
@@ -76,7 +77,7 @@ function ClubRow({ club, onPress }: { club: any; onPress: () => void }) {
           : <Text style={styles.logoInitial}>{club.name?.charAt(0) ?? '?'}</Text>}
       </View>
       <View style={{ flex: 1 }}>
-        <Text style={styles.name} numberOfLines={1}>{club.name}</Text>
+        <Text style={styles.name} numberOfLines={1}>{clubDisplayName(club.name)}</Text>
         <Text style={styles.meta} numberOfLines={1}>
           {club.city ? `${club.city}` : ''}{club.member_count ? `  ·  ${club.member_count} členov` : ''}
         </Text>

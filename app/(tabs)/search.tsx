@@ -10,6 +10,7 @@ import Animated, { FadeInDown, FadeIn } from 'react-native-reanimated';
 import Svg, { Path, Line, Circle } from 'react-native-svg';
 import { Colors } from '@/constants/colors';
 import { supabase } from '@/lib/supabase';
+import { clubDisplayName } from '@/lib/formatVenue';
 import { Event, Club } from '@/types';
 import { EventCard } from '@/components/ui/EventCard';
 import { Button } from '@/components/ui/Button';
@@ -415,7 +416,7 @@ export default function SearchScreen() {
                     <TouchableOpacity style={styles.clubRow} onPress={() => router.push(`/club/${club.id}`)} activeOpacity={0.8}>
                       <View style={styles.clubRowDot} />
                       <View style={{ flex: 1 }}>
-                        <Text style={styles.clubRowName}>{club.name}</Text>
+                        <Text style={styles.clubRowName}>{clubDisplayName(club.name)}</Text>
                         {club.tagline ? <Text style={styles.clubRowTagline}>{club.tagline}</Text> : null}
                       </View>
                       <Text style={styles.clubRowMembers}>{club.member_count} členov</Text>

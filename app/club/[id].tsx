@@ -16,6 +16,7 @@ import { BackButton } from '@/components/ui/BackButton';
 import { useAuth } from '@/context/AuthContext';
 import { useTranslations } from '@/context/LanguageContext';
 import { notify } from '@/lib/notify';
+import { clubDisplayName } from '@/lib/formatVenue';
 
 const COVER_HEIGHT = 260;
 const AVATAR_SIZE = 30;
@@ -274,7 +275,7 @@ export default function ClubDetailScreen() {
 
           {/* Club name + tagline + tags */}
           <View style={styles.clubNameRow}>
-            <Text style={styles.clubName}>{club.name}</Text>
+            <Text style={styles.clubName}>{clubDisplayName(club.name)}</Text>
             <TouchableOpacity
               style={styles.clubShareBtn}
               onPress={() => Share.share({ url: `https://woeva.com/share-club?id=${id}` })}

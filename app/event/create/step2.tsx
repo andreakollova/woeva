@@ -13,6 +13,7 @@ import { Input } from '@/components/ui/Input';
 import { Button } from '@/components/ui/Button';
 import { useCategories } from '@/hooks/useCategories';
 import { supabase } from '@/lib/supabase';
+import { clubDisplayName } from '@/lib/formatVenue';
 import { useAuth } from '@/context/AuthContext';
 import { useTranslations } from '@/context/LanguageContext';
 import { CATEGORY_SK, CATEGORY_EN } from '@/types';
@@ -165,7 +166,7 @@ export default function CreateStep2Screen() {
                       }
                     </View>
                     <View style={{ flex: 1 }}>
-                      <Text style={[styles.postAsTitle, active && styles.postAsTitleActive]}>{club.name}</Text>
+                      <Text style={[styles.postAsTitle, active && styles.postAsTitleActive]}>{clubDisplayName(club.name)}</Text>
                       <Text style={[styles.postAsSub, active && styles.postAsSubActive]}>{t.event.myClub}</Text>
                     </View>
                     <View style={[styles.postAsRadio, active && styles.postAsRadioActive]}>
