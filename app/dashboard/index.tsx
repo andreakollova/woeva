@@ -2225,76 +2225,85 @@ export default function DashboardScreen() {
             <View style={{ paddingTop: 12, paddingBottom: 16, alignItems: 'center' }}>
               <View style={s.billingSheetHandle} />
             </View>
-            {/* Header row */}
-            <View style={{ flexDirection: 'row', alignItems: 'flex-start', justifyContent: 'space-between', marginBottom: 4, paddingHorizontal: 0 }}>
-              <View style={{ flex: 1, marginRight: 12 }}>
-                <Text style={s.billingSheetTitle}>{attendeesEvent?.title}</Text>
-                <Text style={s.listSub}>
-                  {(() => { const n = attendeesEvent ? (attendeesEvent.is_free ? realGoing(attendeesEvent, user!.id) : attendeesEvent.paid_count) : 0; return `${n} ${goingLabel(n, lang)}`; })()}
-                </Text>
-              </View>
-              {attendees.length > 0 && (
-                <TouchableOpacity style={s.exportBtn} onPress={exportAttendeesPdf} activeOpacity={0.7}>
-                  <Svg width={14} height={14} viewBox="0 0 24 24" fill="none">
-                    <Path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" stroke={Colors.black} strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" />
-                    <Path d="M7 10l5 5 5-5M12 15V3" stroke={Colors.black} strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" />
-                  </Svg>
-                  <Text style={s.exportBtnText}>PDF</Text>
-                </TouchableOpacity>
-              )}
-            </View>
+            {/* Title — full width */}
+            <Text style={s.billingSheetTitle}>{attendeesEvent?.title}</Text>
+
             {loadingAttendees
               ? <ActivityIndicator color={Colors.black} style={{ marginTop: 24 }} />
               : <>
-                  <Text style={{ fontSize: 13, fontFamily: Fonts.medium, color: Colors.gray, marginTop: 12, marginBottom: 2, marginLeft: 2 }}>Účastníci</Text>
+                  {/* Divider + Účastníci row */}
+                  <View style={{ height: 1, backgroundColor: Colors.grayLight, marginTop: 14, marginBottom: 10 }} />
+                  <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8 }}>
+                    <Text style={{ fontSize: 13, fontFamily: Fonts.medium, color: Colors.gray }}>Účastníci</Text>
+                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 5 }}>
+                      <View style={{ width: 6, height: 6, borderRadius: 3, backgroundColor: Colors.black }} />
+                      <Text style={{ fontSize: 13, fontFamily: Fonts.medium, color: Colors.black }}>
+                        {(() => { const n = attendeesEvent ? (attendeesEvent.is_free ? realGoing(attendeesEvent, user!.id) : attendeesEvent.paid_count) : 0; return `${n} ${goingLabel(n, lang)}`; })()}
+                      </Text>
+                    </View>
+                  </View>
                   <FlatList
-                  data={[...attendees].sort((a, b) => (b.id === user?.id ? 1 : 0) - (a.id === user?.id ? 1 : 0))}
-                  keyExtractor={i => i.id}
-                  style={{ marginTop: 4 }}
-                  renderItem={({ item, index }) => {
-                    const isIn = checkedIn[attendeesEvent?.id ?? '']?.has(item.id);
-                    const isMe = item.id === user?.id;
-                    return (
-                      <View style={s.attendeeRow}>
-                        <Text style={s.attendeeIndex}>{index + 1}</Text>
-                        <View style={s.attendeeAvatar}>
-                          {item.avatar_url ? <Image source={{ uri: item.avatar_url }} style={StyleSheet.absoluteFill as any} /> : null}
-                          {!item.avatar_url && <Text style={s.attendeeInitial}>{(item.name || '?').charAt(0).toUpperCase()}</Text>}
+                    data={[...attendees].sort((a, b) => (b.id === user?.id ? 1 : 0) - (a.id === user?.id ? 1 : 0))}
+                    keyExtractor={i => i.id}
+                    renderItem={({ item, index }) => {
+                      const isIn = checkedIn[attendeesEvent?.id ?? '']?.has(item.id);
+                      const isMe = item.id === user?.id;
+                      return (
+                        <View style={s.attendeeRow}>
+                          <Text style={s.attendeeIndex}>{index + 1}</Text>
+                          <View style={s.attendeeAvatar}>
+                            {item.avatar_url ? <Image source={{ uri: item.avatar_url }} style={StyleSheet.absoluteFill as any} /> : null}
+                            {!item.avatar_url && <Text style={s.attendeeInitial}>{(item.name || '?').charAt(0).toUpperCase()}</Text>}
+                          </View>
+                          <Text style={[s.attendeeName, { flex: 1 }]}>{(item.name || '').split(' ')[0]}</Text>
+                          {isMe
+                            ? <View style={s.meBadge}><Text style={s.meBadgeText}>ja</Text></View>
+                            : isIn
+                              ? <TouchableOpacity style={s.checkedInBadge} activeOpacity={0.7} onPress={() => {
+                                  Alert.alert(t.dashboard.checkedIn, t.dashboard.undoCheckInConfirm ?? 'Zrušiť potvrdenie príchodu?', [
+                                    { text: t.auth.cancel, style: 'cancel' },
+                                    { text: 'Zrušiť', style: 'destructive', onPress: () => unmarkCheckedIn(attendeesEvent!.id, item.id) },
+                                  ]);
+                                }}>
+                                  <Text style={s.checkedInBadgeText}>{t.dashboard.checkedIn}</Text>
+                                </TouchableOpacity>
+                              : <TouchableOpacity style={s.checkInBtn} onPress={() => markCheckedIn(attendeesEvent!.id, item.id)} activeOpacity={0.7}>
+                                  <Text style={s.checkInBtnText}>{t.dashboard.checkIn}</Text>
+                                </TouchableOpacity>
+                          }
                         </View>
-                        <Text style={[s.attendeeName, { flex: 1 }]}>{(item.name || '').split(' ')[0]}</Text>
-                        {isMe
-                          ? <View style={s.meBadge}><Text style={s.meBadgeText}>ja</Text></View>
-                          : isIn
-                            ? <TouchableOpacity style={s.checkedInBadge} activeOpacity={0.7} onPress={() => {
-                                Alert.alert(t.dashboard.checkedIn, t.dashboard.undoCheckInConfirm ?? 'Zrušiť potvrdenie príchodu?', [
-                                  { text: t.auth.cancel, style: 'cancel' },
-                                  { text: 'Zrušiť', style: 'destructive', onPress: () => unmarkCheckedIn(attendeesEvent!.id, item.id) },
-                                ]);
-                              }}>
-                                <Text style={s.checkedInBadgeText}>{t.dashboard.checkedIn}</Text>
-                              </TouchableOpacity>
-                            : <TouchableOpacity style={s.checkInBtn} onPress={() => markCheckedIn(attendeesEvent!.id, item.id)} activeOpacity={0.7}>
-                                <Text style={s.checkInBtnText}>{t.dashboard.checkIn}</Text>
-                              </TouchableOpacity>
-                        }
-                      </View>
-                    );
-                  }}
-                  ItemSeparatorComponent={() => <View style={{ height: 1, backgroundColor: Colors.grayBorder }} />}
-                  ListEmptyComponent={<Text style={[s.emptySub, { marginTop: 24 }]}>{t.dashboard.noAttendeesYet}</Text>}
-                />
+                      );
+                    }}
+                    ItemSeparatorComponent={() => <View style={{ height: 1, backgroundColor: Colors.grayBorder }} />}
+                    ListEmptyComponent={<Text style={[s.emptySub, { marginTop: 24 }]}>{t.dashboard.noAttendeesYet}</Text>}
+                  />
                 </>
             }
-            {/* Add coordinator — only for club admins/creators */}
+
+            {/* Divider + bottom row: Add coordinator (left) + PDF (right) */}
             {attendeesEvent?.club_id && clubs.some(c => c.id === attendeesEvent?.club_id) && (
-              <TouchableOpacity onPress={openCoordInvite} style={{ flexDirection: 'row', alignItems: 'center', gap: 10, paddingVertical: 16, paddingHorizontal: 4, marginTop: 4 }} activeOpacity={0.7}>
-                <View style={{ width: 28, height: 28, borderRadius: 14, backgroundColor: Colors.grayLight, alignItems: 'center', justifyContent: 'center' }}>
-                  <Svg width={14} height={14} viewBox="0 0 24 24" fill="none">
-                    <Path d="M12 5v14M5 12h14" stroke={Colors.black} strokeWidth={2} strokeLinecap="round" />
-                  </Svg>
+              <>
+                <View style={{ height: 1, backgroundColor: Colors.grayLight, marginTop: 8 }} />
+                <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingVertical: 14 }}>
+                  <TouchableOpacity onPress={openCoordInvite} style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }} activeOpacity={0.7}>
+                    <View style={{ width: 28, height: 28, borderRadius: 14, backgroundColor: Colors.grayLight, alignItems: 'center', justifyContent: 'center' }}>
+                      <Svg width={14} height={14} viewBox="0 0 24 24" fill="none">
+                        <Path d="M12 5v14M5 12h14" stroke={Colors.black} strokeWidth={2} strokeLinecap="round" />
+                      </Svg>
+                    </View>
+                    <Text style={{ fontSize: 14, fontFamily: Fonts.medium, color: Colors.black }}>Pridať koordinátora</Text>
+                  </TouchableOpacity>
+                  {attendees.length > 0 && (
+                    <TouchableOpacity style={s.exportBtn} onPress={exportAttendeesPdf} activeOpacity={0.7}>
+                      <Svg width={14} height={14} viewBox="0 0 24 24" fill="none">
+                        <Path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" stroke={Colors.black} strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" />
+                        <Path d="M7 10l5 5 5-5M12 15V3" stroke={Colors.black} strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" />
+                      </Svg>
+                      <Text style={s.exportBtnText}>PDF</Text>
+                    </TouchableOpacity>
+                  )}
                 </View>
-                <Text style={{ fontSize: 14, fontFamily: Fonts.medium, color: Colors.black }}>Pridať koordinátora</Text>
-              </TouchableOpacity>
+              </>
             )}
           </RNAnimated.View>
         </View>
