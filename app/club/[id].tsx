@@ -91,10 +91,17 @@ export default function ClubDetailScreen() {
 
       const today = new Date().toISOString().slice(0, 10);
       const clubCity = clubData?.city;
-      const base = supabase.from('events').select('*, club:clubs(id, name, cover_url)')
-        .eq('club_id', id).gte('date', today);
-      const { data: eventsData } = await (clubCity ? base.ilike('city', `%${clubCity}%`) : base)
-        .order('date', { ascending: true }).limit(50);
+      const WOEVA_ADMIN = 'ceeafc86-7da8-442d-ac22-2e06ce363973';
+      const isWoevaClub = clubData?.creator_id === WOEVA_ADMIN && clubCity;
+
+      let evQuery = supabase.from('events').select('*, club:clubs(id, name, cover_url)').gte('date', today);
+      if (isWoevaClub) {
+        // Woeva Picks: show events explicitly assigned to this club OR any scraped event for this city
+        evQuery = evQuery.or(`club_id.eq.${id},and(source.not.is.null,city.ilike.%${clubCity}%)`);
+      } else {
+        evQuery = evQuery.eq('club_id', id);
+      }
+      const { data: eventsData } = await evQuery.order('date', { ascending: true }).limit(50);
 
       setClub(clubData);
       setMembers(membersData ?? []);
