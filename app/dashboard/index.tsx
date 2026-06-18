@@ -374,9 +374,15 @@ export default function DashboardScreen() {
   const sheetSnap = (y: RNAnimated.Value) => RNAnimated.timing(y, { toValue: 0, duration: 200, easing: Easing.out(Easing.cubic), useNativeDriver: true }).start();
 
   const attendeesSheetY = useRef(new RNAnimated.Value(SHEET_INIT)).current;
+  const attendeesListOffset = useRef(0);
   const attendeesPan = useRef(PanResponder.create({
     onStartShouldSetPanResponder: () => false,
-    onMoveShouldSetPanResponder: (_, { dy, dx }) => dy > 8 && Math.abs(dy) > Math.abs(dx),
+    onStartShouldSetPanResponderCapture: () => false,
+    // Capture phase: intercept downward swipe only when list is scrolled to the top
+    onMoveShouldSetPanResponderCapture: (_, { dy, dx }) =>
+      attendeesListOffset.current <= 0 && dy > 10 && Math.abs(dy) > Math.abs(dx),
+    onMoveShouldSetPanResponder: (_, { dy, dx }) =>
+      attendeesListOffset.current <= 0 && dy > 10 && Math.abs(dy) > Math.abs(dx),
     onPanResponderMove: (_, { dy }) => { if (dy > 0) attendeesSheetY.setValue(dy); },
     onPanResponderRelease: (_, { dy, vy }) => {
       if (dy > 80 || vy > 0.8) { sheetClose(attendeesSheetY, () => setAttendeesEvent(null)); }
@@ -2245,6 +2251,8 @@ export default function DashboardScreen() {
                   <FlatList
                     data={[...attendees].sort((a, b) => (b.id === user?.id ? 1 : 0) - (a.id === user?.id ? 1 : 0))}
                     keyExtractor={i => i.id}
+                    onScroll={e => { attendeesListOffset.current = e.nativeEvent.contentOffset.y; }}
+                    scrollEventThrottle={16}
                     renderItem={({ item, index }) => {
                       const isIn = checkedIn[attendeesEvent?.id ?? '']?.has(item.id);
                       const isMe = item.id === user?.id;
