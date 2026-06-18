@@ -302,7 +302,11 @@ export default function ClubDetailScreen() {
               onPress={() => router.push(`/club/${id}/settings` as any)}
               activeOpacity={0.8}
             >
-              <Text style={styles.adminText}>{(t.club.clubSettings ?? 'SETTINGS').toUpperCase()}</Text>
+              <Svg width={13} height={13} viewBox="0 0 24 24" fill="none" style={{ marginRight: 5 }}>
+                <Path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7" stroke={Colors.white} strokeWidth={2.2} strokeLinecap="round" strokeLinejoin="round"/>
+                <Path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z" stroke={Colors.white} strokeWidth={2.2} strokeLinecap="round" strokeLinejoin="round"/>
+              </Svg>
+              <Text style={styles.adminText}>Upraviť / Nastavenia</Text>
             </TouchableOpacity>
           )}
         </View>
@@ -529,8 +533,9 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(0,0,0,0.55)', borderRadius: 50,
     paddingHorizontal: 14, paddingVertical: 7,
     borderWidth: 1, borderColor: 'rgba(255,255,255,0.2)',
+    flexDirection: 'row', alignItems: 'center',
   },
-  adminText: { fontSize: 12, fontWeight: '700', color: Colors.white, letterSpacing: 0.5 },
+  adminText: { fontSize: 12, fontWeight: '700', color: Colors.white },
 
   // Card
   card: {

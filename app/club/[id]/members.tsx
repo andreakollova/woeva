@@ -311,7 +311,7 @@ const st = StyleSheet.create({
   sectionLabel: { fontSize: 11, fontWeight: '600', color: Colors.gray, letterSpacing: 0.6, textTransform: 'uppercase', marginBottom: 4, fontFamily: Fonts.semibold },
   sectionDesc: { fontSize: 13, color: Colors.gray, fontFamily: Fonts.regular, lineHeight: 18, marginBottom: 14 },
 
-  divider: { height: 1, backgroundColor: Colors.grayBorder, marginVertical: 20 },
+  divider: { height: 1, backgroundColor: Colors.grayBorder, marginVertical: 10 },
 
   row: { flexDirection: 'row', alignItems: 'center', gap: 12, paddingVertical: 10 },
   av: { width: 40, height: 40, borderRadius: 20, backgroundColor: Colors.grayLight, alignItems: 'center', justifyContent: 'center', overflow: 'hidden', flexShrink: 0 },

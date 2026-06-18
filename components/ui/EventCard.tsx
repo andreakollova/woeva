@@ -192,8 +192,7 @@ function GoingAvatars({ count, attendees, attending, userProfile, userId }: {
   const isAttending = attending ?? false;
 
   // Build ordered list: exclude current user and bot, prioritise profiles with avatars
-  const BOT_ID = '00000000-0000-0000-0000-000000000001';
-  const others = (attendees ?? []).filter((a: any) => a?.profile?.id !== userId && a?.profile?.id !== BOT_ID);
+  const others = (attendees ?? []).filter((a: any) => a?.profile?.id !== userId);
   const sorted = [...others].sort((a, b) => (b.profile?.avatar_url ? 1 : 0) - (a.profile?.avatar_url ? 1 : 0));
 
   const effectiveCount = Math.max(count, isAttending ? 1 : 0);
