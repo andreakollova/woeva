@@ -79,7 +79,7 @@ export default function ClubDetailScreen() {
   }
 
   useFocusEffect(
-    React.useCallback(() => { setStatusBarStyle('light'); loadAll(); }, [id, user, profile?.city])
+    React.useCallback(() => { setStatusBarStyle('light'); loadAll(); }, [id, user])
   );
 
   async function loadAll() {
