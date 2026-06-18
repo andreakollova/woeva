@@ -343,7 +343,9 @@ export default function EventDetailScreen() {
   // Use DB going_count minus bot adjustment as source of truth
   const goingCount = Math.max((event.going_count ?? 0) - botGoingAdjust, attendees.length);
   const otherAtts = attendees.filter(a => a.user_id !== user?.id && (a?.profile?.avatar_url || (a?.profile?.name ?? '').trim()));
-  const overflow = Math.max(0, goingCount - 4);
+  // Going banner (user + up to 3 others = 4 shown), going row (up to 3 shown)
+  const overflowBanner = Math.max(0, goingCount - 4);
+  const overflow = Math.max(0, goingCount - 3);
 
   const d = new Date(displayDate + 'T00:00:00');
   const dayName = d.toLocaleDateString(locale, { weekday: 'short' }).toUpperCase();
@@ -606,7 +608,7 @@ export default function EventDetailScreen() {
                       </View>
                     );
                   })}
-                  {overflow > 0 && <View style={[s.goingAv, s.goingAvOverflow, { marginLeft: -6, zIndex: 8 }]}><Text style={s.goingAvOverflowText}>+{overflow}</Text></View>}
+                  {overflowBanner > 0 && <View style={[s.goingAv, s.goingAvOverflow, { marginLeft: -6, zIndex: 8 }]}><Text style={s.goingAvOverflowText}>+{overflowBanner}</Text></View>}
                 </View>
               <Text style={s.goingBannerArrow}>→</Text>
             </TouchableOpacity>
