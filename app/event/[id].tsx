@@ -291,7 +291,24 @@ export default function EventDetailScreen() {
     } catch {}
   }
 
-  if (!event) return <View style={s.outerWrap} />;
+  if (!event) return (
+    <View style={s.outerWrap}>
+      <StatusBar style="light" />
+      <View style={s.container}>
+        {/* Cover skeleton */}
+        <View style={{ height: COVER_HEIGHT, backgroundColor: '#111' }} />
+        {/* Body skeleton */}
+        <View style={{ flex: 1, backgroundColor: Colors.white, borderTopLeftRadius: 28, borderTopRightRadius: 28, marginTop: -28, paddingHorizontal: 20, paddingTop: 20, gap: 12 }}>
+          <View style={{ height: 22, width: '70%', backgroundColor: Colors.grayLight, borderRadius: 8 }} />
+          <View style={{ height: 14, width: '45%', backgroundColor: Colors.grayLight, borderRadius: 6 }} />
+          <View style={{ height: 14, width: '55%', backgroundColor: Colors.grayLight, borderRadius: 6 }} />
+        </View>
+      </View>
+      <View style={[s.topLeft, { top: insets.top + 10 }]} pointerEvents="box-none">
+        <BackButton color={Colors.white} style={s.backBtn} />
+      </View>
+    </View>
+  );
 
   const isCreator = !!user && event.creator_id === user.id;
   const isPayAtDoor = !!(event as any).pay_at_door;
@@ -542,15 +559,6 @@ export default function EventDetailScreen() {
 
           {/* Title + price + category on cover bottom */}
           <View style={s.coverBottom}>
-            {event.category && (
-              <View style={s.catPill}>
-                <Text style={s.catText}>{event.category.split(',').map((c: string) => {
-                  const key = c.trim();
-                  const sk: Record<string,string> = { 'Movement & Sport': 'Pohyb & Šport', 'Wellness & Body': 'Wellness & Telo', 'Food & Drinks': 'Jedlo & Pitie', 'Art & Creation': 'Umenie & Tvorba', 'Music & Nightlife': 'Hudba & Nočný život', 'Learning & Mind': 'Vzdelávanie', 'Community & Belonging': 'Komunita' };
-                  return (lang === 'sk' ? (sk[key] ?? key) : key);
-                }).join(' · ').toUpperCase()}</Text>
-              </View>
-            )}
             <View style={s.coverTitleRow}>
               <Text style={s.coverTitle} numberOfLines={2}>{event.title}</Text>
               <View style={[s.priceBadge, isFree && s.priceBadgeFree]}>

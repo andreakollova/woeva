@@ -2,8 +2,11 @@ import React, { createContext, useContext, useEffect, useState } from 'react';
 import { Platform } from 'react-native';
 import { Session, User } from '@supabase/supabase-js';
 import * as Notifications from 'expo-notifications';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { supabase } from '@/lib/supabase';
 import { Profile } from '@/types';
+
+export const PENDING_INVITE_KEY = 'woeva_pending_invite_token';
 
 interface AuthContextType {
   session: Session | null;
@@ -50,6 +53,51 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     const { data } = await supabase.from('profiles').select('*').eq('id', userId).single();
     setProfile(data);
     setLoading(false);
+    processPendingInvite(userId);
+  }
+
+  async function processPendingInvite(userId: string) {
+    try {
+      const token = await AsyncStorage.getItem(PENDING_INVITE_KEY);
+      if (!token) return;
+      await AsyncStorage.removeItem(PENDING_INVITE_KEY);
+
+      const { data: invite } = await supabase
+        .from('pending_invites')
+        .select('*')
+        .eq('token', token)
+        .eq('status', 'pending')
+        .single();
+
+      if (!invite || new Date(invite.expires_at) < new Date()) return;
+
+      if (invite.role === 'admin') {
+        await supabase.from('club_members').upsert(
+          { club_id: invite.club_id, user_id: userId, role: 'admin', status: 'approved' },
+          { onConflict: 'club_id,user_id' }
+        );
+      } else {
+        await supabase.from('coordinators').upsert(
+          { club_id: invite.club_id, event_id: invite.event_id ?? null, user_id: userId, invited_by: invite.invited_by, status: 'active' },
+          { onConflict: 'club_id,event_id,user_id' }
+        );
+      }
+
+      await supabase.from('pending_invites')
+        .update({ status: 'accepted', accepted_by: userId })
+        .eq('token', token);
+
+      if (invite.invited_by) {
+        const { data: profile } = await supabase.from('profiles').select('name').eq('id', userId).single();
+        await supabase.from('notifications').insert({
+          user_id: invite.invited_by,
+          type: invite.role === 'admin' ? 'admin_accepted' : 'coordinator_accepted',
+          title: invite.role === 'admin' ? 'Pozvánka prijatá' : 'Koordinátor sa pripojil',
+          body: `${profile?.name ?? 'Niekto'} prijal/a pozvánku do klubu ${invite.club_name}.`,
+          data: { club_id: invite.club_id },
+        });
+      }
+    } catch (_) {}
   }
 
   async function registerPushToken(userId: string) {

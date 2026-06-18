@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, ScrollView, Alert, Linking, ActivityIndicator, Image, TextInput } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, ScrollView, Alert, Linking, ActivityIndicator, Image, Share } from 'react-native';
 import { useLocalSearchParams, useRouter, useNavigation } from 'expo-router';
 import { StackActions } from '@react-navigation/native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -47,24 +47,26 @@ export default function ClubSettingsScreen() {
   const [isCoAdmin, setIsCoAdmin] = useState(false);
   const [deleting, setDeleting] = useState(false);
   const [admins, setAdmins] = useState<{ user_id: string; name: string; avatar_url: string | null }[]>([]);
-  const [inviteQuery, setInviteQuery] = useState('');
-  const [inviteResults, setInviteResults] = useState<{ id: string; name: string; avatar_url: string | null }[]>([]);
-  const [showInvite, setShowInvite] = useState(false);
-  const [notifChat, setNotifChat] = useState(profile?.notif_chat ?? true);
+  const [coordinators, setCoordinators] = useState<{ id: string; user_id: string; event_id: string | null; name: string; avatar_url: string | null; event_title: string | null }[]>([]);
+  const [sharingAdmin, setSharingAdmin] = useState(false);
+  const [sharingCoord, setSharingCoord] = useState(false);
+  const [notifChat, setNotifChat] = useState(true);
 
   useEffect(() => { load(); }, [id, user]);
 
   async function load() {
-    const [{ data: clubData }, { data: memberData }, { data: adminData }] = await Promise.all([
+    const [{ data: clubData }, { data: memberData }, { data: adminData }, { data: coordData }] = await Promise.all([
       supabase.from('clubs').select('id, name, creator_id').eq('id', id).single(),
       user
         ? supabase.from('club_members').select('role').eq('club_id', id).eq('user_id', user.id).eq('status', 'approved').maybeSingle()
         : Promise.resolve({ data: null }),
       supabase.from('club_members').select('user_id, profile:profiles(name, avatar_url)').eq('club_id', id).eq('role', 'admin').eq('status', 'approved'),
+      supabase.from('coordinators').select('id, user_id, event_id, profile:profiles(name, avatar_url), event:events(title)').eq('club_id', id).eq('status', 'active'),
     ]);
     setClub(clubData ?? null);
     const adminList = ((adminData ?? []) as any[]).map(m => ({ user_id: m.user_id, name: m.profile?.name ?? '', avatar_url: m.profile?.avatar_url ?? null }));
     setAdmins(adminList);
+    setCoordinators(((coordData ?? []) as any[]).map(c => ({ id: c.id, user_id: c.user_id, event_id: c.event_id ?? null, name: c.profile?.name ?? '', avatar_url: c.profile?.avatar_url ?? null, event_title: c.event?.title ?? null })));
     if (clubData) {
       const ownerInList = adminList.find(a => a.user_id === clubData.creator_id);
       if (ownerInList) {
@@ -80,22 +82,32 @@ export default function ClubSettingsScreen() {
     }
   }
 
-  async function searchInvite(q: string) {
-    setInviteQuery(q);
-    if (q.trim().length < 2) { setInviteResults([]); return; }
-    const { data } = await supabase.from('profiles').select('id, name, avatar_url').or(`name.ilike.%${q.trim()}%`).neq('id', user!.id).limit(6);
-    const existingIds = new Set(admins.map(a => a.user_id));
-    setInviteResults(((data ?? []) as any[]).filter(r => !existingIds.has(r.id)));
-  }
-
-  async function inviteAdmin(profileId: string, profileName: string) {
-    if (!club) return;
-    await supabase.from('club_members').upsert({ club_id: id, user_id: profileId, role: 'admin', status: 'pending' }, { onConflict: 'club_id,user_id' });
-    await supabase.from('notifications').insert({ user_id: profileId, type: 'admin_invite', title: `Pozvánka: ${club.name}`, body: `Bol/a si pozvaný/á spravovať klub ${club.name}.`, data: { club_id: id, action: 'admin_invite' } });
-    setShowInvite(false);
-    setInviteQuery('');
-    setInviteResults([]);
-    Alert.alert(lang === 'sk' ? 'Pozvánka odoslaná' : 'Invite sent', `${profileName}`);
+  async function shareAdminInvite() {
+    if (!club || !user) return;
+    setSharingAdmin(true);
+    try {
+      const { data: myProfile } = await supabase.from('profiles').select('name').eq('id', user.id).single();
+      const { data } = await supabase.from('pending_invites').insert({
+        club_id: id,
+        role: 'admin',
+        event_id: null,
+        invited_by: user.id,
+        club_name: club.name,
+        inviter_name: myProfile?.name ?? '',
+      }).select('token').single();
+      if (!data?.token) throw new Error('no token');
+      const url = `https://woeva.com/invite?token=${data.token}`;
+      await Share.share({
+        message: lang === 'sk'
+          ? `${myProfile?.name ?? 'Niekto'} ťa pozýva spravovať klub "${club.name}" vo Woeva. Prijmi pozvánku: ${url}`
+          : `${myProfile?.name ?? 'Someone'} invited you to manage club "${club.name}" on Woeva: ${url}`,
+        url,
+      });
+    } catch {
+      Alert.alert(lang === 'sk' ? 'Chyba' : 'Error', lang === 'sk' ? 'Nepodarilo sa vytvoriť pozvánku.' : 'Failed to create invite.');
+    } finally {
+      setSharingAdmin(false);
+    }
   }
 
   async function removeAdmin(adminUserId: string) {
@@ -104,6 +116,44 @@ export default function ClubSettingsScreen() {
       { text: lang === 'sk' ? 'Odstrániť' : 'Remove', style: 'destructive', onPress: async () => {
         await supabase.from('club_members').update({ role: 'member' }).eq('club_id', id).eq('user_id', adminUserId);
         setAdmins(prev => prev.filter(a => a.user_id !== adminUserId));
+      }},
+    ]);
+  }
+
+  async function shareCoordInvite() {
+    if (!club || !user) return;
+    setSharingCoord(true);
+    try {
+      const { data: myProfile } = await supabase.from('profiles').select('name').eq('id', user.id).single();
+      const { data } = await supabase.from('pending_invites').insert({
+        club_id: id,
+        role: 'coordinator',
+        event_id: null,
+        invited_by: user.id,
+        club_name: club.name,
+        inviter_name: myProfile?.name ?? '',
+      }).select('token').single();
+      if (!data?.token) throw new Error('no token');
+      const url = `https://woeva.com/invite?token=${data.token}`;
+      await Share.share({
+        message: lang === 'sk'
+          ? `${myProfile?.name ?? 'Niekto'} ťa pozýva ako koordinátora pre klub "${club.name}" vo Woeva. Prijmi pozvánku: ${url}`
+          : `${myProfile?.name ?? 'Someone'} invited you as a coordinator for club "${club.name}" on Woeva: ${url}`,
+        url,
+      });
+    } catch {
+      Alert.alert(lang === 'sk' ? 'Chyba' : 'Error', lang === 'sk' ? 'Nepodarilo sa vytvoriť pozvánku.' : 'Failed to create invite.');
+    } finally {
+      setSharingCoord(false);
+    }
+  }
+
+  async function removeCoordinator(coordId: string) {
+    Alert.alert(lang === 'sk' ? 'Odstrániť koordinátora?' : 'Remove coordinator?', '', [
+      { text: lang === 'sk' ? 'Zrušiť' : 'Cancel', style: 'cancel' },
+      { text: lang === 'sk' ? 'Odstrániť' : 'Remove', style: 'destructive', onPress: async () => {
+        await supabase.from('coordinators').update({ status: 'removed' }).eq('id', coordId);
+        setCoordinators(prev => prev.filter(c => c.id !== coordId));
       }},
     ]);
   }
@@ -280,29 +330,47 @@ export default function ClubSettingsScreen() {
                   }
                 </View>
               ))}
-              <TouchableOpacity style={[styles.row, admins.length > 0 && styles.rowBorder]} onPress={() => setShowInvite(v => !v)} activeOpacity={0.7}>
-                <Text style={[styles.rowLabel, { color: Colors.black }]}>+ {lang === 'sk' ? 'Pozvať správcu' : 'Invite admin'}</Text>
-              </TouchableOpacity>
-              {showInvite && (
-                <View style={{ paddingHorizontal: 16, paddingBottom: 12 }}>
-                  <TextInput
-                    style={styles.inviteInput}
-                    value={inviteQuery}
-                    onChangeText={searchInvite}
-                    placeholder={lang === 'sk' ? 'Hľadaj podľa mena...' : 'Search by name...'}
-                    placeholderTextColor={Colors.gray}
-                    autoFocus
-                  />
-                  {inviteResults.map(r => (
-                    <TouchableOpacity key={r.id} style={styles.inviteResult} onPress={() => inviteAdmin(r.id, r.name)}>
-                      <Text style={styles.rowLabel}>{r.name}</Text>
-                      <Text style={styles.rowSub}>+ {lang === 'sk' ? 'Pozvať' : 'Invite'}</Text>
-                    </TouchableOpacity>
-                  ))}
+              <TouchableOpacity style={[styles.row, admins.length > 0 && styles.rowBorder]} onPress={shareAdminInvite} disabled={sharingAdmin} activeOpacity={0.7}>
+                <View style={{ flex: 1 }}>
+                  <Text style={[styles.rowLabel, { color: Colors.black }]}>+ {lang === 'sk' ? 'Pozvať správcu' : 'Invite admin'}</Text>
+                  <Text style={styles.rowSub}>{lang === 'sk' ? 'Môže spravovať eventy, členov a nastavenia klubu' : 'Can manage events, members and club settings'}</Text>
                 </View>
-              )}
+                {sharingAdmin ? <ActivityIndicator size="small" color={Colors.gray} /> : <ChevronIcon />}
+              </TouchableOpacity>
             </View>
             <Text style={styles.ownerNote}>{lang === 'sk' ? 'Zmena vlastníka klubu nie je možná. Chceš nový klub? Založ si ho.' : 'Transferring club ownership is not possible. Want a new club? Create one.'}</Text>
+          </View>
+        )}
+
+        {/* Coordinators section */}
+        {(isCreator || isCoAdmin) && (
+          <View style={[styles.section, { marginBottom: 16 }]}>
+            <Text style={styles.sectionLabel}>{lang === 'sk' ? 'KOORDINÁTORI' : 'COORDINATORS'}</Text>
+            <View style={styles.list}>
+              {coordinators.map((c, i) => (
+                <View key={c.id} style={[styles.adminRow, i < coordinators.length - 1 && styles.rowBorder]}>
+                  <View style={styles.adminAvatar}>
+                    {c.avatar_url ? <Image source={{ uri: c.avatar_url }} style={StyleSheet.absoluteFill as any} borderRadius={20} /> : null}
+                    {!c.avatar_url && <Text style={styles.adminInitial}>{(c.name || '?').charAt(0).toUpperCase()}</Text>}
+                  </View>
+                  <View style={{ flex: 1 }}>
+                    <Text style={styles.rowLabel}>{c.name.split(' ')[0]}</Text>
+                    <Text style={styles.rowSub}>{c.event_title ?? (lang === 'sk' ? 'Všetky eventy' : 'All events')}</Text>
+                  </View>
+                  <TouchableOpacity onPress={() => removeCoordinator(c.id)} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
+                    <Text style={styles.removeText}>{lang === 'sk' ? 'Odstrániť' : 'Remove'}</Text>
+                  </TouchableOpacity>
+                </View>
+              ))}
+              <TouchableOpacity style={[styles.row, coordinators.length > 0 && styles.rowBorder]} onPress={shareCoordInvite} disabled={sharingCoord} activeOpacity={0.7}>
+                <View style={{ flex: 1 }}>
+                  <Text style={[styles.rowLabel, { color: Colors.black }]}>+ {lang === 'sk' ? 'Pridať koordinátora' : 'Add coordinator'}</Text>
+                  <Text style={styles.rowSub}>{lang === 'sk' ? 'Môže iba skenovať QR kódy a potvrdzovať vstupy' : 'Can only scan QR codes and confirm entry'}</Text>
+                </View>
+                {sharingCoord ? <ActivityIndicator size="small" color={Colors.gray} /> : <ChevronIcon />}
+              </TouchableOpacity>
+            </View>
+            <Text style={styles.ownerNote}>{lang === 'sk' ? 'Koordinátori môžu iba skenovať QR kódy a potvrdzovať príchody.' : 'Coordinators can only scan QR codes and confirm entries.'}</Text>
           </View>
         )}
 
@@ -411,8 +479,6 @@ const styles = StyleSheet.create({
   adminInitial: { fontSize: 14, fontWeight: '600', color: Colors.gray },
   ownerBadge: { fontSize: 12, color: Colors.gray, fontFamily: Fonts.regular },
   removeText: { fontSize: 13, color: '#FF3B30', fontFamily: Fonts.regular },
-  inviteInput: { height: 40, borderWidth: 1.5, borderColor: Colors.grayBorder, borderRadius: 10, paddingHorizontal: 12, fontSize: 14, color: Colors.black, marginBottom: 8 },
-  inviteResult: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingVertical: 10, borderTopWidth: 1, borderColor: Colors.grayBorder },
   toggleRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 16, paddingVertical: 14, backgroundColor: Colors.white },
   toggle: { width: 44, height: 26, borderRadius: 13, backgroundColor: Colors.grayBorder, justifyContent: 'center', padding: 2 },
   toggleOn: { backgroundColor: Colors.lime },

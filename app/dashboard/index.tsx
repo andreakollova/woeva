@@ -358,6 +358,15 @@ export default function DashboardScreen() {
   const [inviteResults, setInviteResults] = useState<{ id: string; name: string; avatar_url: string | null }[]>([]);
   const [invitingAdmin, setInvitingAdmin] = useState(false);
 
+  // Coordinator invite
+  const [showCoordInvite, setShowCoordInvite] = useState(false);
+  const [coordScope, setCoordScope] = useState<'event' | 'club'>('event');
+  const [coordQuery, setCoordQuery] = useState('');
+  const [coordResults, setCoordResults] = useState<{ id: string; name: string; avatar_url: string | null }[]>([]);
+
+  // Coordinator mode (user is coordinator but not admin of any club)
+  const [myCoordinations, setMyCoordinations] = useState<{ id: string; club_id: string; event_id: string | null; club_name: string; event_title: string | null }[]>([]);
+
   // Animated bottom sheet refs for modals
   const SHEET_INIT = 900;
   const sheetOpen = (y: RNAnimated.Value) => RNAnimated.timing(y, { toValue: 0, duration: 300, easing: Easing.out(Easing.cubic), useNativeDriver: true }).start();
@@ -366,8 +375,8 @@ export default function DashboardScreen() {
 
   const attendeesSheetY = useRef(new RNAnimated.Value(SHEET_INIT)).current;
   const attendeesPan = useRef(PanResponder.create({
-    onStartShouldSetPanResponder: () => true,
-    onMoveShouldSetPanResponder: () => true,
+    onStartShouldSetPanResponder: () => false,
+    onMoveShouldSetPanResponder: (_, { dy, dx }) => dy > 8 && Math.abs(dy) > Math.abs(dx),
     onPanResponderMove: (_, { dy }) => { if (dy > 0) attendeesSheetY.setValue(dy); },
     onPanResponderRelease: (_, { dy, vy }) => {
       if (dy > 80 || vy > 0.8) { sheetClose(attendeesSheetY, () => setAttendeesEvent(null)); }
@@ -397,9 +406,25 @@ export default function DashboardScreen() {
     },
   })).current;
 
+  const coordInviteSheetY = useRef(new RNAnimated.Value(SHEET_INIT)).current;
+  const coordInvitePan = useRef(PanResponder.create({
+    onStartShouldSetPanResponder: () => false,
+    onMoveShouldSetPanResponder: (_, { dy, dx }) => dy > 8 && Math.abs(dy) > Math.abs(dx),
+    onPanResponderMove: (_, { dy }) => { if (dy > 0) coordInviteSheetY.setValue(dy); },
+    onPanResponderRelease: (_, { dy, vy }) => {
+      if (dy > 80 || vy > 0.8) { sheetClose(coordInviteSheetY, () => { setShowCoordInvite(false); setCoordQuery(''); setCoordResults([]); }); }
+      else { sheetSnap(coordInviteSheetY); }
+    },
+  })).current;
+
   function closeAttendees() { sheetClose(attendeesSheetY, () => setAttendeesEvent(null)); }
   function closeClubSettings() { sheetClose(clubSettingsSheetY, () => setShowClubSettings(false)); }
   function closeInviteAdmin() { sheetClose(inviteAdminSheetY, () => { setShowInviteAdmin(false); setInviteQuery(''); setInviteResults([]); }); }
+  function closeCoordInvite() { sheetClose(coordInviteSheetY, () => { setShowCoordInvite(false); setCoordQuery(''); setCoordResults([]); }); }
+  function openCoordInvite() {
+    setCoordScope('event'); setCoordQuery(''); setCoordResults([]);
+    coordInviteSheetY.setValue(SHEET_INIT); setShowCoordInvite(true); sheetOpen(coordInviteSheetY);
+  }
 
   // Check-ins: eventId → Set of userId
   const [checkedIn, setCheckedIn] = useState<Record<string, Set<string>>>({});
@@ -470,6 +495,25 @@ export default function DashboardScreen() {
         setClubAdmins(prev => prev.filter(a => a.user_id !== userId));
       }},
     ]);
+  }
+
+  async function searchCoord(q: string) {
+    setCoordQuery(q);
+    if (q.trim().length < 2) { setCoordResults([]); return; }
+    const { data } = await supabase.from('profiles').select('id, name, avatar_url').ilike('name', `%${q.trim()}%`).neq('id', user!.id).limit(6);
+    setCoordResults((data ?? []) as any[]);
+  }
+
+  async function addCoordinator(profileId: string, profileName: string) {
+    if (!attendeesEvent) return;
+    const clubId = attendeesEvent.club_id;
+    if (!clubId) return;
+    const eventId = coordScope === 'event' ? (attendeesEvent.id.includes('_') ? attendeesEvent.id.split('_')[0] : attendeesEvent.id) : null;
+    await supabase.from('coordinators').upsert({ club_id: clubId, event_id: eventId, user_id: profileId, invited_by: user!.id, status: 'active' }, { onConflict: 'club_id,event_id,user_id' });
+    const scopeLabel = coordScope === 'event' ? attendeesEvent.title : (clubs.find(c => c.id === clubId)?.name ?? 'klub');
+    await supabase.from('notifications').insert({ user_id: profileId, type: 'coordinator_invite', title: 'Bol/a si pridaný/á ako koordinátor', body: `Koordinátor pre: ${scopeLabel}`, data: { club_id: clubId, event_id: eventId, action: 'coordinator_invite' } });
+    closeCoordInvite();
+    Alert.alert('Koordinátor pridaný', profileName);
   }
 
   async function searchInvite(q: string) {
@@ -581,6 +625,42 @@ export default function DashboardScreen() {
       if (!allClubs.find(c => c.id === ac.id)) allClubs.push(ac);
     }
     setClubs(allClubs);
+
+    // Fetch coordinator assignments for this user
+    const { data: coordData } = await supabase
+      .from('coordinators')
+      .select('id, club_id, event_id, club:clubs(name), event:events(title, date)')
+      .eq('user_id', user.id).eq('status', 'active');
+    const coordList = ((coordData ?? []) as any[]).map(c => ({
+      id: c.id, club_id: c.club_id, event_id: c.event_id ?? null,
+      club_name: c.club?.name ?? '', event_title: c.event?.title ?? null,
+    }));
+    setMyCoordinations(coordList);
+
+    // Coordinator mode: user has no admin clubs but does coordinate events
+    if (allClubs.length === 0 && coordList.length > 0) {
+      const specificIds = coordList.filter(c => c.event_id).map(c => c.event_id as string);
+      const coordClubIds = [...new Set(coordList.map(c => c.club_id))];
+      const today = new Date().toISOString().split('T')[0];
+      let coordEvs: any[] = [];
+      if (specificIds.length > 0) {
+        const { data: ev } = await supabase.from('events').select('id, title, date, time, going_count, cover_url, cover_urls, club_id, creator_id, price, is_free, status, capacity, is_recurring').in('id', specificIds).neq('status', 'cancelled');
+        coordEvs = [...(ev ?? [])];
+      }
+      if (coordClubIds.length > 0) {
+        const { data: clEv } = await supabase.from('events').select('id, title, date, time, going_count, cover_url, cover_urls, club_id, creator_id, price, is_free, status, capacity, is_recurring').in('club_id', coordClubIds).gte('date', today).neq('status', 'cancelled').order('date', { ascending: true });
+        for (const e of (clEv ?? [])) { if (!coordEvs.find(x => x.id === e.id)) coordEvs.push(e); }
+      }
+      if (coordEvs.length > 0) {
+        const { data: ciData } = await supabase.from('check_ins').select('event_id, user_id').in('event_id', coordEvs.map(e => e.id));
+        const initCI: Record<string, Set<string>> = {};
+        (ciData ?? []).forEach((ci: any) => { if (!initCI[ci.event_id]) initCI[ci.event_id] = new Set(); initCI[ci.event_id].add(ci.user_id); });
+        setCheckedIn(initCI);
+      }
+      setEvents(coordEvs.map(e => ({ ...e, paid_count: 0, online_count: 0, door_count: 0, scan_count: 0, net_revenue: 0, platform_fee: 0, gross_revenue: 0 })) as EventRow[]);
+      setLoading(false);
+      return;
+    }
 
     const clubIds = allClubs.map(c => c.id);
 
@@ -973,6 +1053,185 @@ export default function DashboardScreen() {
       <View style={[s.container, { paddingTop: insets.top }]}>
         <View style={s.topBar}><BackButton /><Text style={s.pageTitle}>{t.dashboard.dashboard}</Text><View style={{ width: 36 }} /></View>
         <ActivityIndicator style={{ marginTop: 80 }} color={Colors.black} />
+      </View>
+    );
+  }
+
+  // ── Coordinator mode: user has no admin clubs, only coordinator assignments ──
+  if (clubs.length === 0 && myCoordinations.length > 0) {
+    return (
+      <View style={[s.container, { paddingTop: insets.top }]}>
+        <View style={s.topBar}>
+          {activeTab === 'scan'
+            ? <TouchableOpacity onPress={() => setActiveTab('home')} style={s.backBtn} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
+                <Svg width={22} height={22} viewBox="0 0 24 24" fill="none">
+                  <Path d="M19 12H5M12 5l-7 7 7 7" stroke={Colors.black} strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" />
+                </Svg>
+              </TouchableOpacity>
+            : <BackButton />}
+          <Text style={s.pageTitle}>Koordinátor</Text>
+          <View style={{ width: 36 }} />
+        </View>
+
+        {activeTab !== 'scan' && (
+          <ScrollView contentContainerStyle={[s.scroll, { paddingBottom: insets.bottom + 100 }]} showsVerticalScrollIndicator={false} refreshControl={<RefreshControl refreshing={false} onRefresh={load} tintColor={Colors.black} />}>
+            <Text style={[s.sectionTitle, { marginBottom: 16 }]}>Moje eventy</Text>
+            {events.length === 0
+              ? <Text style={s.emptySub}>Zatiaľ žiadne eventy na koordináciu.</Text>
+              : events.sort((a, b) => a.date.localeCompare(b.date)).map(e => (
+                  <View key={e.id} style={{ flexDirection: 'row', alignItems: 'center', paddingVertical: 10, borderBottomWidth: 1, borderColor: Colors.grayBorder }}>
+                    <TouchableOpacity style={{ flexDirection: 'row', alignItems: 'center', flex: 1, gap: 10 }} onPress={() => openAttendees(e)} activeOpacity={0.7}>
+                      <View style={{ width: 50, height: 50, borderRadius: 10, overflow: 'hidden', backgroundColor: Colors.grayLight }}>
+                        {(e.cover_url || ((e as any).cover_urls?.[0])) && <Image source={{ uri: e.cover_url ?? (e as any).cover_urls[0] }} style={StyleSheet.absoluteFill as any} resizeMode="cover" />}
+                      </View>
+                      <View style={{ flex: 1 }}>
+                        <Text style={s.listName} numberOfLines={1}>{e.title}</Text>
+                        <Text style={s.listSub}>{new Date(e.date + 'T00:00:00').toLocaleDateString('sk-SK', { weekday: 'short', day: 'numeric', month: 'short' })}{e.time ? ' · ' + e.time.slice(0, 5) : ''}</Text>
+                      </View>
+                    </TouchableOpacity>
+                    <TouchableOpacity style={s.shareBtn} onPress={() => setActiveTab('scan')} hitSlop={8}>
+                      <Svg width={18} height={18} viewBox="0 0 24 24" fill="none">
+                        <Rect x="3" y="3" width="6" height="6" rx="1" stroke={Colors.black} strokeWidth={1.8} />
+                        <Rect x="15" y="3" width="6" height="6" rx="1" stroke={Colors.black} strokeWidth={1.8} />
+                        <Rect x="3" y="15" width="6" height="6" rx="1" stroke={Colors.black} strokeWidth={1.8} />
+                        <Path d="M15 17h3M17 15v3" stroke={Colors.black} strokeWidth={1.8} strokeLinecap="round" />
+                      </Svg>
+                    </TouchableOpacity>
+                  </View>
+                ))
+            }
+          </ScrollView>
+        )}
+
+        {/* Scan tab - same as admin */}
+        {activeTab === 'scan' && (
+          <View style={[StyleSheet.absoluteFill, s.scanContainer, { top: insets.top + 60, bottom: 80 + insets.bottom }]}>
+            {!cameraPermission?.granted ? (
+              <View style={s.scanPermBox}>
+                <Text style={s.scanPermText}>{t.dashboard.cameraPermissionNeeded}</Text>
+                <TouchableOpacity style={s.scanPermBtn} onPress={requestCameraPermission} activeOpacity={0.8}>
+                  <Text style={s.scanPermBtnText}>{t.dashboard.allowCamera}</Text>
+                </TouchableOpacity>
+              </View>
+            ) : SafeCameraView ? (
+              <SafeCameraView
+                style={StyleSheet.absoluteFill}
+                onBarcodeScanned={scannedTicket ? undefined : async (result: any) => {
+                  const raw: string = result.data ?? result.value ?? '';
+                  if (!raw.startsWith('woeva:')) return;
+                  const parts = raw.split(':');
+                  const type = parts[1];
+                  if (type === 'ticket') {
+                    const ticketId = parts[2];
+                    const { data: ticket } = await supabase.from('tickets').select('id, event_id, user_id, profile:profiles(name, avatar_url), event:events(title)').eq('id', ticketId).maybeSingle();
+                    if (!ticket) { setScannedTicket({ eventTitle: '?', userName: t.dashboard.unknownTicket, avatar_url: null, valid: false, eventId: '', userId: '' }); return; }
+                    setScannedTicket({ eventTitle: (ticket as any).event?.title ?? '?', userName: (ticket as any).profile?.name ?? '?', avatar_url: (ticket as any).profile?.avatar_url ?? null, valid: true, eventId: ticket.event_id, userId: ticket.user_id });
+                  } else if (type === 'event') {
+                    const eventId = parts[2]; const userId = parts[3];
+                    const { data: ev } = await supabase.from('events').select('title').eq('id', eventId).maybeSingle();
+                    const { data: prof } = await supabase.from('profiles').select('name, avatar_url').eq('id', userId).maybeSingle();
+                    setScannedTicket({ eventTitle: ev?.title ?? '?', userName: prof?.name ?? '?', avatar_url: (prof as any)?.avatar_url ?? null, valid: !!ev, eventId, userId });
+                  }
+                }}
+              />
+            ) : null}
+            {scannedTicket && (
+              <View style={s.scanResultCard}>
+                <View style={s.scanAvatarWrap}>
+                  {scannedTicket.avatar_url ? <Image source={{ uri: scannedTicket.avatar_url }} style={s.scanAvatar} /> : <View style={[s.scanAvatar, { backgroundColor: Colors.grayLight, alignItems: 'center', justifyContent: 'center' }]}><Text style={{ fontSize: 24 }}>{scannedTicket.userName.charAt(0).toUpperCase()}</Text></View>}
+                </View>
+                <Text style={s.scanResultName}>{scannedTicket.userName}</Text>
+                <Text style={s.scanResultEvent}>{scannedTicket.eventTitle}</Text>
+                {scannedTicket.valid
+                  ? <TouchableOpacity style={[s.scanCheckInBtn, checkedIn[scannedTicket.eventId]?.has(scannedTicket.userId) && s.scanCheckInBtnDone]} onPress={() => markCheckedIn(scannedTicket.eventId, scannedTicket.userId)} activeOpacity={0.8}>
+                      <Text style={s.scanCheckInBtnText}>{checkedIn[scannedTicket.eventId]?.has(scannedTicket.userId) ? t.dashboard.checkedIn : t.dashboard.checkIn}</Text>
+                    </TouchableOpacity>
+                  : <View style={s.scanInvalidBadge}><Text style={s.scanInvalidText}>{t.dashboard.invalidTicket}</Text></View>
+                }
+                <TouchableOpacity onPress={() => setScannedTicket(null)} style={s.scanCloseBtn}><Text style={s.scanCloseBtnText}>{t.dashboard.scanNext}</Text></TouchableOpacity>
+              </View>
+            )}
+          </View>
+        )}
+
+        {/* Bottom nav - coordinator: Home + Scan */}
+        <View style={[s.bottomNavWrapper, { paddingBottom: insets.bottom + 8 }]}>
+          <View style={[s.bottomNavPill, { justifyContent: 'space-around' }]}>
+            <TouchableOpacity style={s.bottomNavItem} onPress={() => router.push('/(tabs)' as any)} activeOpacity={0.7}>
+              <Svg width={22} height={22} viewBox="0 0 24 24" fill="none">
+                <Path d="M3 9l9-7 9 7v11a2 2 0 01-2 2H5a2 2 0 01-2-2z M9 22V12h6v10" stroke="rgba(0,0,0,0.35)" strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round" />
+              </Svg>
+              <Text style={s.bottomNavLabel}>{t.dashboard.homeTab}</Text>
+            </TouchableOpacity>
+            <TouchableOpacity style={s.bottomNavItem} onPress={() => setActiveTab('home')} activeOpacity={0.7}>
+              <Svg width={22} height={22} viewBox="0 0 24 24" fill="none">
+                <Path d="M3 6h18M3 12h18M3 18h18" stroke={activeTab === 'home' ? Colors.black : 'rgba(0,0,0,0.35)'} strokeWidth={activeTab === 'home' ? 2.5 : 1.8} strokeLinecap="round" />
+              </Svg>
+              <Text style={[s.bottomNavLabel, activeTab === 'home' && s.bottomNavLabelActive]}>Eventy</Text>
+            </TouchableOpacity>
+            <TouchableOpacity style={s.bottomNavScanBtn} onPress={() => setActiveTab('scan')} activeOpacity={0.85}>
+              <Svg width={22} height={22} viewBox="0 0 24 24" fill="none">
+                <Rect x="3" y="3" width="6" height="6" rx="1" stroke={activeTab === 'scan' ? Colors.black : Colors.gray} strokeWidth={2} />
+                <Rect x="15" y="3" width="6" height="6" rx="1" stroke={activeTab === 'scan' ? Colors.black : Colors.gray} strokeWidth={2} />
+                <Rect x="3" y="15" width="6" height="6" rx="1" stroke={activeTab === 'scan' ? Colors.black : Colors.gray} strokeWidth={2} />
+                <Path d="M15 17h3M17 15v3" stroke={activeTab === 'scan' ? Colors.black : Colors.gray} strokeWidth={2} strokeLinecap="round" />
+              </Svg>
+            </TouchableOpacity>
+          </View>
+        </View>
+
+        {/* Attendees modal - coordinator version (no invite coordinator button) */}
+        <Modal visible={!!attendeesEvent} transparent animationType="none" onRequestClose={closeAttendees}>
+          <View style={{ flex: 1, justifyContent: 'flex-end' }}>
+            <Pressable style={[StyleSheet.absoluteFill, { backgroundColor: 'rgba(0,0,0,0.5)' }]} onPress={closeAttendees} />
+            <RNAnimated.View style={[s.attendeesSheet, { paddingBottom: insets.bottom + 16, transform: [{ translateY: attendeesSheetY }] }]} {...attendeesPan.panHandlers}>
+              <View style={{ paddingTop: 12, paddingBottom: 16, alignItems: 'center' }}><View style={s.billingSheetHandle} /></View>
+              <View style={{ flexDirection: 'row', alignItems: 'flex-start', justifyContent: 'space-between', marginBottom: 4 }}>
+                <View style={{ flex: 1, marginRight: 12 }}>
+                  <Text style={s.billingSheetTitle}>{attendeesEvent?.title}</Text>
+                  <Text style={s.listSub}>{(() => { const n = attendeesEvent ? (attendeesEvent.is_free ? realGoing(attendeesEvent, user!.id) : attendeesEvent.paid_count) : 0; return `${n} ${goingLabel(n, lang)}`; })()}</Text>
+                </View>
+              </View>
+              {loadingAttendees
+                ? <ActivityIndicator color={Colors.black} style={{ marginTop: 24 }} />
+                : <>
+                    <Text style={{ fontSize: 13, fontFamily: Fonts.medium, color: Colors.gray, marginTop: 12, marginBottom: 2, marginLeft: 2 }}>Účastníci</Text>
+                    <FlatList
+                      data={[...attendees].sort((a, b) => (b.id === user?.id ? 1 : 0) - (a.id === user?.id ? 1 : 0))}
+                      keyExtractor={i => i.id}
+                      style={{ marginTop: 4 }}
+                      renderItem={({ item, index }) => {
+                        const isIn = checkedIn[attendeesEvent?.id ?? '']?.has(item.id);
+                        const isMe = item.id === user?.id;
+                        return (
+                          <View style={s.attendeeRow}>
+                            <Text style={s.attendeeIndex}>{index + 1}</Text>
+                            <View style={s.attendeeAvatar}>
+                              {item.avatar_url ? <Image source={{ uri: item.avatar_url }} style={StyleSheet.absoluteFill as any} /> : null}
+                              {!item.avatar_url && <Text style={s.attendeeInitial}>{(item.name || '?').charAt(0).toUpperCase()}</Text>}
+                            </View>
+                            <Text style={[s.attendeeName, { flex: 1 }]}>{(item.name || '').split(' ')[0]}</Text>
+                            {isMe
+                              ? <View style={s.meBadge}><Text style={s.meBadgeText}>ja</Text></View>
+                              : isIn
+                                ? <TouchableOpacity style={s.checkedInBadge} activeOpacity={0.7} onPress={() => { Alert.alert(t.dashboard.checkedIn, t.dashboard.undoCheckInConfirm ?? 'Zrušiť?', [{ text: t.auth.cancel, style: 'cancel' }, { text: 'Zrušiť', style: 'destructive', onPress: () => unmarkCheckedIn(attendeesEvent!.id, item.id) }]); }}>
+                                    <Text style={s.checkedInBadgeText}>{t.dashboard.checkedIn}</Text>
+                                  </TouchableOpacity>
+                                : <TouchableOpacity style={s.checkInBtn} onPress={() => markCheckedIn(attendeesEvent!.id, item.id)} activeOpacity={0.7}>
+                                    <Text style={s.checkInBtnText}>{t.dashboard.checkIn}</Text>
+                                  </TouchableOpacity>
+                            }
+                          </View>
+                        );
+                      }}
+                      ItemSeparatorComponent={() => <View style={{ height: 1, backgroundColor: Colors.grayBorder }} />}
+                      ListEmptyComponent={<Text style={[s.emptySub, { marginTop: 24 }]}>{t.dashboard.noAttendeesYet}</Text>}
+                    />
+                  </>
+              }
+            </RNAnimated.View>
+          </View>
+        </Modal>
       </View>
     );
   }
@@ -1961,12 +2220,9 @@ export default function DashboardScreen() {
       <Modal visible={!!attendeesEvent} transparent animationType="none" onRequestClose={closeAttendees}>
         <View style={{ flex: 1, justifyContent: 'flex-end' }}>
           <Pressable style={[StyleSheet.absoluteFill, { backgroundColor: 'rgba(0,0,0,0.5)' }]} onPress={closeAttendees} />
-          <RNAnimated.View style={[s.attendeesSheet, { paddingBottom: insets.bottom + 16, transform: [{ translateY: attendeesSheetY }] }]}>
-            {/* Handle — swipe zone */}
-            <View
-              {...attendeesPan.panHandlers}
-              style={{ paddingTop: 12, paddingBottom: 16, alignItems: 'center' }}
-            >
+          <RNAnimated.View style={[s.attendeesSheet, { paddingBottom: insets.bottom + 16, transform: [{ translateY: attendeesSheetY }] }]} {...attendeesPan.panHandlers}>
+            {/* Handle */}
+            <View style={{ paddingTop: 12, paddingBottom: 16, alignItems: 'center' }}>
               <View style={s.billingSheetHandle} />
             </View>
             {/* Header row */}
@@ -1989,10 +2245,12 @@ export default function DashboardScreen() {
             </View>
             {loadingAttendees
               ? <ActivityIndicator color={Colors.black} style={{ marginTop: 24 }} />
-              : <FlatList
+              : <>
+                  <Text style={{ fontSize: 13, fontFamily: Fonts.medium, color: Colors.gray, marginTop: 12, marginBottom: 2, marginLeft: 2 }}>Účastníci</Text>
+                  <FlatList
                   data={[...attendees].sort((a, b) => (b.id === user?.id ? 1 : 0) - (a.id === user?.id ? 1 : 0))}
                   keyExtractor={i => i.id}
-                  style={{ marginTop: 8 }}
+                  style={{ marginTop: 4 }}
                   renderItem={({ item, index }) => {
                     const isIn = checkedIn[attendeesEvent?.id ?? '']?.has(item.id);
                     const isMe = item.id === user?.id;
@@ -2025,7 +2283,59 @@ export default function DashboardScreen() {
                   ItemSeparatorComponent={() => <View style={{ height: 1, backgroundColor: Colors.grayBorder }} />}
                   ListEmptyComponent={<Text style={[s.emptySub, { marginTop: 24 }]}>{t.dashboard.noAttendeesYet}</Text>}
                 />
+                </>
             }
+            {/* Add coordinator — only for club admins/creators */}
+            {attendeesEvent?.club_id && clubs.some(c => c.id === attendeesEvent?.club_id) && (
+              <TouchableOpacity onPress={openCoordInvite} style={{ flexDirection: 'row', alignItems: 'center', gap: 10, paddingVertical: 16, paddingHorizontal: 4, marginTop: 4 }} activeOpacity={0.7}>
+                <View style={{ width: 28, height: 28, borderRadius: 14, backgroundColor: Colors.grayLight, alignItems: 'center', justifyContent: 'center' }}>
+                  <Svg width={14} height={14} viewBox="0 0 24 24" fill="none">
+                    <Path d="M12 5v14M5 12h14" stroke={Colors.black} strokeWidth={2} strokeLinecap="round" />
+                  </Svg>
+                </View>
+                <Text style={{ fontSize: 14, fontFamily: Fonts.medium, color: Colors.black }}>Pridať koordinátora</Text>
+              </TouchableOpacity>
+            )}
+          </RNAnimated.View>
+        </View>
+      </Modal>
+
+      {/* ── Coordinator Invite Modal ─────────────────────────────────────────── */}
+      <Modal visible={showCoordInvite} transparent animationType="none" onRequestClose={closeCoordInvite}>
+        <View style={{ flex: 1, justifyContent: 'flex-end' }}>
+          <Pressable style={[StyleSheet.absoluteFill, { backgroundColor: 'rgba(0,0,0,0.5)' }]} onPress={closeCoordInvite} />
+          <RNAnimated.View style={[s.attendeesSheet, { paddingBottom: insets.bottom + 16, transform: [{ translateY: coordInviteSheetY }] }]} {...coordInvitePan.panHandlers}>
+            <View style={{ paddingTop: 12, paddingBottom: 16, alignItems: 'center' }}><View style={s.billingSheetHandle} /></View>
+            <Text style={s.billingSheetTitle}>Pridať koordinátora</Text>
+            <Text style={[s.listSub, { marginBottom: 16 }]}>Koordinátor môže iba skenovať QR kódy a potvrdzovať vstupy.</Text>
+            {/* Scope selector */}
+            <View style={{ flexDirection: 'row', backgroundColor: Colors.grayLight, borderRadius: 12, padding: 3, marginBottom: 16 }}>
+              <TouchableOpacity style={[{ flex: 1, paddingVertical: 9, borderRadius: 10, alignItems: 'center' }, coordScope === 'event' && { backgroundColor: Colors.white }]} onPress={() => setCoordScope('event')} activeOpacity={0.7}>
+                <Text style={{ fontSize: 13, fontFamily: coordScope === 'event' ? Fonts.semibold : Fonts.regular, color: Colors.black }}>Iba tento event</Text>
+              </TouchableOpacity>
+              <TouchableOpacity style={[{ flex: 1, paddingVertical: 9, borderRadius: 10, alignItems: 'center' }, coordScope === 'club' && { backgroundColor: Colors.white }]} onPress={() => setCoordScope('club')} activeOpacity={0.7}>
+                <Text style={{ fontSize: 13, fontFamily: coordScope === 'club' ? Fonts.semibold : Fonts.regular, color: Colors.black }}>Všetky eventy klubu</Text>
+              </TouchableOpacity>
+            </View>
+            {/* Search */}
+            <TextInput
+              style={s.inviteInput}
+              value={coordQuery}
+              onChangeText={searchCoord}
+              placeholder="Hľadaj podľa mena..."
+              placeholderTextColor={Colors.gray}
+              autoFocus
+            />
+            {coordResults.map((r, i) => (
+              <TouchableOpacity key={r.id} style={[s.attendeeRow, i < coordResults.length - 1 && { borderBottomWidth: 1, borderColor: Colors.grayBorder }]} onPress={() => addCoordinator(r.id, r.name)} activeOpacity={0.7}>
+                <View style={s.attendeeAvatar}>
+                  {r.avatar_url ? <Image source={{ uri: r.avatar_url }} style={StyleSheet.absoluteFill as any} /> : null}
+                  {!r.avatar_url && <Text style={s.attendeeInitial}>{(r.name || '?').charAt(0).toUpperCase()}</Text>}
+                </View>
+                <Text style={[s.attendeeName, { flex: 1 }]}>{r.name}</Text>
+                <Text style={s.listSub}>+ Pridať</Text>
+              </TouchableOpacity>
+            ))}
           </RNAnimated.View>
         </View>
       </Modal>
@@ -2367,8 +2677,8 @@ const s = StyleSheet.create({
 
   // Attendees modal
   attendeesSheet: { backgroundColor: Colors.white, borderTopLeftRadius: 28, borderTopRightRadius: 28, paddingHorizontal: 24, paddingTop: 0, maxHeight: '85%', flex: 1 },
-  attendeeRow: { flexDirection: 'row', alignItems: 'center', gap: 10, paddingVertical: 11 },
-  attendeeIndex: { fontSize: 12, color: Colors.gray, fontFamily: Fonts.regular, width: 22, textAlign: 'right' },
+  attendeeRow: { flexDirection: 'row', alignItems: 'center', gap: 10, paddingVertical: 11, marginLeft: -4 },
+  attendeeIndex: { fontSize: 12, color: Colors.gray, fontFamily: Fonts.regular, width: 18, textAlign: 'left' },
   exportBtn: { flexDirection: 'row', alignItems: 'center', gap: 5, backgroundColor: Colors.grayLight, borderRadius: 20, paddingHorizontal: 12, paddingVertical: 7 },
   exportBtnText: { fontSize: 12, fontWeight: '700', color: Colors.black, fontFamily: Fonts.bold },
   attendeeAvatar: { width: 40, height: 40, borderRadius: 20, backgroundColor: Colors.lime, alignItems: 'center', justifyContent: 'center', overflow: 'hidden' },

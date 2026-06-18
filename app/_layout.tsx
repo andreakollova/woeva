@@ -76,6 +76,7 @@ export default function RootLayout() {
             <Stack.Screen name="club/[id]/edit" options={{ animation: 'slide_from_right' }} />
             <Stack.Screen name="club/[id]/members" options={{ animation: 'slide_from_right' }} />
             <Stack.Screen name="club/create" options={{ animation: 'slide_from_right' }} />
+            <Stack.Screen name="invite/[token]" options={{ animation: 'fade' }} />
           </Stack>
         </StripeProvider>
         </AuthProvider>
