@@ -172,13 +172,13 @@ export default function ClubSettingsScreen() {
   }
 
   const ROWS = [
-    isCreator && {
+    (isCreator || isCoAdmin) && {
       icon: 'edit',
       label: lang === 'sk' ? 'Upraviť profil klubu' : 'Edit club profile',
       sub: lang === 'sk' ? 'Názov, popis, fotky' : 'Name, description, photos',
       onPress: () => router.push(`/club/${id}/edit` as any),
     },
-    isCreator && {
+    (isCreator || isCoAdmin) && {
       icon: 'users',
       label: lang === 'sk' ? 'Správca klubu' : 'Club admins',
       sub: lang === 'sk' ? 'Spravovať správcov' : 'Manage admins',
@@ -216,7 +216,7 @@ export default function ClubSettingsScreen() {
         showsVerticalScrollIndicator={false}
       >
         {/* Admins section */}
-        {isCreator && (
+        {(isCreator || isCoAdmin) && (
           <View style={[styles.section, { marginBottom: 16 }]}>
             <Text style={styles.sectionLabel}>{lang === 'sk' ? 'SPRÁVCOVIA' : 'ADMINS'}</Text>
             <View style={styles.list}>
@@ -257,6 +257,7 @@ export default function ClubSettingsScreen() {
                 </View>
               )}
             </View>
+            <Text style={styles.ownerNote}>{lang === 'sk' ? 'Zmena vlastníka klubu nie je možná. Chceš nový klub? Založ si ho.' : 'Transferring club ownership is not possible. Want a new club? Create one.'}</Text>
           </View>
         )}
 
@@ -324,7 +325,7 @@ export default function ClubSettingsScreen() {
           </View>
         )}
 
-        {isCreator && (
+        {(isCreator || isCoAdmin) && (
           <View style={styles.deleteWrap}>
             {deleting
               ? <ActivityIndicator size="small" color={Colors.gray} />
@@ -372,4 +373,5 @@ const styles = StyleSheet.create({
   toggleOn: { backgroundColor: Colors.lime },
   toggleThumb: { width: 22, height: 22, borderRadius: 11, backgroundColor: Colors.white },
   toggleThumbOn: { alignSelf: 'flex-end' },
+  ownerNote: { fontSize: 12, color: Colors.gray, paddingHorizontal: 16, paddingTop: 10, paddingBottom: 4 },
 });
