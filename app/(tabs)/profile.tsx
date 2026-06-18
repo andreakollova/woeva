@@ -172,7 +172,7 @@ export default function ProfileScreen() {
                   {club.logo_url || club.cover_url
                     ? <Image source={{ uri: (club.logo_url ?? club.cover_url)! }} style={styles.rowImg} />
                     : <View style={[styles.rowImg, styles.rowImgFallback]}>
-                        <Text style={styles.rowImgInitial}>{club.name.charAt(0).toUpperCase()}</Text>
+                        <Text style={styles.rowImgInitial}>{(club.name || '?').charAt(0).toUpperCase()}</Text>
                       </View>
                   }
                   <View style={{ flex: 1 }}>
@@ -207,7 +207,7 @@ export default function ProfileScreen() {
                     {event.cover_url
                       ? <Image source={{ uri: event.cover_url }} style={styles.rowImg} />
                       : <View style={[styles.rowImg, styles.rowImgFallback]}>
-                          <Text style={styles.rowImgInitial}>{event.title.charAt(0).toUpperCase()}</Text>
+                          <Text style={styles.rowImgInitial}>{(event.title || '?').charAt(0).toUpperCase()}</Text>
                         </View>
                     }
                     <View style={{ flex: 1 }}>

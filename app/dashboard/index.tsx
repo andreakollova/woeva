@@ -1864,7 +1864,7 @@ export default function DashboardScreen() {
                 <View key={a.user_id} style={s.settingsAdminRow}>
                   <View style={s.attendeeAvatar}>
                     {a.avatar_url ? <Image source={{ uri: a.avatar_url }} style={StyleSheet.absoluteFill as any} /> : null}
-                    {!a.avatar_url && <Text style={s.attendeeInitial}>{a.name.charAt(0).toUpperCase()}</Text>}
+                    {!a.avatar_url && <Text style={s.attendeeInitial}>{(a.name || '?').charAt(0).toUpperCase()}</Text>}
                   </View>
                   <Text style={[s.attendeeName, { flex: 1 }]}>{a.name.split(' ')[0]}</Text>
                   {a.user_id === user?.id
@@ -1941,10 +1941,10 @@ export default function DashboardScreen() {
               >
                 <View style={s.attendeeAvatar}>
                   {r.avatar_url ? <Image source={{ uri: r.avatar_url }} style={StyleSheet.absoluteFill as any} /> : null}
-                  {!r.avatar_url && <Text style={s.attendeeInitial}>{r.name.charAt(0).toUpperCase()}</Text>}
+                  {!r.avatar_url && <Text style={s.attendeeInitial}>{(r.name || '?').charAt(0).toUpperCase()}</Text>}
                 </View>
                 <View style={{ flex: 1 }}>
-                  <Text style={s.attendeeName}>{r.name.split(' ')[0]}</Text>
+                  <Text style={s.attendeeName}>{(r.name || '').split(' ')[0]}</Text>
                   {r.email && <Text style={s.listSub}>{r.email}</Text>}
                 </View>
                 <Text style={[s.listSub, { marginLeft: 'auto' }]}>{t.club.addArrow}</Text>
@@ -2001,9 +2001,9 @@ export default function DashboardScreen() {
                         <Text style={s.attendeeIndex}>{index + 1}</Text>
                         <View style={s.attendeeAvatar}>
                           {item.avatar_url ? <Image source={{ uri: item.avatar_url }} style={StyleSheet.absoluteFill as any} /> : null}
-                          {!item.avatar_url && <Text style={s.attendeeInitial}>{item.name.charAt(0).toUpperCase()}</Text>}
+                          {!item.avatar_url && <Text style={s.attendeeInitial}>{(item.name || '?').charAt(0).toUpperCase()}</Text>}
                         </View>
-                        <Text style={[s.attendeeName, { flex: 1 }]}>{item.name.split(' ')[0]}</Text>
+                        <Text style={[s.attendeeName, { flex: 1 }]}>{(item.name || '').split(' ')[0]}</Text>
                         {isMe
                           ? <View style={s.meBadge}><Text style={s.meBadgeText}>ja</Text></View>
                           : isIn
