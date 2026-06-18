@@ -87,7 +87,7 @@ serve(async (req) => {
         .from('profiles')
         .select('push_token')
         .in('id', attendeeUserIds)
-        .neq('notifications_enabled', false)
+        .or('notifications_enabled.is.null,notifications_enabled.eq.true')
         .not('push_token', 'is', null);
 
       const attTokens = (attProfiles ?? [])
