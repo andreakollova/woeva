@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { useFocusEffect } from 'expo-router';
-import { View, Text, StyleSheet, TextInput, ScrollView, TouchableOpacity, Modal, Pressable, Image, PanResponder } from 'react-native';
+import { View, Text, StyleSheet, TextInput, ScrollView, TouchableOpacity, Modal, Pressable, Image, PanResponder, Animated as RNAnimated } from 'react-native';
 import { StatusBar, setStatusBarStyle } from 'expo-status-bar';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
@@ -42,11 +42,37 @@ export default function SearchScreen() {
   const [mapClubs, setMapClubs] = useState<ClubWithLocation[]>([]);
   const [showFilter, setShowFilter] = useState(false);
   const [selectedTags, setSelectedTags] = useState<string[]>([]);
+
+  const filterSheetY = useRef(new RNAnimated.Value(600)).current;
   const filterPanResponder = useRef(PanResponder.create({
     onStartShouldSetPanResponder: () => true,
     onMoveShouldSetPanResponder: () => true,
-    onPanResponderRelease: (_, { dy, vy }) => { if (dy > 80 || vy > 0.8) setShowFilter(false); },
+    onPanResponderMove: (_, { dy }) => { if (dy > 0) filterSheetY.setValue(dy); },
+    onPanResponderRelease: (_, { dy, vy }) => {
+      if (dy > 80 || vy > 0.8) {
+        RNAnimated.timing(filterSheetY, { toValue: 600, duration: 220, useNativeDriver: true }).start(() => {
+          setShowFilter(false);
+          filterSheetY.setValue(600);
+        });
+      } else {
+        RNAnimated.spring(filterSheetY, { toValue: 0, useNativeDriver: true }).start();
+      }
+    },
   })).current;
+
+  useEffect(() => {
+    if (showFilter) {
+      filterSheetY.setValue(600);
+      (RNAnimated.spring(filterSheetY, { toValue: 0, useNativeDriver: true, tension: 65, friction: 11 } as any) as any).start();
+    }
+  }, [showFilter]);
+
+  function closeFilter() {
+    RNAnimated.timing(filterSheetY, { toValue: 600, duration: 220, useNativeDriver: true }).start(() => {
+      setShowFilter(false);
+      filterSheetY.setValue(600);
+    });
+  }
   const [priceFilter, setPriceFilter] = useState<PriceFilter>('all');
   const [headerHeight, setHeaderHeight] = useState(insets.top + 220);
   const mapRef = useRef<MapView>(null);
@@ -404,13 +430,11 @@ export default function SearchScreen() {
       )}
 
       {/* Filter modal */}
-      <Modal visible={showFilter} transparent animationType="none" onRequestClose={() => setShowFilter(false)}>
-        <Pressable style={styles.modalBackdrop} onPress={() => setShowFilter(false)} />
-        <Animated.View
-          entering={FadeIn.duration(180)}
-          style={[styles.filterSheet, { paddingBottom: insets.bottom + 20 }]}
-        >
-          <View {...filterPanResponder.panHandlers}>
+      <Modal visible={showFilter} transparent animationType="none" onRequestClose={closeFilter}>
+        <View style={{ flex: 1, justifyContent: 'flex-end' }}>
+          <Pressable style={[StyleSheet.absoluteFill, { backgroundColor: 'rgba(0,0,0,0.45)' }]} onPress={closeFilter} />
+          <RNAnimated.View style={[styles.filterSheet, { transform: [{ translateY: filterSheetY }], paddingBottom: insets.bottom + 20 }]}>
+          <View {...filterPanResponder.panHandlers} style={{ alignItems: 'center', paddingTop: 4, paddingBottom: 20 }}>
             <View style={styles.filterHandle} />
           </View>
 
@@ -462,11 +486,12 @@ export default function SearchScreen() {
             <TouchableOpacity onPress={clearFilter} style={styles.clearBtn} activeOpacity={0.7}>
               <Text style={styles.clearBtnText}>{t.search.clearAll}</Text>
             </TouchableOpacity>
-            <TouchableOpacity onPress={() => setShowFilter(false)} style={styles.applyBtn} activeOpacity={0.8}>
+            <TouchableOpacity onPress={closeFilter} style={styles.applyBtn} activeOpacity={0.8}>
               <Text style={styles.applyBtnText}>{t.search.apply}</Text>
             </TouchableOpacity>
           </View>
-        </Animated.View>
+        </RNAnimated.View>
+      </View>
       </Modal>
     </View>
   );
@@ -569,7 +594,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 24, paddingTop: 12,
     maxHeight: '80%',
   },
-  filterHandle: { width: 36, height: 4, borderRadius: 2, backgroundColor: Colors.grayBorder, alignSelf: 'center', marginBottom: 20 },
+  filterHandle: { width: 36, height: 4, borderRadius: 2, backgroundColor: Colors.grayBorder, alignSelf: 'center' },
   filterTitle: { fontSize: 20, fontWeight: '700', color: Colors.black, marginBottom: 20 },
   filterSection: { marginBottom: 24 },
   filterLabel: { fontSize: 12, fontWeight: '600', color: Colors.gray, textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: 12 },

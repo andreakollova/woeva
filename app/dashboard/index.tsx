@@ -1,7 +1,7 @@
 import React, { useState, useCallback, useMemo, useRef } from 'react';
 import {
   View, Text, StyleSheet, ScrollView, TouchableOpacity, Pressable,
-  Image, Alert, ActivityIndicator, Modal, TextInput, Platform, FlatList, KeyboardAvoidingView, RefreshControl, Share,
+  Image, Alert, ActivityIndicator, Modal, TextInput, Platform, FlatList, KeyboardAvoidingView, RefreshControl, Share, PanResponder, Animated as RNAnimated,
 } from 'react-native';
 // expo-camera requires a native build - safe lazy import
 let _expoCamera: any = null;
@@ -358,6 +358,53 @@ export default function DashboardScreen() {
   const [inviteResults, setInviteResults] = useState<{ id: string; name: string; avatar_url: string | null }[]>([]);
   const [invitingAdmin, setInvitingAdmin] = useState(false);
 
+  // Animated bottom sheet refs for modals
+  const attendeesSheetY = useRef(new RNAnimated.Value(600)).current;
+  const attendeesPan = useRef(PanResponder.create({
+    onStartShouldSetPanResponder: () => true,
+    onMoveShouldSetPanResponder: () => true,
+    onPanResponderMove: (_, { dy }) => { if (dy > 0) attendeesSheetY.setValue(dy); },
+    onPanResponderRelease: (_, { dy, vy }) => {
+      if (dy > 80 || vy > 0.8) {
+        RNAnimated.timing(attendeesSheetY, { toValue: 600, duration: 220, useNativeDriver: true }).start(() => { setAttendeesEvent(null); attendeesSheetY.setValue(600); });
+      } else { RNAnimated.spring(attendeesSheetY, { toValue: 0, useNativeDriver: true }).start(); }
+    },
+  })).current;
+
+  const clubSettingsSheetY = useRef(new RNAnimated.Value(600)).current;
+  const clubSettingsPan = useRef(PanResponder.create({
+    onStartShouldSetPanResponder: () => true,
+    onMoveShouldSetPanResponder: () => true,
+    onPanResponderMove: (_, { dy }) => { if (dy > 0) clubSettingsSheetY.setValue(dy); },
+    onPanResponderRelease: (_, { dy, vy }) => {
+      if (dy > 80 || vy > 0.8) {
+        RNAnimated.timing(clubSettingsSheetY, { toValue: 600, duration: 220, useNativeDriver: true }).start(() => { setShowClubSettings(false); clubSettingsSheetY.setValue(600); });
+      } else { RNAnimated.spring(clubSettingsSheetY, { toValue: 0, useNativeDriver: true }).start(); }
+    },
+  })).current;
+
+  const inviteAdminSheetY = useRef(new RNAnimated.Value(600)).current;
+  const inviteAdminPan = useRef(PanResponder.create({
+    onStartShouldSetPanResponder: () => true,
+    onMoveShouldSetPanResponder: () => true,
+    onPanResponderMove: (_, { dy }) => { if (dy > 0) inviteAdminSheetY.setValue(dy); },
+    onPanResponderRelease: (_, { dy, vy }) => {
+      if (dy > 80 || vy > 0.8) {
+        RNAnimated.timing(inviteAdminSheetY, { toValue: 600, duration: 220, useNativeDriver: true }).start(() => { setShowInviteAdmin(false); setInviteQuery(''); setInviteResults([]); inviteAdminSheetY.setValue(600); });
+      } else { RNAnimated.spring(inviteAdminSheetY, { toValue: 0, useNativeDriver: true }).start(); }
+    },
+  })).current;
+
+  function closeAttendees() {
+    RNAnimated.timing(attendeesSheetY, { toValue: 600, duration: 220, useNativeDriver: true }).start(() => { setAttendeesEvent(null); attendeesSheetY.setValue(600); });
+  }
+  function closeClubSettings() {
+    RNAnimated.timing(clubSettingsSheetY, { toValue: 600, duration: 220, useNativeDriver: true }).start(() => { setShowClubSettings(false); clubSettingsSheetY.setValue(600); });
+  }
+  function closeInviteAdmin() {
+    RNAnimated.timing(inviteAdminSheetY, { toValue: 600, duration: 220, useNativeDriver: true }).start(() => { setShowInviteAdmin(false); setInviteQuery(''); setInviteResults([]); inviteAdminSheetY.setValue(600); });
+  }
+
   // Check-ins: eventId → Set of userId
   const [checkedIn, setCheckedIn] = useState<Record<string, Set<string>>>({});
 
@@ -394,6 +441,16 @@ export default function DashboardScreen() {
     if (id) loadMembers(id);
     else setMembers([]);
   }, [selectedClubId, clubs.length]);
+
+  React.useEffect(() => {
+    if (!!attendeesEvent) { attendeesSheetY.setValue(600); (RNAnimated.spring(attendeesSheetY, { toValue: 0, useNativeDriver: true, tension: 65, friction: 11 } as any) as any).start(); }
+  }, [!!attendeesEvent]);
+  React.useEffect(() => {
+    if (showClubSettings) { clubSettingsSheetY.setValue(600); (RNAnimated.spring(clubSettingsSheetY, { toValue: 0, useNativeDriver: true, tension: 65, friction: 11 } as any) as any).start(); }
+  }, [showClubSettings]);
+  React.useEffect(() => {
+    if (showInviteAdmin) { inviteAdminSheetY.setValue(600); (RNAnimated.spring(inviteAdminSheetY, { toValue: 0, useNativeDriver: true, tension: 65, friction: 11 } as any) as any).start(); }
+  }, [showInviteAdmin]);
 
   async function openClubSettings() {
     const targetClub = selectedClub ?? clubs[0];
@@ -1800,15 +1857,13 @@ export default function DashboardScreen() {
       )}
 
       {/* ── Club Settings Modal ─────────────────────────────────────────────── */}
-      <Modal visible={showClubSettings} transparent animationType="slide" onRequestClose={() => setShowClubSettings(false)}>
-        <View style={s.modalOverlay}>
-          <Pressable style={StyleSheet.absoluteFill} onPress={() => setShowClubSettings(false)} />
-          <View style={[s.attendeesSheet, { paddingBottom: insets.bottom + 24 }]}>
+      <Modal visible={showClubSettings} transparent animationType="none" onRequestClose={closeClubSettings}>
+        <View style={{ flex: 1, justifyContent: 'flex-end' }}>
+          <Pressable style={[StyleSheet.absoluteFill, { backgroundColor: 'rgba(0,0,0,0.5)' }]} onPress={closeClubSettings} />
+          <RNAnimated.View style={[s.attendeesSheet, { paddingBottom: insets.bottom + 24, transform: [{ translateY: clubSettingsSheetY }] }]}>
             <View
-              style={{ paddingTop: 8, alignItems: 'center', marginBottom: 4 }}
-              onStartShouldSetResponder={() => true}
-              onMoveShouldSetResponder={(_, { dy }) => dy > 5}
-              onResponderRelease={(_, { dy }) => { if (dy > 60) setShowClubSettings(false); }}
+              {...clubSettingsPan.panHandlers}
+              style={{ paddingTop: 12, paddingBottom: 16, alignItems: 'center' }}
             >
               <View style={s.billingSheetHandle} />
             </View>
@@ -1857,20 +1912,18 @@ export default function DashboardScreen() {
                 </View>
               ))}
             </View>
-          </View>
+          </RNAnimated.View>
         </View>
       </Modal>
 
       {/* ── Invite Admin Modal ──────────────────────────────────────────────── */}
-      <Modal visible={showInviteAdmin} transparent animationType="slide" onRequestClose={() => setShowInviteAdmin(false)}>
-        <View style={s.modalOverlay}>
-          <Pressable style={StyleSheet.absoluteFill} onPress={() => { setShowInviteAdmin(false); setInviteQuery(''); setInviteResults([]); }} />
-          <View style={[s.attendeesSheet, { paddingBottom: insets.bottom + 16 }]}>
+      <Modal visible={showInviteAdmin} transparent animationType="none" onRequestClose={closeInviteAdmin}>
+        <View style={{ flex: 1, justifyContent: 'flex-end' }}>
+          <Pressable style={[StyleSheet.absoluteFill, { backgroundColor: 'rgba(0,0,0,0.5)' }]} onPress={closeInviteAdmin} />
+          <RNAnimated.View style={[s.attendeesSheet, { paddingBottom: insets.bottom + 16, transform: [{ translateY: inviteAdminSheetY }] }]}>
             <View
-              style={{ paddingTop: 8, alignItems: 'center', marginBottom: 4 }}
-              onStartShouldSetResponder={() => true}
-              onMoveShouldSetResponder={(_, { dy }) => dy > 5}
-              onResponderRelease={(_, { dy }) => { if (dy > 60) { setShowInviteAdmin(false); setInviteQuery(''); setInviteResults([]); } }}
+              {...inviteAdminPan.panHandlers}
+              style={{ paddingTop: 12, paddingBottom: 16, alignItems: 'center' }}
             >
               <View style={s.billingSheetHandle} />
             </View>
@@ -1908,21 +1961,19 @@ export default function DashboardScreen() {
             {inviteQuery.length >= 2 && inviteResults.length === 0 && (
               <Text style={[s.emptySub, { marginTop: 12 }]}>{t.club.notFound}</Text>
             )}
-          </View>
+          </RNAnimated.View>
         </View>
       </Modal>
 
       {/* ── Attendees Modal ─────────────────────────────────────────────────── */}
-      <Modal visible={!!attendeesEvent} transparent animationType="slide" onRequestClose={() => setAttendeesEvent(null)}>
-        <View style={s.modalOverlay}>
-          <Pressable style={StyleSheet.absoluteFill} onPress={() => setAttendeesEvent(null)} />
-          <View style={[s.attendeesSheet, { paddingBottom: insets.bottom + 16 }]}>
+      <Modal visible={!!attendeesEvent} transparent animationType="none" onRequestClose={closeAttendees}>
+        <View style={{ flex: 1, justifyContent: 'flex-end' }}>
+          <Pressable style={[StyleSheet.absoluteFill, { backgroundColor: 'rgba(0,0,0,0.5)' }]} onPress={closeAttendees} />
+          <RNAnimated.View style={[s.attendeesSheet, { paddingBottom: insets.bottom + 16, transform: [{ translateY: attendeesSheetY }] }]}>
             {/* Handle — swipe zone */}
             <View
-              style={{ paddingVertical: 8, alignItems: 'center' }}
-              onStartShouldSetResponder={() => true}
-              onMoveShouldSetResponder={(_, { dy }) => dy > 5}
-              onResponderRelease={(_, { dy }) => { if (dy > 60) setAttendeesEvent(null); }}
+              {...attendeesPan.panHandlers}
+              style={{ paddingTop: 12, paddingBottom: 16, alignItems: 'center' }}
             >
               <View style={s.billingSheetHandle} />
             </View>
@@ -1983,7 +2034,7 @@ export default function DashboardScreen() {
                   ListEmptyComponent={<Text style={[s.emptySub, { marginTop: 24 }]}>{t.dashboard.noAttendeesYet}</Text>}
                 />
             }
-          </View>
+          </RNAnimated.View>
         </View>
       </Modal>
 

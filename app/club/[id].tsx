@@ -89,7 +89,7 @@ export default function ClubDetailScreen() {
 
     const today = new Date().toISOString().slice(0, 10);
     const clubCity = clubData?.city;
-    const base = supabase.from('events').select('*, club:clubs(id, name, cover_url), attendees:event_attendees(profile:profiles(id, name, avatar_url))')
+    const base = supabase.from('events').select('*, club:clubs(id, name, cover_url)')
       .eq('club_id', id).gte('date', today);
     const { data: eventsData } = await (clubCity ? base.ilike('city', `%${clubCity}%`) : base)
       .order('date', { ascending: true }).limit(100);
@@ -166,7 +166,7 @@ export default function ClubDetailScreen() {
         <View style={styles.modalOverlay}>
           <RNAnimated.View style={[styles.membersSheet, { transform: [{ translateY: sheetY }] }]}>
             {/* Handle — drag zone only */}
-            <View {...panResponder.panHandlers} style={{ alignItems: 'center', paddingTop: 10, paddingBottom: 6 }}>
+            <View {...panResponder.panHandlers} style={{ alignItems: 'center', paddingTop: 10, paddingBottom: 20 }}>
               <View style={styles.membersSheetHandle} />
             </View>
             {/* Header — not in drag zone so ✕ button works */}
