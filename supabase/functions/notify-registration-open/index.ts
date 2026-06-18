@@ -7,6 +7,12 @@ const db = createClient(
 );
 
 serve(async (req) => {
+  const authHeader = req.headers.get('Authorization') ?? '';
+  const serviceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? '';
+  if (!authHeader.includes(serviceKey)) {
+    return new Response(JSON.stringify({ error: 'Unauthorized' }), { status: 401 });
+  }
+
   try {
     // Find events where registration just opened and notification hasn't been sent yet
     const { data: events, error } = await db
