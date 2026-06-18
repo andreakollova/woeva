@@ -467,7 +467,7 @@ const manageStyles = StyleSheet.create({
 });
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: Colors.white },
+  container: { flex: 1, backgroundColor: Colors.black },
 
   // Cover
   cover: { height: COVER_HEIGHT, position: 'relative' },

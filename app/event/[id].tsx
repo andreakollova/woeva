@@ -850,7 +850,7 @@ export default function EventDetailScreen() {
 
 const s = StyleSheet.create({
   outerWrap: { flex: 1, backgroundColor: Colors.black },
-  container: { flex: 1, backgroundColor: Colors.white },
+  container: { flex: 1, backgroundColor: Colors.black },
 
   // Cover
   coverWrap: { overflow: 'hidden', backgroundColor: '#111' },
