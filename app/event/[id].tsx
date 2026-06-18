@@ -596,7 +596,7 @@ export default function EventDetailScreen() {
                   {/* Current user always on top */}
                   <View style={[s.goingAv, s.goingAvUser, { marginLeft: 0, zIndex: 10 }]}>
                     {profile?.avatar_url
-                      ? <Image source={{ uri: profile.avatar_url }} style={s.goingAvImg} resizeMode="cover" />
+                      ? <Image source={{ uri: profile.avatar_url }} style={StyleSheet.absoluteFill} resizeMode="cover" />
                       : <Text style={s.goingAvInitial}>{(profile?.name ?? user?.email ?? '?').charAt(0).toUpperCase()}</Text>}
                   </View>
                   {/* Other attendees - only real ones */}
@@ -605,7 +605,7 @@ export default function EventDetailScreen() {
                     const initial = (att?.profile?.name ?? '').charAt(0).toUpperCase();
                     return (
                       <View key={i} style={[s.goingAv, s.goingAvOther, { marginLeft: -6, zIndex: 9 - i }]}>
-                        {avatarUrl ? <Image source={{ uri: avatarUrl }} style={s.goingAvImg} resizeMode="cover" /> : <Text style={s.goingAvInitial}>{initial}</Text>}
+                        {avatarUrl ? <Image source={{ uri: avatarUrl }} style={StyleSheet.absoluteFill} resizeMode="cover" /> : <Text style={s.goingAvInitial}>{initial}</Text>}
                       </View>
                     );
                   })}
@@ -694,7 +694,7 @@ export default function EventDetailScreen() {
                     const initial = (att?.profile?.name ?? '').charAt(0).toUpperCase();
                     return (
                       <View key={i} style={[s.av, { marginLeft: i === 0 ? 0 : -10, zIndex: 10 - i }, !avatarUrl && { backgroundColor: '#888', alignItems: 'center', justifyContent: 'center' }]}>
-                        {avatarUrl ? <Image source={{ uri: avatarUrl }} style={s.avImg} resizeMode="cover" /> : <Text style={{ fontSize: 11, fontWeight: '700', color: Colors.white }}>{initial}</Text>}
+                        {avatarUrl ? <Image source={{ uri: avatarUrl }} style={StyleSheet.absoluteFill} resizeMode="cover" /> : <Text style={{ fontSize: 11, fontWeight: '700', color: Colors.white }}>{initial}</Text>}
                       </View>
                     );
                   })}
