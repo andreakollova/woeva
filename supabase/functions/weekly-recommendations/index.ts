@@ -49,13 +49,24 @@ Deno.serve(async (req) => {
     byCity[e.city].push(e);
   }
 
-  // Users who opted into discovery notifications
-  const { data: users } = await db
-    .from('profiles')
-    .select('id, city, interests, push_token, notif_new_event_my_tags, notif_new_event_all, last_weekly_rec')
-    .eq('notifications_enabled', true)
-    .not('push_token', 'is', null)
-    .not('city', 'is', null);
+  // Users who opted into discovery notifications — paginate to avoid memory issues
+  const PAGE_SIZE = 1000;
+  let allUsers: any[] = [];
+  let page = 0;
+  while (true) {
+    const { data: batch } = await db
+      .from('profiles')
+      .select('id, city, interests, push_token, notif_new_event_my_tags, notif_new_event_all, last_weekly_rec')
+      .eq('notifications_enabled', true)
+      .not('push_token', 'is', null)
+      .not('city', 'is', null)
+      .range(page * PAGE_SIZE, (page + 1) * PAGE_SIZE - 1);
+    if (!batch?.length) break;
+    allUsers = allUsers.concat(batch);
+    if (batch.length < PAGE_SIZE) break;
+    page++;
+  }
+  const users = allUsers;
 
   if (!users?.length) {
     return new Response(JSON.stringify({ ok: true, sent: 0 }), { headers: { 'Content-Type': 'application/json' } });

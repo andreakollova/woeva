@@ -39,18 +39,18 @@ serve(async (req) => {
       data: data ?? {},
     }));
 
-    const res = await fetch('https://exp.host/--/api/v2/push/send', {
-      method: 'POST',
-      headers: {
-        'Accept': 'application/json',
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify(messages),
-    });
+    const BATCH_SIZE = 100;
+    const results = [];
+    for (let i = 0; i < messages.length; i += BATCH_SIZE) {
+      const res = await fetch('https://exp.host/--/api/v2/push/send', {
+        method: 'POST',
+        headers: { 'Accept': 'application/json', 'Content-Type': 'application/json' },
+        body: JSON.stringify(messages.slice(i, i + BATCH_SIZE)),
+      });
+      results.push(await res.json());
+    }
 
-    const result = await res.json();
-
-    return new Response(JSON.stringify({ ok: true, result }), {
+    return new Response(JSON.stringify({ ok: true, sent: messages.length, batches: results.length }), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     });
   } catch (e) {
