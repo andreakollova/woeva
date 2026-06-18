@@ -94,7 +94,7 @@ async function buildPass(supabase: any, userId: string, event_id: string): Promi
         ...(event.price > 0 ? [{ key: 'price', label: 'ZAPLATENÁ CENA', value: `€${Number(event.price).toFixed(2)}` }] : []),
       ],
     },
-    barcodes: [{ message: attendee.id, format: 'PKBarcodeFormatQR', messageEncoding: 'iso-8859-1' }],
+    barcodes: [{ message: `woeva:event:${event_id}:${userId}`, format: 'PKBarcodeFormatQR', messageEncoding: 'iso-8859-1' }],
   };
 
   const passJsonBytes = new TextEncoder().encode(JSON.stringify(passJson));

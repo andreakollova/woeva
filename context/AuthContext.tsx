@@ -89,13 +89,27 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
       if (invite.invited_by) {
         const { data: profile } = await supabase.from('profiles').select('name').eq('id', userId).single();
+        const notifTitle = invite.role === 'admin' ? 'Pozvánka prijatá' : 'Koordinátor sa pripojil';
+        const notifBody = `${profile?.name ?? 'Niekto'} prijal/a pozvánku do klubu ${invite.club_name}.`;
         await supabase.from('notifications').insert({
           user_id: invite.invited_by,
           type: invite.role === 'admin' ? 'admin_accepted' : 'coordinator_accepted',
-          title: invite.role === 'admin' ? 'Pozvánka prijatá' : 'Koordinátor sa pripojil',
-          body: `${profile?.name ?? 'Niekto'} prijal/a pozvánku do klubu ${invite.club_name}.`,
+          title: notifTitle,
+          body: notifBody,
           data: { club_id: invite.club_id },
         });
+        // Send push to inviter
+        const { data: inviterProfile } = await supabase
+          .from('profiles')
+          .select('push_token')
+          .eq('id', invite.invited_by)
+          .or('notifications_enabled.is.null,notifications_enabled.eq.true')
+          .single();
+        if (inviterProfile?.push_token?.startsWith('ExponentPushToken[')) {
+          await supabase.functions.invoke('send-push', {
+            body: { tokens: [inviterProfile.push_token], title: notifTitle, body: notifBody, data: { club_id: invite.club_id } },
+          });
+        }
       }
     } catch (_) {}
   }

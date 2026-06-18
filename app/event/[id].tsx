@@ -48,6 +48,7 @@ export default function EventDetailScreen() {
   const [toast, setToast] = useState(false);
   const [attendees, setAttendees] = useState<Attendee[]>([]);
   const [isMember, setIsMember] = useState(false);
+  const [isClubAdmin, setIsClubAdmin] = useState(false);
   const [unreadCount, setUnreadCount] = useState(0);
   const [coverLoaded, setCoverLoaded] = useState(false);
   const [botGoingAdjust, setBotGoingAdjust] = useState(0);
@@ -153,8 +154,9 @@ export default function EventDetailScreen() {
         .gt('created_at', lastRead ?? '1970-01-01T00:00:00Z');
       setUnreadCount(count ?? 0);
       if (data?.club_id) {
-        const { data: mem } = await supabase.from('club_members').select('id').eq('club_id', data.club_id).eq('user_id', user.id).single();
+        const { data: mem } = await supabase.from('club_members').select('id, role').eq('club_id', data.club_id).eq('user_id', user.id).eq('status', 'approved').single();
         setIsMember(!!mem);
+        setIsClubAdmin(mem?.role === 'admin');
       }
     }
   }
@@ -750,25 +752,25 @@ export default function EventDetailScreen() {
           {/* ── Chat ── */}
           <View style={s.hairline} />
           <TouchableOpacity
-            style={[s.chatRow, !isAttending && !isCreator && { opacity: 0.4 }]}
-            onPress={() => { if (!isAttending && !isCreator) return; setUnreadCount(0); router.push(`/chat/${id}`); }}
-            activeOpacity={isAttending || isCreator ? 0.7 : 1}
+            style={[s.chatRow, !isAttending && !isCreator && !isClubAdmin && { opacity: 0.4 }]}
+            onPress={() => { if (!isAttending && !isCreator && !isClubAdmin) return; setUnreadCount(0); router.push(`/chat/${id}`); }}
+            activeOpacity={isAttending || isCreator || isClubAdmin ? 0.7 : 1}
           >
             <View style={[s.chatIconBox, !isAttending && !isCreator && { backgroundColor: Colors.grayLight }]}>
               <Svg width={15} height={15} viewBox="0 0 24 24" fill="none">
-                <Path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" stroke={isAttending || isCreator ? Colors.black : Colors.gray} strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" />
+                <Path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" stroke={isAttending || isCreator || isClubAdmin ? Colors.black : Colors.gray} strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" />
               </Svg>
             </View>
             <View style={{ flex: 1 }}>
-              <Text style={[s.chatLabel, !isAttending && !isCreator && { color: Colors.gray }]}>{t.chat.groupChat}</Text>
+              <Text style={[s.chatLabel, !isAttending && !isCreator && !isClubAdmin && { color: Colors.gray }]}>{t.chat.groupChat}</Text>
               <Text style={s.chatSub}>
-                {isAttending || isCreator
+                {isAttending || isCreator || isClubAdmin
                   ? (unreadCount > 0 ? t.event.newMessages(unreadCount) : t.event.chatTapToOpen)
                   : t.event.chatJoinToUnlock}
               </Text>
             </View>
-            {(isAttending || isCreator) && unreadCount > 0 && <View style={s.unreadBadge}><Text style={s.unreadBadgeText}>{unreadCount > 99 ? '99+' : unreadCount}</Text></View>}
-            {(isAttending || isCreator) && <Svg width={14} height={14} viewBox="0 0 24 24" fill="none">
+            {(isAttending || isCreator || isClubAdmin) && unreadCount > 0 && <View style={s.unreadBadge}><Text style={s.unreadBadgeText}>{unreadCount > 99 ? '99+' : unreadCount}</Text></View>}
+            {(isAttending || isCreator || isClubAdmin) && <Svg width={14} height={14} viewBox="0 0 24 24" fill="none">
               <Path d="M9 18l6-6-6-6" stroke={Colors.gray} strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" />
             </Svg>}
           </TouchableOpacity>

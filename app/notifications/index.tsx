@@ -55,7 +55,7 @@ export default function NotificationsScreen() {
         <Path d="M12 5v14M5 12h14" stroke={Colors.black} strokeWidth={2.5} strokeLinecap="round" />
       </Svg>
     );
-    if (type === 'admin_invite') return (
+    if (type === 'admin_invite' || type === 'coordinator_invite') return (
       <Svg width={16} height={16} viewBox="0 0 24 24" fill="none">
         <Path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2" stroke={Colors.black} strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" />
         <Path d="M16 11h6m-3-3v6" stroke={Colors.black} strokeWidth={2} strokeLinecap="round" />
@@ -78,7 +78,7 @@ export default function NotificationsScreen() {
   function iconBgForType(type: Notification['type']) {
     if (type === 'event_cancelled') return '#FFF0F0';
     if (type === 'new_event' || type === 'club_event') return Colors.lime;
-    if (type === 'admin_invite') return '#E8F4FF';
+    if (type === 'admin_invite' || type === 'coordinator_invite') return '#E8F4FF';
     if (type === 'join') return Colors.lime;
     return Colors.grayLight;
   }
@@ -88,28 +88,73 @@ export default function NotificationsScreen() {
     await supabase.from('notifications').delete().eq('id', id);
   }
 
-  async function handleAdminInvite(n: Notification, accept: boolean) {
+  async function handleInvite(n: Notification, accept: boolean) {
     const clubId = n.data?.club_id;
+    const token = n.data?.token;
+    const isCoord = n.type === 'coordinator_invite';
     if (!clubId || !user) return;
+
     if (accept) {
-      await supabase.from('club_members')
-        .update({ status: 'approved' })
-        .eq('club_id', clubId).eq('user_id', user.id).eq('role', 'admin');
-      Alert.alert(t.notif.welcomeAboard, t.notif.welcomeAboardMsg);
+      if (token) {
+        const { data: invite } = await supabase
+          .from('pending_invites').select('*')
+          .eq('token', token).eq('status', 'pending').single();
+        if (!invite || new Date(invite.expires_at) < new Date()) {
+          Alert.alert('Chyba', 'Pozvánka vypršala alebo už bola použitá.');
+          return;
+        }
+        if (isCoord) {
+          await supabase.from('coordinators').upsert(
+            { club_id: clubId, event_id: invite.event_id ?? null, user_id: user.id, invited_by: invite.invited_by, status: 'active' },
+            { onConflict: 'club_id,event_id,user_id' }
+          );
+        } else {
+          await supabase.from('club_members').upsert(
+            { club_id: clubId, user_id: user.id, role: 'admin', status: 'approved' },
+            { onConflict: 'club_id,user_id' }
+          );
+        }
+        await supabase.from('pending_invites').update({ status: 'accepted', accepted_by: user.id }).eq('token', token);
+        if (invite.invited_by) {
+          const { data: myProfile } = await supabase.from('profiles').select('name').eq('id', user.id).single();
+          const notifTitle = isCoord ? 'Koordinátor sa pripojil' : 'Pozvánka prijatá';
+          const notifBody = `${myProfile?.name ?? 'Niekto'} prijal/a pozvánku do klubu ${invite.club_name}.`;
+          await supabase.from('notifications').insert({
+            user_id: invite.invited_by,
+            type: isCoord ? 'coordinator_accepted' : 'admin_accepted',
+            title: notifTitle, body: notifBody, data: { club_id: clubId },
+          });
+          const { data: inviterProfile } = await supabase.from('profiles').select('push_token')
+            .eq('id', invite.invited_by).or('notifications_enabled.is.null,notifications_enabled.eq.true').single();
+          if (inviterProfile?.push_token?.startsWith('ExponentPushToken[')) {
+            await supabase.functions.invoke('send-push', {
+              body: { tokens: [inviterProfile.push_token], title: notifTitle, body: notifBody, data: { club_id: clubId } },
+            });
+          }
+        }
+      } else {
+        // Legacy: direct club_members pending flow (from old dashboard invite)
+        await supabase.from('club_members').update({ status: 'approved' })
+          .eq('club_id', clubId).eq('user_id', user.id).eq('role', 'admin');
+      }
+      Alert.alert(t.notif.welcomeAboard, isCoord ? 'Si teraz koordinátor. Nájdeš skener v Dashboarde.' : t.notif.welcomeAboardMsg);
     } else {
-      await supabase.from('club_members')
-        .delete()
-        .eq('club_id', clubId).eq('user_id', user.id).eq('role', 'admin').eq('status', 'pending');
+      if (token) {
+        await supabase.from('pending_invites').update({ status: 'declined' }).eq('token', token);
+      } else {
+        await supabase.from('club_members').delete()
+          .eq('club_id', clubId).eq('user_id', user.id).eq('role', 'admin').eq('status', 'pending');
+      }
     }
-    await supabase.from('notifications').update({ read: true }).eq('id', n.id);
-    setNotifications(prev => prev.map(x => x.id === n.id ? { ...x, read: true } : x));
+    await supabase.from('notifications').delete().eq('id', n.id);
+    setNotifications(prev => prev.filter(x => x.id !== n.id));
   }
 
   function handleTap(n: Notification) {
-    if (n.type === 'admin_invite' && n.data?.action === 'admin_invite') {
+    if ((n.type === 'admin_invite' || n.type === 'coordinator_invite') && n.data?.action) {
       Alert.alert(n.title, n.body ?? '', [
-        { text: t.common.decline, style: 'destructive', onPress: () => handleAdminInvite(n, false) },
-        { text: t.common.accept, onPress: () => handleAdminInvite(n, true) },
+        { text: t.common.decline, style: 'destructive', onPress: () => handleInvite(n, false) },
+        { text: t.common.accept, onPress: () => handleInvite(n, true) },
       ]);
       return;
     }
@@ -177,8 +222,15 @@ export default function NotificationsScreen() {
                   <Text style={styles.rowTime}>{timeAgo(n.created_at)}</Text>
                 </View>
                 {n.body ? <Text style={styles.rowBody}>{n.body}</Text> : null}
-                {n.type === 'admin_invite' && !n.read && (
-                  <Text style={styles.rowAction}>{t.notif.tapToAcceptDecline}</Text>
+                {(n.type === 'admin_invite' || n.type === 'coordinator_invite') && !n.read && (
+                  <View style={styles.inviteActions}>
+                    <TouchableOpacity style={styles.declineInviteBtn} onPress={() => handleInvite(n, false)} activeOpacity={0.7}>
+                      <Text style={styles.declineInviteBtnText}>{t.common.decline}</Text>
+                    </TouchableOpacity>
+                    <TouchableOpacity style={styles.acceptInviteBtn} onPress={() => handleInvite(n, true)} activeOpacity={0.7}>
+                      <Text style={styles.acceptInviteBtnText}>{t.common.accept}</Text>
+                    </TouchableOpacity>
+                  </View>
                 )}
               </View>
               {!n.read && <View style={styles.unreadDot} />}
@@ -206,6 +258,11 @@ const styles = StyleSheet.create({
   rowAction: { fontSize: 12, color: Colors.black, fontFamily: Fonts.medium, fontWeight: '600', marginTop: 4 },
   unreadDot: { width: 8, height: 8, borderRadius: 4, backgroundColor: Colors.lime, marginTop: 6, flexShrink: 0 },
   deleteAction: { width: 72, backgroundColor: '#FF3B30', alignItems: 'center', justifyContent: 'center' },
+  inviteActions: { flexDirection: 'row', gap: 8, marginTop: 8 },
+  acceptInviteBtn: { backgroundColor: Colors.lime, borderRadius: 20, paddingHorizontal: 14, paddingVertical: 6 },
+  acceptInviteBtnText: { fontSize: 12, fontWeight: '600', color: Colors.black, fontFamily: Fonts.semibold },
+  declineInviteBtn: { backgroundColor: Colors.grayLight, borderRadius: 20, paddingHorizontal: 14, paddingVertical: 6 },
+  declineInviteBtnText: { fontSize: 12, fontWeight: '500', color: Colors.gray, fontFamily: Fonts.medium },
   empty: { flex: 1, alignItems: 'center', justifyContent: 'center', paddingTop: 80, gap: 12 },
   emptyText: { fontSize: 15, color: Colors.gray, fontFamily: Fonts.regular },
 });

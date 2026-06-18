@@ -1186,7 +1186,11 @@ export default function DashboardScreen() {
                 <Text style={s.scanResultName}>{scannedTicket.userName}</Text>
                 <Text style={s.scanResultEvent}>{scannedTicket.eventTitle}</Text>
                 {scannedTicket.valid
-                  ? <TouchableOpacity style={[s.scanCheckInBtn, checkedIn[scannedTicket.eventId]?.has(scannedTicket.userId) && s.scanCheckInBtnDone]} onPress={() => markCheckedIn(scannedTicket.eventId, scannedTicket.userId)} activeOpacity={0.8}>
+                  ? <TouchableOpacity style={[s.scanCheckInBtn, checkedIn[scannedTicket.eventId]?.has(scannedTicket.userId) && s.scanCheckInBtnDone]} onPress={() => {
+                      if (checkedIn[scannedTicket!.eventId]?.has(scannedTicket!.userId)) { setScannedTicket(null); return; }
+                      markCheckedIn(scannedTicket!.eventId, scannedTicket!.userId);
+                      setTimeout(() => setScannedTicket(null), 1200);
+                    }} activeOpacity={0.8}>
                       <Text style={s.scanCheckInBtnText}>{checkedIn[scannedTicket.eventId]?.has(scannedTicket.userId) ? t.dashboard.checkedIn : t.dashboard.checkIn}</Text>
                     </TouchableOpacity>
                   : <View style={s.scanInvalidBadge}><Text style={s.scanInvalidText}>{t.dashboard.invalidTicket}</Text></View>
@@ -1259,7 +1263,7 @@ export default function DashboardScreen() {
                             {isMe
                               ? <View style={s.meBadge}><Text style={s.meBadgeText}>ja</Text></View>
                               : isIn
-                                ? <TouchableOpacity style={s.checkedInBadge} activeOpacity={0.7} onPress={() => { Alert.alert(t.dashboard.checkedIn, t.dashboard.undoCheckInConfirm ?? 'Zrušiť?', [{ text: t.auth.cancel, style: 'cancel' }, { text: 'Zrušiť', style: 'destructive', onPress: () => unmarkCheckedIn(attendeesEvent!.id, item.id) }]); }}>
+                                ? <TouchableOpacity style={s.checkedInBadge} activeOpacity={0.7} onPress={() => { Alert.alert(t.dashboard.checkedIn, t.dashboard.undoCheckInConfirm ?? 'Zrušiť?', [{ text: 'Vrátiť sa', style: 'cancel' }, { text: 'Zrušiť', style: 'destructive', onPress: () => unmarkCheckedIn(attendeesEvent!.id, item.id) }]); }}>
                                     <Text style={s.checkedInBadgeText}>{t.dashboard.checkedIn}</Text>
                                   </TouchableOpacity>
                                 : <TouchableOpacity style={s.checkInBtn} onPress={() => markCheckedIn(attendeesEvent!.id, item.id)} activeOpacity={0.7}>
@@ -2138,7 +2142,11 @@ export default function DashboardScreen() {
                   {scannedTicket.valid && (
                     <TouchableOpacity
                       style={[s.scanCheckInBtn, checkedIn[scannedTicket.eventId]?.has(scannedTicket.userId) && s.scanCheckInBtnDone]}
-                      onPress={() => markCheckedIn(scannedTicket.eventId, scannedTicket.userId)}
+                      onPress={() => {
+                        if (checkedIn[scannedTicket!.eventId]?.has(scannedTicket!.userId)) { setScannedTicket(null); return; }
+                        markCheckedIn(scannedTicket!.eventId, scannedTicket!.userId);
+                        setTimeout(() => setScannedTicket(null), 1200);
+                      }}
                       activeOpacity={0.8}
                     >
                       <Text style={s.scanCheckInBtnText}>
@@ -2310,7 +2318,7 @@ export default function DashboardScreen() {
                             : isIn
                               ? <TouchableOpacity style={s.checkedInBadge} activeOpacity={0.7} onPress={() => {
                                   Alert.alert(t.dashboard.checkedIn, t.dashboard.undoCheckInConfirm ?? 'Zrušiť potvrdenie príchodu?', [
-                                    { text: t.auth.cancel, style: 'cancel' },
+                                    { text: 'Vrátiť sa', style: 'cancel' },
                                     { text: 'Zrušiť', style: 'destructive', onPress: () => unmarkCheckedIn(attendeesEvent!.id, item.id) },
                                   ]);
                                 }}>

@@ -1,6 +1,6 @@
 import { BackButton } from '@/components/ui/BackButton';
 import React, { useEffect, useState } from 'react';
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Alert, Image, Share, ActivityIndicator } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Alert, Image, Share, ActivityIndicator, Modal, TextInput } from 'react-native';
 import { useLocalSearchParams } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Svg, { Path } from 'react-native-svg';
@@ -36,6 +36,16 @@ export default function ClubMembersScreen() {
   const [tab, setTab] = useState<'members' | 'requests'>('members');
   const [sharingAdmin, setSharingAdmin] = useState(false);
   const [sharingCoord, setSharingCoord] = useState(false);
+
+  const [showAdminSearch, setShowAdminSearch] = useState(false);
+  const [adminQuery, setAdminQuery] = useState('');
+  const [adminResults, setAdminResults] = useState<{ id: string; name: string; avatar_url: string | null }[]>([]);
+  const [sendingAdminInvite, setSendingAdminInvite] = useState<string | null>(null);
+
+  const [showCoordSearch, setShowCoordSearch] = useState(false);
+  const [coordQuery, setCoordQuery] = useState('');
+  const [coordResults, setCoordResults] = useState<{ id: string; name: string; avatar_url: string | null }[]>([]);
+  const [sendingCoordInvite, setSendingCoordInvite] = useState<string | null>(null);
 
   useEffect(() => { load(); }, [id, user]);
 
@@ -97,6 +107,87 @@ export default function ClubMembersScreen() {
     } catch {
       Alert.alert(lang === 'sk' ? 'Chyba' : 'Error', lang === 'sk' ? 'Nepodarilo sa vytvoriť pozvánku.' : 'Failed to create invite.');
     } finally { setSharingCoord(false); }
+  }
+
+  async function searchMembers(q: string, excludeIds: Set<string>, setResults: (r: { id: string; name: string; avatar_url: string | null }[]) => void) {
+    if (q.trim().length < 2) { setResults([]); return; }
+    const { data } = await supabase
+      .from('club_members')
+      .select('user_id, profile:profiles(id, name, avatar_url)')
+      .eq('club_id', id)
+      .eq('status', 'approved');
+    const filtered = ((data ?? []) as any[])
+      .map((m: any) => m.profile)
+      .filter((p: any) => p && !excludeIds.has(p.id) && p.name?.toLowerCase().includes(q.trim().toLowerCase()));
+    setResults(filtered);
+  }
+
+  async function inviteAdminFromSearch(profileId: string, profileName: string) {
+    if (!club || !user) return;
+    setSendingAdminInvite(profileId);
+    try {
+      const { data: myProfile } = await supabase.from('profiles').select('name').eq('id', user.id).single();
+      const { data } = await supabase.from('pending_invites').insert({
+        club_id: id, role: 'admin', event_id: null,
+        invited_by: user.id, club_name: club.name, inviter_name: myProfile?.name ?? '',
+      }).select('token').single();
+      if (!data?.token) throw new Error('no token');
+      const title = `Pozvánka: ${club.name}`;
+      const body = `${myProfile?.name ?? 'Niekto'} ťa pozýva spravovať klub ${club.name}.`;
+      await supabase.from('notifications').insert({
+        user_id: profileId, type: 'admin_invite', title, body,
+        data: { token: data.token, club_id: id, action: 'admin_invite' },
+      });
+      const { data: inviteeProfile } = await supabase.from('profiles').select('push_token')
+        .eq('id', profileId).or('notifications_enabled.is.null,notifications_enabled.eq.true').single();
+      if (inviteeProfile?.push_token?.startsWith('ExponentPushToken[')) {
+        await supabase.functions.invoke('send-push', {
+          body: { tokens: [inviteeProfile.push_token], title, body, data: { club_id: id } },
+        });
+      }
+      setShowAdminSearch(false);
+      setAdminQuery('');
+      setAdminResults([]);
+      Alert.alert(lang === 'sk' ? 'Pozvánka odoslaná' : 'Invite sent', `${profileName} ${lang === 'sk' ? 'dostal/a pozvánku správcu.' : 'received an admin invite.'}`);
+    } catch {
+      Alert.alert(lang === 'sk' ? 'Chyba' : 'Error', lang === 'sk' ? 'Pozvánku sa nepodarilo odoslať.' : 'Failed to send invite.');
+    } finally {
+      setSendingAdminInvite(null);
+    }
+  }
+
+  async function inviteCoordFromSearch(profileId: string, profileName: string) {
+    if (!club || !user) return;
+    setSendingCoordInvite(profileId);
+    try {
+      const { data: myProfile } = await supabase.from('profiles').select('name').eq('id', user.id).single();
+      const { data } = await supabase.from('pending_invites').insert({
+        club_id: id, role: 'coordinator', event_id: null,
+        invited_by: user.id, club_name: club.name, inviter_name: myProfile?.name ?? '',
+      }).select('token').single();
+      if (!data?.token) throw new Error('no token');
+      const title = `Pozvánka koordinátora: ${club.name}`;
+      const body = `${myProfile?.name ?? 'Niekto'} ťa pozýva ako koordinátora klubu ${club.name}.`;
+      await supabase.from('notifications').insert({
+        user_id: profileId, type: 'coordinator_invite', title, body,
+        data: { token: data.token, club_id: id, action: 'coordinator_invite' },
+      });
+      const { data: inviteeProfile } = await supabase.from('profiles').select('push_token')
+        .eq('id', profileId).or('notifications_enabled.is.null,notifications_enabled.eq.true').single();
+      if (inviteeProfile?.push_token?.startsWith('ExponentPushToken[')) {
+        await supabase.functions.invoke('send-push', {
+          body: { tokens: [inviteeProfile.push_token], title, body, data: { club_id: id } },
+        });
+      }
+      setShowCoordSearch(false);
+      setCoordQuery('');
+      setCoordResults([]);
+      Alert.alert(lang === 'sk' ? 'Pozvánka odoslaná' : 'Invite sent', `${profileName} ${lang === 'sk' ? 'dostal/a pozvánku koordinátora.' : 'received a coordinator invite.'}`);
+    } catch {
+      Alert.alert(lang === 'sk' ? 'Chyba' : 'Error', lang === 'sk' ? 'Pozvánku sa nepodarilo odoslať.' : 'Failed to send invite.');
+    } finally {
+      setSendingCoordInvite(null);
+    }
   }
 
   async function removeAdmin(adminUserId: string) {
@@ -200,14 +291,16 @@ export default function ClubMembersScreen() {
         ))}
 
         {/* Invite admin button */}
-        <TouchableOpacity style={st.inviteBtn} onPress={shareAdminInvite} disabled={sharingAdmin} activeOpacity={0.7}>
-          {sharingAdmin
-            ? <ActivityIndicator size="small" color={Colors.gray} />
-            : <>
-                <Text style={st.inviteBtnText}>+ {lang === 'sk' ? 'Pozvať správcu' : 'Invite admin'}</Text>
-                <ChevronIcon />
-              </>
-          }
+        <TouchableOpacity style={st.inviteBtn} onPress={() => Alert.alert(
+          lang === 'sk' ? 'Pozvať správcu' : 'Invite admin', '',
+          [
+            { text: lang === 'sk' ? 'Hľadať v členoch' : 'Search members', onPress: () => setShowAdminSearch(true) },
+            { text: lang === 'sk' ? 'Poslať odkaz' : 'Share link', onPress: shareAdminInvite },
+            { text: lang === 'sk' ? 'Zrušiť' : 'Cancel', style: 'cancel' },
+          ]
+        )} activeOpacity={0.7}>
+          <Text style={st.inviteBtnText}>+ {lang === 'sk' ? 'Pozvať správcu' : 'Invite admin'}</Text>
+          <ChevronIcon />
         </TouchableOpacity>
 
         <View style={st.divider} />
@@ -236,14 +329,16 @@ export default function ClubMembersScreen() {
           </View>
         ))}
 
-        <TouchableOpacity style={st.inviteBtn} onPress={shareCoordInvite} disabled={sharingCoord} activeOpacity={0.7}>
-          {sharingCoord
-            ? <ActivityIndicator size="small" color={Colors.gray} />
-            : <>
-                <Text style={st.inviteBtnText}>+ {lang === 'sk' ? 'Pridať koordinátora' : 'Add coordinator'}</Text>
-                <ChevronIcon />
-              </>
-          }
+        <TouchableOpacity style={st.inviteBtn} onPress={() => Alert.alert(
+          lang === 'sk' ? 'Pridať koordinátora' : 'Add coordinator', '',
+          [
+            { text: lang === 'sk' ? 'Hľadať v členoch' : 'Search members', onPress: () => setShowCoordSearch(true) },
+            { text: lang === 'sk' ? 'Poslať odkaz' : 'Share link', onPress: shareCoordInvite },
+            { text: lang === 'sk' ? 'Zrušiť' : 'Cancel', style: 'cancel' },
+          ]
+        )} activeOpacity={0.7}>
+          <Text style={st.inviteBtnText}>+ {lang === 'sk' ? 'Pridať koordinátora' : 'Add coordinator'}</Text>
+          <ChevronIcon />
         </TouchableOpacity>
 
         <View style={st.divider} />
@@ -299,6 +394,88 @@ export default function ClubMembersScreen() {
           );
         })}
       </ScrollView>
+
+      {/* Admin search modal */}
+      <Modal visible={showAdminSearch} animationType="slide" presentationStyle="pageSheet" onRequestClose={() => { setShowAdminSearch(false); setAdminQuery(''); setAdminResults([]); }}>
+        <View style={[st.modal, { paddingTop: insets.top + 16 }]}>
+          <View style={st.modalHeader}>
+            <Text style={st.modalTitle}>{lang === 'sk' ? 'Hľadať správcu' : 'Search admin'}</Text>
+            <TouchableOpacity onPress={() => { setShowAdminSearch(false); setAdminQuery(''); setAdminResults([]); }} hitSlop={12}>
+              <Svg width={22} height={22} viewBox="0 0 24 24" fill="none">
+                <Path d="M18 6L6 18M6 6l12 12" stroke={Colors.black} strokeWidth={2.5} strokeLinecap="round" />
+              </Svg>
+            </TouchableOpacity>
+          </View>
+          <TextInput
+            style={st.searchInput}
+            placeholder={lang === 'sk' ? 'Hľadať podľa mena...' : 'Search by name...'}
+            placeholderTextColor={Colors.gray}
+            value={adminQuery}
+            onChangeText={q => { setAdminQuery(q); searchMembers(q, new Set(admins.map(a => a.user_id)), setAdminResults); }}
+            autoFocus
+            clearButtonMode="while-editing"
+          />
+          {adminResults.map(r => (
+            <View key={r.id} style={st.searchRow}>
+              <View style={[st.av, { flexShrink: 0 }]}>
+                {r.avatar_url
+                  ? <Image source={{ uri: r.avatar_url }} style={StyleSheet.absoluteFill as any} borderRadius={20} />
+                  : <Text style={st.avInitial}>{(r.name || '?').charAt(0).toUpperCase()}</Text>}
+              </View>
+              <Text style={[st.rowName, { flex: 1 }]}>{r.name}</Text>
+              <TouchableOpacity style={st.inviteActionBtn} onPress={() => inviteAdminFromSearch(r.id, r.name)} disabled={sendingAdminInvite === r.id} activeOpacity={0.8}>
+                {sendingAdminInvite === r.id
+                  ? <ActivityIndicator size="small" color={Colors.white} />
+                  : <Text style={st.inviteActionBtnText}>{lang === 'sk' ? 'Pozvať' : 'Invite'}</Text>}
+              </TouchableOpacity>
+            </View>
+          ))}
+          {adminQuery.length >= 2 && adminResults.length === 0 && (
+            <Text style={st.emptyText}>{lang === 'sk' ? 'Žiadni členovia nenájdení.' : 'No members found.'}</Text>
+          )}
+        </View>
+      </Modal>
+
+      {/* Coordinator search modal */}
+      <Modal visible={showCoordSearch} animationType="slide" presentationStyle="pageSheet" onRequestClose={() => { setShowCoordSearch(false); setCoordQuery(''); setCoordResults([]); }}>
+        <View style={[st.modal, { paddingTop: insets.top + 16 }]}>
+          <View style={st.modalHeader}>
+            <Text style={st.modalTitle}>{lang === 'sk' ? 'Hľadať koordinátora' : 'Search coordinator'}</Text>
+            <TouchableOpacity onPress={() => { setShowCoordSearch(false); setCoordQuery(''); setCoordResults([]); }} hitSlop={12}>
+              <Svg width={22} height={22} viewBox="0 0 24 24" fill="none">
+                <Path d="M18 6L6 18M6 6l12 12" stroke={Colors.black} strokeWidth={2.5} strokeLinecap="round" />
+              </Svg>
+            </TouchableOpacity>
+          </View>
+          <TextInput
+            style={st.searchInput}
+            placeholder={lang === 'sk' ? 'Hľadať podľa mena...' : 'Search by name...'}
+            placeholderTextColor={Colors.gray}
+            value={coordQuery}
+            onChangeText={q => { setCoordQuery(q); searchMembers(q, new Set(coordinators.map(c => c.user_id)), setCoordResults); }}
+            autoFocus
+            clearButtonMode="while-editing"
+          />
+          {coordResults.map(r => (
+            <View key={r.id} style={st.searchRow}>
+              <View style={[st.av, { flexShrink: 0 }]}>
+                {r.avatar_url
+                  ? <Image source={{ uri: r.avatar_url }} style={StyleSheet.absoluteFill as any} borderRadius={20} />
+                  : <Text style={st.avInitial}>{(r.name || '?').charAt(0).toUpperCase()}</Text>}
+              </View>
+              <Text style={[st.rowName, { flex: 1 }]}>{r.name}</Text>
+              <TouchableOpacity style={st.inviteActionBtn} onPress={() => inviteCoordFromSearch(r.id, r.name)} disabled={sendingCoordInvite === r.id} activeOpacity={0.8}>
+                {sendingCoordInvite === r.id
+                  ? <ActivityIndicator size="small" color={Colors.white} />
+                  : <Text style={st.inviteActionBtnText}>{lang === 'sk' ? 'Pozvať' : 'Invite'}</Text>}
+              </TouchableOpacity>
+            </View>
+          ))}
+          {coordQuery.length >= 2 && coordResults.length === 0 && (
+            <Text style={st.emptyText}>{lang === 'sk' ? 'Žiadni členovia nenájdení.' : 'No members found.'}</Text>
+          )}
+        </View>
+      </Modal>
     </View>
   );
 }
@@ -338,4 +515,12 @@ const st = StyleSheet.create({
   approveBtnText: { fontSize: 12, fontWeight: '600', fontFamily: Fonts.semibold, color: Colors.black },
   rejectBtn: { backgroundColor: Colors.grayLight, borderRadius: 20, paddingHorizontal: 12, paddingVertical: 6 },
   rejectBtnText: { fontSize: 12, fontWeight: '500', fontFamily: Fonts.medium, color: Colors.gray },
+
+  modal: { flex: 1, backgroundColor: Colors.white, paddingHorizontal: 20 },
+  modalHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 20 },
+  modalTitle: { fontSize: 20, fontWeight: '700', color: Colors.black, fontFamily: Fonts.bold },
+  searchInput: { backgroundColor: Colors.grayLight, borderRadius: 14, paddingHorizontal: 16, paddingVertical: 12, fontSize: 15, color: Colors.black, fontFamily: Fonts.regular, marginBottom: 12 },
+  searchRow: { flexDirection: 'row', alignItems: 'center', gap: 12, paddingVertical: 10, borderBottomWidth: 1, borderColor: Colors.grayBorder },
+  inviteActionBtn: { backgroundColor: Colors.black, borderRadius: 20, paddingHorizontal: 16, paddingVertical: 8 },
+  inviteActionBtnText: { fontSize: 13, fontWeight: '600', color: Colors.white, fontFamily: Fonts.semibold },
 });
