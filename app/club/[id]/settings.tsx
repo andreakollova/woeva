@@ -275,8 +275,8 @@ export default function ClubSettingsScreen() {
     },
     (isCreator || isCoAdmin) && {
       icon: 'users',
-      label: lang === 'sk' ? 'Správca klubu' : 'Club admins',
-      sub: lang === 'sk' ? 'Spravovať správcov' : 'Manage admins',
+      label: lang === 'sk' ? 'Vedenie klubu a správcovia' : 'Leadership & admins',
+      sub: lang === 'sk' ? 'Správcovia, koordinátori, členovia' : 'Admins, coordinators, members',
       onPress: () => router.push(`/club/${id}/members` as any),
     },
     {
@@ -310,68 +310,6 @@ export default function ClubSettingsScreen() {
         contentContainerStyle={[styles.scroll, { paddingBottom: insets.bottom + 40 }]}
         showsVerticalScrollIndicator={false}
       >
-        {/* Admins section */}
-        {(isCreator || isCoAdmin) && (
-          <View style={[styles.section, { marginBottom: 16 }]}>
-            <Text style={styles.sectionLabel}>{lang === 'sk' ? 'SPRÁVCOVIA' : 'ADMINS'}</Text>
-            <View style={styles.list}>
-              {admins.map((a, i) => (
-                <View key={a.user_id} style={[styles.adminRow, i < admins.length - 1 && styles.rowBorder]}>
-                  <View style={styles.adminAvatar}>
-                    {a.avatar_url ? <Image source={{ uri: a.avatar_url }} style={StyleSheet.absoluteFill as any} borderRadius={20} /> : null}
-                    {!a.avatar_url && <Text style={styles.adminInitial}>{(a.name || '?').charAt(0).toUpperCase()}</Text>}
-                  </View>
-                  <Text style={[styles.rowLabel, { flex: 1 }]}>{a.name.split(' ')[0]}</Text>
-                  {a.user_id === club?.creator_id
-                    ? <Text style={styles.ownerBadge}>{lang === 'sk' ? 'Vlastník' : 'Owner'}</Text>
-                    : <TouchableOpacity onPress={() => removeAdmin(a.user_id)} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
-                        <Text style={styles.removeText}>{lang === 'sk' ? 'Odstrániť' : 'Remove'}</Text>
-                      </TouchableOpacity>
-                  }
-                </View>
-              ))}
-              <TouchableOpacity style={[styles.row, admins.length > 0 && styles.rowBorder]} onPress={shareAdminInvite} disabled={sharingAdmin} activeOpacity={0.7}>
-                <View style={{ flex: 1 }}>
-                  <Text style={[styles.rowLabel, { color: Colors.black }]}>+ {lang === 'sk' ? 'Pozvať správcu' : 'Invite admin'}</Text>
-                  <Text style={styles.rowSub}>{lang === 'sk' ? 'Môže spravovať eventy, členov a nastavenia klubu' : 'Can manage events, members and club settings'}</Text>
-                </View>
-                {sharingAdmin ? <ActivityIndicator size="small" color={Colors.gray} /> : <ChevronIcon />}
-              </TouchableOpacity>
-            </View>
-          </View>
-        )}
-
-        {/* Coordinators section */}
-        {(isCreator || isCoAdmin) && (
-          <View style={[styles.section, { marginBottom: 16 }]}>
-            <Text style={styles.sectionLabel}>{lang === 'sk' ? 'KOORDINÁTORI' : 'COORDINATORS'}</Text>
-            <View style={styles.list}>
-              {coordinators.map((c, i) => (
-                <View key={c.id} style={[styles.adminRow, i < coordinators.length - 1 && styles.rowBorder]}>
-                  <View style={styles.adminAvatar}>
-                    {c.avatar_url ? <Image source={{ uri: c.avatar_url }} style={StyleSheet.absoluteFill as any} borderRadius={20} /> : null}
-                    {!c.avatar_url && <Text style={styles.adminInitial}>{(c.name || '?').charAt(0).toUpperCase()}</Text>}
-                  </View>
-                  <View style={{ flex: 1 }}>
-                    <Text style={styles.rowLabel}>{c.name.split(' ')[0]}</Text>
-                    <Text style={styles.rowSub}>{c.event_title ?? (lang === 'sk' ? 'Všetky eventy' : 'All events')}</Text>
-                  </View>
-                  <TouchableOpacity onPress={() => removeCoordinator(c.id)} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
-                    <Text style={styles.removeText}>{lang === 'sk' ? 'Odstrániť' : 'Remove'}</Text>
-                  </TouchableOpacity>
-                </View>
-              ))}
-              <TouchableOpacity style={[styles.row, coordinators.length > 0 && styles.rowBorder]} onPress={shareCoordInvite} disabled={sharingCoord} activeOpacity={0.7}>
-                <View style={{ flex: 1 }}>
-                  <Text style={[styles.rowLabel, { color: Colors.black }]}>+ {lang === 'sk' ? 'Pridať koordinátora' : 'Add coordinator'}</Text>
-                  <Text style={styles.rowSub}>{lang === 'sk' ? 'Môže iba skenovať QR kódy a potvrdzovať vstupy' : 'Can only scan QR codes and confirm entry'}</Text>
-                </View>
-                {sharingCoord ? <ActivityIndicator size="small" color={Colors.gray} /> : <ChevronIcon />}
-              </TouchableOpacity>
-            </View>
-          </View>
-        )}
-
         {/* Notification toggles */}
         <View style={[styles.section, { marginBottom: 16 }]}>
           <Text style={styles.sectionLabel}>{lang === 'sk' ? 'MOJE NOTIFIKÁCIE' : 'MY NOTIFICATIONS'}</Text>
