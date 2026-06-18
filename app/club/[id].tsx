@@ -301,7 +301,7 @@ export default function ClubDetailScreen() {
               onPress={() => router.push(`/club/${id}/settings` as any)}
               activeOpacity={0.8}
             >
-              <Text style={styles.adminText}>{t.club.clubSettings.toUpperCase()}</Text>
+              <Text style={styles.adminText}>{(t.club.clubSettings ?? 'SETTINGS').toUpperCase()}</Text>
             </TouchableOpacity>
           )}
         </View>
