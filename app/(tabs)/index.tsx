@@ -338,8 +338,8 @@ export default function HomeScreen() {
 
   const citySheetY = useRef(new RNAnimated.Value(900)).current;
   const cityPanResponder = useRef(PanResponder.create({
-    onStartShouldSetPanResponder: () => true,
-    onMoveShouldSetPanResponder: () => true,
+    onStartShouldSetPanResponder: () => false,
+    onMoveShouldSetPanResponder: (_, { dy, dx }) => dy > 8 && Math.abs(dy) > Math.abs(dx),
     onPanResponderMove: (_, { dy }) => { if (dy > 0) citySheetY.setValue(dy); },
     onPanResponderRelease: (_, { dy, vy }) => {
       if (dy > 100 || vy > 0.8) {
@@ -355,7 +355,7 @@ export default function HomeScreen() {
 
   function openCitySheet() {
     citySheetY.setValue(900);
-    openCitySheet();
+    setShowCityPicker(true);
     RNAnimated.timing(citySheetY, { toValue: 0, duration: 300, easing: Easing.out(Easing.cubic), useNativeDriver: true }).start();
   }
 
@@ -852,9 +852,9 @@ export default function HomeScreen() {
       <Modal visible={showCityPicker} transparent animationType="none" onRequestClose={closeCitySheet}>
         <View style={styles.cityModalBg}>
           <Pressable style={StyleSheet.absoluteFill} onPress={closeCitySheet} />
-          <RNAnimated.View style={[styles.cityModalSheet, { transform: [{ translateY: citySheetY }] }]}>
-            {/* Handle — drag zone */}
-            <View {...cityPanResponder.panHandlers} style={styles.cityModalHandleZone}>
+          <RNAnimated.View style={[styles.cityModalSheet, { transform: [{ translateY: citySheetY }] }]} {...cityPanResponder.panHandlers}>
+            {/* Handle */}
+            <View style={styles.cityModalHandleZone}>
               <View style={styles.cityModalHandle} />
             </View>
             <ScrollView
