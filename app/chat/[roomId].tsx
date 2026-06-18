@@ -184,7 +184,6 @@ export default function ChatScreen() {
           .from('profiles')
           .select('push_token, muted_chats')
           .in('id', attendeeIds)
-          .neq('notifications_enabled', false)
           .not('push_token', 'is', null);
 
         const tokens = (pushProfiles ?? [])
