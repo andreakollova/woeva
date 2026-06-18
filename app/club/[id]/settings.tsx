@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, ScrollView, Alert, Linking, ActivityIndicator } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, ScrollView, Alert, Linking, ActivityIndicator, Image, TextInput } from 'react-native';
 import { useLocalSearchParams, useRouter, useNavigation } from 'expo-router';
 import { StackActions } from '@react-navigation/native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -45,21 +45,56 @@ export default function ClubSettingsScreen() {
   const [isCreator, setIsCreator] = useState(false);
   const [isCoAdmin, setIsCoAdmin] = useState(false);
   const [deleting, setDeleting] = useState(false);
+  const [admins, setAdmins] = useState<{ user_id: string; name: string; avatar_url: string | null }[]>([]);
+  const [inviteQuery, setInviteQuery] = useState('');
+  const [inviteResults, setInviteResults] = useState<{ id: string; name: string; avatar_url: string | null }[]>([]);
+  const [showInvite, setShowInvite] = useState(false);
+  const [notifChat, setNotifChat] = useState(profile?.notif_chat ?? true);
 
   useEffect(() => { load(); }, [id, user]);
 
   async function load() {
-    const [{ data: clubData }, { data: memberData }] = await Promise.all([
+    const [{ data: clubData }, { data: memberData }, { data: adminData }] = await Promise.all([
       supabase.from('clubs').select('id, name, creator_id').eq('id', id).single(),
       user
         ? supabase.from('club_members').select('role').eq('club_id', id).eq('user_id', user.id).eq('status', 'approved').maybeSingle()
         : Promise.resolve({ data: null }),
+      supabase.from('club_members').select('user_id, profile:profiles(name, avatar_url)').eq('club_id', id).eq('role', 'admin').eq('status', 'approved'),
     ]);
     setClub(clubData ?? null);
+    setAdmins(((adminData ?? []) as any[]).map(m => ({ user_id: m.user_id, name: m.profile?.name ?? '', avatar_url: m.profile?.avatar_url ?? null })));
     if (user && clubData) {
       setIsCreator(clubData.creator_id === user.id);
       setIsCoAdmin(memberData?.role === 'admin' && clubData.creator_id !== user.id);
     }
+  }
+
+  async function searchInvite(q: string) {
+    setInviteQuery(q);
+    if (q.trim().length < 2) { setInviteResults([]); return; }
+    const { data } = await supabase.from('profiles').select('id, name, avatar_url').or(`name.ilike.%${q.trim()}%`).neq('id', user!.id).limit(6);
+    const existingIds = new Set(admins.map(a => a.user_id));
+    setInviteResults(((data ?? []) as any[]).filter(r => !existingIds.has(r.id)));
+  }
+
+  async function inviteAdmin(profileId: string, profileName: string) {
+    if (!club) return;
+    await supabase.from('club_members').upsert({ club_id: id, user_id: profileId, role: 'admin', status: 'pending' }, { onConflict: 'club_id,user_id' });
+    await supabase.from('notifications').insert({ user_id: profileId, type: 'admin_invite', title: `Pozvánka: ${club.name}`, body: `Bol/a si pozvaný/á spravovať klub ${club.name}.`, data: { club_id: id, action: 'admin_invite' } });
+    setShowInvite(false);
+    setInviteQuery('');
+    setInviteResults([]);
+    Alert.alert(lang === 'sk' ? 'Pozvánka odoslaná' : 'Invite sent', `${profileName}`);
+  }
+
+  async function removeAdmin(adminUserId: string) {
+    Alert.alert(lang === 'sk' ? 'Odstrániť správcu?' : 'Remove admin?', '', [
+      { text: lang === 'sk' ? 'Zrušiť' : 'Cancel', style: 'cancel' },
+      { text: lang === 'sk' ? 'Odstrániť' : 'Remove', style: 'destructive', onPress: async () => {
+        await supabase.from('club_members').update({ role: 'member' }).eq('club_id', id).eq('user_id', adminUserId);
+        setAdmins(prev => prev.filter(a => a.user_id !== adminUserId));
+      }},
+    ]);
   }
 
   async function handleLeave() {
@@ -151,8 +186,8 @@ export default function ClubSettingsScreen() {
     },
     {
       icon: 'bell',
-      label: lang === 'sk' ? 'Notifikácie' : 'Notifications',
-      sub: null,
+      label: lang === 'sk' ? 'Všetky notifikácie' : 'All notifications',
+      sub: lang === 'sk' ? 'Nastavenia push notifikácií' : 'Push notification settings',
       onPress: () => router.push('/settings/notifications' as any),
     },
     {
@@ -180,6 +215,76 @@ export default function ClubSettingsScreen() {
         contentContainerStyle={[styles.scroll, { paddingBottom: insets.bottom + 40 }]}
         showsVerticalScrollIndicator={false}
       >
+        {/* Admins section */}
+        {isCreator && (
+          <View style={[styles.section, { marginBottom: 16 }]}>
+            <Text style={styles.sectionLabel}>{lang === 'sk' ? 'SPRÁVCOVIA' : 'ADMINS'}</Text>
+            <View style={styles.list}>
+              {admins.map((a, i) => (
+                <View key={a.user_id} style={[styles.adminRow, i < admins.length - 1 && styles.rowBorder]}>
+                  <View style={styles.adminAvatar}>
+                    {a.avatar_url ? <Image source={{ uri: a.avatar_url }} style={StyleSheet.absoluteFill as any} borderRadius={20} /> : null}
+                    {!a.avatar_url && <Text style={styles.adminInitial}>{(a.name || '?').charAt(0).toUpperCase()}</Text>}
+                  </View>
+                  <Text style={[styles.rowLabel, { flex: 1 }]}>{a.name.split(' ')[0]}</Text>
+                  {a.user_id === user?.id
+                    ? <Text style={styles.ownerBadge}>{lang === 'sk' ? 'Vlastník' : 'Owner'}</Text>
+                    : <TouchableOpacity onPress={() => removeAdmin(a.user_id)} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
+                        <Text style={styles.removeText}>{lang === 'sk' ? 'Odstrániť' : 'Remove'}</Text>
+                      </TouchableOpacity>
+                  }
+                </View>
+              ))}
+              <TouchableOpacity style={[styles.row, admins.length > 0 && styles.rowBorder]} onPress={() => setShowInvite(v => !v)} activeOpacity={0.7}>
+                <Text style={[styles.rowLabel, { color: Colors.black }]}>+ {lang === 'sk' ? 'Pozvať správcu' : 'Invite admin'}</Text>
+              </TouchableOpacity>
+              {showInvite && (
+                <View style={{ paddingHorizontal: 16, paddingBottom: 12 }}>
+                  <TextInput
+                    style={styles.inviteInput}
+                    value={inviteQuery}
+                    onChangeText={searchInvite}
+                    placeholder={lang === 'sk' ? 'Hľadaj podľa mena...' : 'Search by name...'}
+                    placeholderTextColor={Colors.gray}
+                    autoFocus
+                  />
+                  {inviteResults.map(r => (
+                    <TouchableOpacity key={r.id} style={styles.inviteResult} onPress={() => inviteAdmin(r.id, r.name)}>
+                      <Text style={styles.rowLabel}>{r.name}</Text>
+                      <Text style={styles.rowSub}>+ {lang === 'sk' ? 'Pozvať' : 'Invite'}</Text>
+                    </TouchableOpacity>
+                  ))}
+                </View>
+              )}
+            </View>
+          </View>
+        )}
+
+        {/* Notification toggles */}
+        <View style={[styles.section, { marginBottom: 16 }]}>
+          <Text style={styles.sectionLabel}>{lang === 'sk' ? 'MOJE NOTIFIKÁCIE' : 'MY NOTIFICATIONS'}</Text>
+          <View style={styles.list}>
+            <View style={[styles.toggleRow, styles.rowBorder]}>
+              <Text style={styles.rowLabel}>{lang === 'sk' ? 'Nové správy v chate' : 'New chat messages'}</Text>
+              <TouchableOpacity
+                style={[styles.toggle, notifChat && styles.toggleOn]}
+                onPress={() => {
+                  const next = !notifChat;
+                  setNotifChat(next);
+                  if (user) supabase.from('profiles').update({ notif_chat: next }).eq('id', user.id);
+                }}
+                activeOpacity={0.8}
+              >
+                <View style={[styles.toggleThumb, notifChat && styles.toggleThumbOn]} />
+              </TouchableOpacity>
+            </View>
+            <View style={styles.toggleRow}>
+              <Text style={styles.rowLabel}>{lang === 'sk' ? 'Notifikácie' : 'All notifications'}</Text>
+              <ChevronIcon />
+            </View>
+          </View>
+        </View>
+
         <View style={styles.section}>
           <View style={styles.list}>
             {ROWS.map((item, i) => (
@@ -253,4 +358,18 @@ const styles = StyleSheet.create({
 
   deleteWrap: { marginTop: 32, alignItems: 'center' },
   deleteText: { fontSize: 13, color: Colors.gray, fontFamily: Fonts.regular },
+
+  sectionLabel: { fontSize: 11, fontWeight: '600', color: Colors.gray, letterSpacing: 0.5, marginBottom: 8, fontFamily: Fonts.semibold },
+  adminRow: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 16, paddingVertical: 12, gap: 12, backgroundColor: Colors.white },
+  adminAvatar: { width: 36, height: 36, borderRadius: 18, backgroundColor: Colors.grayLight, alignItems: 'center', justifyContent: 'center', overflow: 'hidden' },
+  adminInitial: { fontSize: 14, fontWeight: '600', color: Colors.gray },
+  ownerBadge: { fontSize: 12, color: Colors.gray, fontFamily: Fonts.regular },
+  removeText: { fontSize: 13, color: '#FF3B30', fontFamily: Fonts.regular },
+  inviteInput: { height: 40, borderWidth: 1.5, borderColor: Colors.grayBorder, borderRadius: 10, paddingHorizontal: 12, fontSize: 14, color: Colors.black, marginBottom: 8 },
+  inviteResult: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingVertical: 10, borderTopWidth: 1, borderColor: Colors.grayBorder },
+  toggleRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 16, paddingVertical: 14, backgroundColor: Colors.white },
+  toggle: { width: 44, height: 26, borderRadius: 13, backgroundColor: Colors.grayBorder, justifyContent: 'center', padding: 2 },
+  toggleOn: { backgroundColor: Colors.lime },
+  toggleThumb: { width: 22, height: 22, borderRadius: 11, backgroundColor: Colors.white },
+  toggleThumbOn: { alignSelf: 'flex-end' },
 });
