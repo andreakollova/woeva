@@ -1,7 +1,7 @@
 import React, { useEffect, useState, useCallback, useRef } from 'react';
 import {
   View, Text, StyleSheet, ScrollView, TouchableOpacity, Pressable,
-  RefreshControl, Image, Modal, Dimensions, Animated as RNAnimated, PanResponder,
+  RefreshControl, Image, Modal, Dimensions, Animated as RNAnimated, PanResponder, Easing,
 } from 'react-native';
 import { StatusBar, setStatusBarStyle } from 'expo-status-bar';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -336,34 +336,33 @@ export default function HomeScreen() {
   const [showCityPicker, setShowCityPicker] = useState(false);
   const [expandedCountries, setExpandedCountries] = useState<Set<string>>(new Set(['SK']));
 
-  const citySheetY = useRef(new RNAnimated.Value(600)).current;
+  const citySheetY = useRef(new RNAnimated.Value(900)).current;
   const cityPanResponder = useRef(PanResponder.create({
     onStartShouldSetPanResponder: () => true,
     onMoveShouldSetPanResponder: () => true,
     onPanResponderMove: (_, { dy }) => { if (dy > 0) citySheetY.setValue(dy); },
     onPanResponderRelease: (_, { dy, vy }) => {
       if (dy > 100 || vy > 0.8) {
-        RNAnimated.timing(citySheetY, { toValue: 600, duration: 220, useNativeDriver: true }).start(() => {
+        RNAnimated.timing(citySheetY, { toValue: 900, duration: 220, easing: Easing.in(Easing.cubic), useNativeDriver: true }).start(() => {
           setShowCityPicker(false);
-          citySheetY.setValue(600);
+          citySheetY.setValue(900);
         });
       } else {
-        RNAnimated.spring(citySheetY, { toValue: 0, useNativeDriver: true }).start();
+        RNAnimated.timing(citySheetY, { toValue: 0, duration: 200, easing: Easing.out(Easing.cubic), useNativeDriver: true }).start();
       }
     },
   })).current;
 
-  useEffect(() => {
-    if (showCityPicker) {
-      citySheetY.setValue(600);
-      (RNAnimated.spring(citySheetY, { toValue: 0, useNativeDriver: true, tension: 65, friction: 11 } as any) as any).start();
-    }
-  }, [showCityPicker]);
+  function openCitySheet() {
+    citySheetY.setValue(900);
+    openCitySheet();
+    RNAnimated.timing(citySheetY, { toValue: 0, duration: 300, easing: Easing.out(Easing.cubic), useNativeDriver: true }).start();
+  }
 
   function closeCitySheet() {
-    RNAnimated.timing(citySheetY, { toValue: 600, duration: 220, useNativeDriver: true }).start(() => {
+    RNAnimated.timing(citySheetY, { toValue: 900, duration: 220, easing: Easing.in(Easing.cubic), useNativeDriver: true }).start(() => {
       setShowCityPicker(false);
-      citySheetY.setValue(600);
+      citySheetY.setValue(900);
     });
   }
   const [unreadNotifs, setUnreadNotifs] = useState(0);
@@ -650,7 +649,7 @@ export default function HomeScreen() {
             </Animated.View>
           ) : (
             <>
-              <TouchableOpacity onPress={() => setShowCityPicker(true)} style={styles.cityRow}>
+              <TouchableOpacity onPress={() => openCitySheet()} style={styles.cityRow}>
                 <Text style={styles.cityLabel}>{city ?? t.home.selectCity}</Text>
                 <Svg width={14} height={14} viewBox="0 0 24 24" fill="none">
                   <Path d="M6 9l6 6 6-6" stroke={Colors.gray} strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" />

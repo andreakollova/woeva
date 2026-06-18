@@ -1,7 +1,7 @@
 import React, { useState, useCallback, useMemo, useRef } from 'react';
 import {
   View, Text, StyleSheet, ScrollView, TouchableOpacity, Pressable,
-  Image, Alert, ActivityIndicator, Modal, TextInput, Platform, FlatList, KeyboardAvoidingView, RefreshControl, Share, PanResponder, Animated as RNAnimated,
+  Image, Alert, ActivityIndicator, Modal, TextInput, Platform, FlatList, KeyboardAvoidingView, RefreshControl, Share, PanResponder, Animated as RNAnimated, Easing,
 } from 'react-native';
 // expo-camera requires a native build - safe lazy import
 let _expoCamera: any = null;
@@ -359,51 +359,47 @@ export default function DashboardScreen() {
   const [invitingAdmin, setInvitingAdmin] = useState(false);
 
   // Animated bottom sheet refs for modals
-  const attendeesSheetY = useRef(new RNAnimated.Value(600)).current;
+  const SHEET_INIT = 900;
+  const sheetOpen = (y: RNAnimated.Value) => RNAnimated.timing(y, { toValue: 0, duration: 300, easing: Easing.out(Easing.cubic), useNativeDriver: true }).start();
+  const sheetClose = (y: RNAnimated.Value, cb: () => void) => RNAnimated.timing(y, { toValue: SHEET_INIT, duration: 220, easing: Easing.in(Easing.cubic), useNativeDriver: true }).start(() => { cb(); y.setValue(SHEET_INIT); });
+  const sheetSnap = (y: RNAnimated.Value) => RNAnimated.timing(y, { toValue: 0, duration: 200, easing: Easing.out(Easing.cubic), useNativeDriver: true }).start();
+
+  const attendeesSheetY = useRef(new RNAnimated.Value(SHEET_INIT)).current;
   const attendeesPan = useRef(PanResponder.create({
     onStartShouldSetPanResponder: () => true,
     onMoveShouldSetPanResponder: () => true,
     onPanResponderMove: (_, { dy }) => { if (dy > 0) attendeesSheetY.setValue(dy); },
     onPanResponderRelease: (_, { dy, vy }) => {
-      if (dy > 80 || vy > 0.8) {
-        RNAnimated.timing(attendeesSheetY, { toValue: 600, duration: 220, useNativeDriver: true }).start(() => { setAttendeesEvent(null); attendeesSheetY.setValue(600); });
-      } else { RNAnimated.spring(attendeesSheetY, { toValue: 0, useNativeDriver: true }).start(); }
+      if (dy > 80 || vy > 0.8) { sheetClose(attendeesSheetY, () => setAttendeesEvent(null)); }
+      else { sheetSnap(attendeesSheetY); }
     },
   })).current;
 
-  const clubSettingsSheetY = useRef(new RNAnimated.Value(600)).current;
+  const clubSettingsSheetY = useRef(new RNAnimated.Value(SHEET_INIT)).current;
   const clubSettingsPan = useRef(PanResponder.create({
     onStartShouldSetPanResponder: () => false,
     onMoveShouldSetPanResponder: (_, { dy, dx }) => dy > 8 && Math.abs(dy) > Math.abs(dx),
     onPanResponderMove: (_, { dy }) => { if (dy > 0) clubSettingsSheetY.setValue(dy); },
     onPanResponderRelease: (_, { dy, vy }) => {
-      if (dy > 80 || vy > 0.8) {
-        RNAnimated.timing(clubSettingsSheetY, { toValue: 600, duration: 220, useNativeDriver: true }).start(() => { setShowClubSettings(false); clubSettingsSheetY.setValue(600); });
-      } else { RNAnimated.spring(clubSettingsSheetY, { toValue: 0, useNativeDriver: true }).start(); }
+      if (dy > 80 || vy > 0.8) { sheetClose(clubSettingsSheetY, () => setShowClubSettings(false)); }
+      else { sheetSnap(clubSettingsSheetY); }
     },
   })).current;
 
-  const inviteAdminSheetY = useRef(new RNAnimated.Value(600)).current;
+  const inviteAdminSheetY = useRef(new RNAnimated.Value(SHEET_INIT)).current;
   const inviteAdminPan = useRef(PanResponder.create({
     onStartShouldSetPanResponder: () => true,
     onMoveShouldSetPanResponder: () => true,
     onPanResponderMove: (_, { dy }) => { if (dy > 0) inviteAdminSheetY.setValue(dy); },
     onPanResponderRelease: (_, { dy, vy }) => {
-      if (dy > 80 || vy > 0.8) {
-        RNAnimated.timing(inviteAdminSheetY, { toValue: 600, duration: 220, useNativeDriver: true }).start(() => { setShowInviteAdmin(false); setInviteQuery(''); setInviteResults([]); inviteAdminSheetY.setValue(600); });
-      } else { RNAnimated.spring(inviteAdminSheetY, { toValue: 0, useNativeDriver: true }).start(); }
+      if (dy > 80 || vy > 0.8) { sheetClose(inviteAdminSheetY, () => { setShowInviteAdmin(false); setInviteQuery(''); setInviteResults([]); }); }
+      else { sheetSnap(inviteAdminSheetY); }
     },
   })).current;
 
-  function closeAttendees() {
-    RNAnimated.timing(attendeesSheetY, { toValue: 600, duration: 220, useNativeDriver: true }).start(() => { setAttendeesEvent(null); attendeesSheetY.setValue(600); });
-  }
-  function closeClubSettings() {
-    RNAnimated.timing(clubSettingsSheetY, { toValue: 600, duration: 220, useNativeDriver: true }).start(() => { setShowClubSettings(false); clubSettingsSheetY.setValue(600); });
-  }
-  function closeInviteAdmin() {
-    RNAnimated.timing(inviteAdminSheetY, { toValue: 600, duration: 220, useNativeDriver: true }).start(() => { setShowInviteAdmin(false); setInviteQuery(''); setInviteResults([]); inviteAdminSheetY.setValue(600); });
-  }
+  function closeAttendees() { sheetClose(attendeesSheetY, () => setAttendeesEvent(null)); }
+  function closeClubSettings() { sheetClose(clubSettingsSheetY, () => setShowClubSettings(false)); }
+  function closeInviteAdmin() { sheetClose(inviteAdminSheetY, () => { setShowInviteAdmin(false); setInviteQuery(''); setInviteResults([]); }); }
 
   // Check-ins: eventId → Set of userId
   const [checkedIn, setCheckedIn] = useState<Record<string, Set<string>>>({});
@@ -442,15 +438,6 @@ export default function DashboardScreen() {
     else setMembers([]);
   }, [selectedClubId, clubs.length]);
 
-  React.useEffect(() => {
-    if (!!attendeesEvent) { attendeesSheetY.setValue(600); (RNAnimated.spring(attendeesSheetY, { toValue: 0, useNativeDriver: true, tension: 65, friction: 11 } as any) as any).start(); }
-  }, [!!attendeesEvent]);
-  React.useEffect(() => {
-    if (showClubSettings) { clubSettingsSheetY.setValue(600); (RNAnimated.spring(clubSettingsSheetY, { toValue: 0, useNativeDriver: true, tension: 65, friction: 11 } as any) as any).start(); }
-  }, [showClubSettings]);
-  React.useEffect(() => {
-    if (showInviteAdmin) { inviteAdminSheetY.setValue(600); (RNAnimated.spring(inviteAdminSheetY, { toValue: 0, useNativeDriver: true, tension: 65, friction: 11 } as any) as any).start(); }
-  }, [showInviteAdmin]);
 
   async function openClubSettings() {
     const targetClub = selectedClub ?? clubs[0];
@@ -466,7 +453,9 @@ export default function DashboardScreen() {
       name: m.profile?.name ?? '',
       avatar_url: m.profile?.avatar_url ?? null,
     })));
+    clubSettingsSheetY.setValue(SHEET_INIT);
     setShowClubSettings(true);
+    sheetOpen(clubSettingsSheetY);
   }
 
   async function removeAdmin(userId: string) {
@@ -769,7 +758,9 @@ export default function DashboardScreen() {
   }
 
   async function openAttendees(event: EventRow) {
+    attendeesSheetY.setValue(SHEET_INIT);
     setAttendeesEvent(event);
+    sheetOpen(attendeesSheetY);
     setLoadingAttendees(true);
     // For recurring events the id is synthetic: "realUUID_YYYY-MM-DD"
     // UUIDs contain only hyphens, so the first underscore separates uuid from date
@@ -1884,7 +1875,7 @@ export default function DashboardScreen() {
                   }
                 </View>
               ))}
-              <TouchableOpacity style={s.settingsRow} onPress={() => { closeClubSettings(); setTimeout(() => setShowInviteAdmin(true), 280); }} activeOpacity={0.7}>
+              <TouchableOpacity style={s.settingsRow} onPress={() => { closeClubSettings(); setTimeout(() => { inviteAdminSheetY.setValue(SHEET_INIT); setShowInviteAdmin(true); sheetOpen(inviteAdminSheetY); }, 280); }} activeOpacity={0.7}>
                 <Text style={[s.settingsRowLabel, { color: Colors.black, fontWeight: '600' }]}>{t.dashboard.inviteAdminPlus}</Text>
               </TouchableOpacity>
             </View>
