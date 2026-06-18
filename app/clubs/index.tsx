@@ -1,31 +1,40 @@
 import React, { useEffect, useState } from 'react';
 import { View, Text, StyleSheet, ScrollView, TextInput, TouchableOpacity, Image } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { useRouter } from 'expo-router';
+import { useRouter, useLocalSearchParams } from 'expo-router';
 import { BackButton } from '@/components/ui/BackButton';
 import { Colors } from '@/constants/colors';
 import { Fonts } from '@/constants/fonts';
 import { supabase } from '@/lib/supabase';
 import { clubDisplayName } from '@/lib/formatVenue';
 
+function memberLabel(count: number): string {
+  if (count === 1) return '1 člen';
+  if (count >= 2 && count <= 4) return `${count} členovia`;
+  return `${count} členov`;
+}
+
 export default function AllClubsScreen() {
   const insets = useSafeAreaInsets();
   const router = useRouter();
+  const { city: cityParam } = useLocalSearchParams<{ city?: string }>();
   const [clubs, setClubs] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
 
   useEffect(() => {
     (async () => {
-      const { data } = await supabase
+      let q = supabase
         .from('clubs')
-        .select('id, name, logo_url, cover_url, member_count, city, description')
+        .select('id, name, logo_url, cover_url, member_count, city')
         .order('member_count', { ascending: false })
         .limit(100);
+      if (cityParam) q = (q as any).ilike('city', `%${cityParam}%`);
+      const { data } = await q;
       setClubs(data ?? []);
       setLoading(false);
     })();
-  }, []);
+  }, [cityParam]);
 
   const displayed = search.trim()
     ? clubs.filter(c => c.name?.toLowerCase().includes(search.toLowerCase()) || c.city?.toLowerCase().includes(search.toLowerCase()))
@@ -79,9 +88,8 @@ function ClubRow({ club, onPress }: { club: any; onPress: () => void }) {
       <View style={{ flex: 1 }}>
         <Text style={styles.name} numberOfLines={1}>{clubDisplayName(club.name)}</Text>
         <Text style={styles.meta} numberOfLines={1}>
-          {club.city ? `${club.city}` : ''}{club.member_count ? `  ·  ${club.member_count} členov` : ''}
+          {club.city ? `${club.city}` : ''}{club.member_count ? `  ·  ${memberLabel(club.member_count)}` : ''}
         </Text>
-        {club.description ? <Text style={styles.desc} numberOfLines={2}>{club.description}</Text> : null}
       </View>
       <Text style={styles.arrow}>›</Text>
     </TouchableOpacity>
@@ -102,6 +110,5 @@ const styles = StyleSheet.create({
   logoInitial: { fontSize:22, fontWeight:'800', color:Colors.black },
   name: { fontSize:15, fontWeight:'700', fontFamily:Fonts.bold, color:Colors.black, marginBottom:2 },
   meta: { fontSize:12, color:Colors.gray, fontFamily:Fonts.regular },
-  desc: { fontSize:12, color:Colors.gray, fontFamily:Fonts.regular, marginTop:2 },
   arrow: { fontSize:22, color:Colors.gray, paddingLeft:4 },
 });

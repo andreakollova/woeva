@@ -128,7 +128,7 @@ export default function ClubDetailScreen() {
         const seen = new Set<string>();
         eventsData = merged
           .filter(e => { if (seen.has(e.id)) return false; seen.add(e.id); return true; })
-          .sort((a, b) => a.date.localeCompare(b.date))
+          .sort((a, b) => (a.date ?? '').localeCompare(b.date ?? ''))
           .slice(0, 50);
       } else {
         const { data } = await supabase.from('events')

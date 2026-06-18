@@ -312,7 +312,11 @@ function getRotatingCover(event: { cover_url: string | null; cover_urls?: string
 }
 
 function getEventDate(date: string, isRecurring?: boolean): Date {
-  const d = new Date(date + 'T00:00:00');
+  if (!date) return new Date();
+  // Handle both 'YYYY-MM-DD' and full ISO timestamps
+  const dateOnly = date.length > 10 ? date.slice(0, 10) : date;
+  const d = new Date(dateOnly + 'T00:00:00');
+  if (isNaN(d.getTime())) return new Date();
   if (!isRecurring) return d;
   const today = new Date();
   today.setHours(0, 0, 0, 0);

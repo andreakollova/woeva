@@ -470,17 +470,26 @@ export default function HomeScreen() {
         : trendQ.eq('city', cityFilter);
     }
 
-    let clubsQ = supabase.from('clubs').select('id,name,logo_url,cover_url').limit(20);
+    let clubsQ = supabase.from('clubs').select('id,name,logo_url,cover_url,member_count').limit(40);
     if (cityFilter) clubsQ = (clubsQ as any).eq('city', cityFilter);
 
-    const [mainRes, trendRes, clubsRes] = await Promise.all([mainQ, trendQ, clubsQ]);
+    const nextWeek = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
+    let upcomingQ = supabase.from('events').select('club_id').gte('date', today).lte('date', nextWeek).not('club_id', 'is', null);
+    if (cityFilter) upcomingQ = (upcomingQ as any).ilike('city', `%${cityFilter}%`);
+
+    const [mainRes, trendRes, clubsRes, upcomingRes] = await Promise.all([mainQ, trendQ, clubsQ, upcomingQ]);
 
     const expanded = expandRecurringEvents(filterExpired(mainRes.data ?? []));
     setEvents(expanded);
     setTrendingEvents(filterExpired(trendRes.data ?? []).slice(0, 10));
+
+    const activeClubIds = new Set((upcomingRes.data ?? []).map((e: any) => e.club_id));
+    // Assign stable random offset per club (based on id hash) so order shuffles across sessions but is stable within render
     const sortedClubs = (clubsRes.data ?? []).sort((a: any, b: any) => {
-      const scoreA = (a.member_count ?? 0) + Math.random() * 6;
-      const scoreB = (b.member_count ?? 0) + Math.random() * 6;
+      const randA = ((parseInt(a.id.replace(/-/g, '').slice(0, 8), 16) + Date.now()) % 200);
+      const randB = ((parseInt(b.id.replace(/-/g, '').slice(0, 8), 16) + Date.now()) % 200);
+      const scoreA = (activeClubIds.has(a.id) ? 1000 : 0) + (a.member_count ?? 0) * 3 + randA;
+      const scoreB = (activeClubIds.has(b.id) ? 1000 : 0) + (b.member_count ?? 0) * 3 + randB;
       return scoreB - scoreA;
     });
     // Deduplicate clubs with the same display name (e.g. "Woeva Picks BA" + "Woeva Picks" both show as "Woeva Picks")
@@ -815,7 +824,7 @@ export default function HomeScreen() {
         {/* ── Kluby ── */}
         {!loading && clubs.length > 0 && (
           <View style={styles.section}>
-            <SectionHeader title="Kluby" onSeeAll={() => router.push('/clubs' as any)} />
+            <SectionHeader title="Kluby" onSeeAll={() => router.push((`/clubs${city && city !== 'Your city' && city !== 'Select city' ? `?city=${encodeURIComponent(city)}` : ''}`) as any)} />
             <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ paddingHorizontal:20, gap:12 }}>
               {clubs.map(club => (
                 <ClubCard key={club.id} club={club} onPress={() => router.push(`/club/${club.id}` as any)} />
