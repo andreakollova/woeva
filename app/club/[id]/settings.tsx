@@ -72,7 +72,7 @@ export default function ClubSettingsScreen() {
   async function searchInvite(q: string) {
     setInviteQuery(q);
     if (q.trim().length < 2) { setInviteResults([]); return; }
-    const { data } = await supabase.from('profiles').select('id, name, avatar_url').or(`name.ilike.%${q.trim()}%`).neq('id', user!.id).limit(6);
+    const { data } = await supabase.from('profiles').select('id, name, avatar_url, email').or(`name.ilike.%${q.trim()}%,email.ilike.%${q.trim()}%`).neq('id', user!.id).limit(6);
     const existingIds = new Set(admins.map(a => a.user_id));
     setInviteResults(((data ?? []) as any[]).filter(r => !existingIds.has(r.id)));
   }
