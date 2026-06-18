@@ -96,8 +96,8 @@ export default function ClubDetailScreen() {
 
       let evQuery = supabase.from('events').select('*, club:clubs(id, name, cover_url)').gte('date', today);
       if (isWoevaClub) {
-        // Woeva Picks: show events explicitly assigned to this club OR any scraped event for this city
-        evQuery = evQuery.or(`club_id.eq.${id},and(source.not.is.null,city.ilike.*${clubCity}*)`);
+        // Woeva Picks: show events explicitly assigned to this club OR any event by Woeva admin for this city
+        evQuery = evQuery.or(`club_id.eq.${id},and(creator_id.eq.${WOEVA_ADMIN},city.ilike.*${clubCity}*)`);
       } else {
         evQuery = evQuery.eq('club_id', id);
       }
