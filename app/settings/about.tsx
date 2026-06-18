@@ -33,7 +33,7 @@ export default function AboutScreen() {
         <View style={styles.appCard}>
           <Image source={require('../../assets/app-icon-logo.png')} style={styles.iconBox} />
           <Text style={styles.appName}>Woeva</Text>
-          <Text style={styles.appVersion}>Version 1.2.0 · build 40</Text>
+          <Text style={styles.appVersion}>Version 1.3.0 · build 72</Text>
           <Text style={styles.appTagline}>{t.about.appTagline}</Text>
         </View>
 
