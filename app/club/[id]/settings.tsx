@@ -338,7 +338,6 @@ export default function ClubSettingsScreen() {
                 {sharingAdmin ? <ActivityIndicator size="small" color={Colors.gray} /> : <ChevronIcon />}
               </TouchableOpacity>
             </View>
-            <Text style={styles.ownerNote}>{lang === 'sk' ? 'Zmena vlastníka klubu nie je možná. Chceš nový klub? Založ si ho.' : 'Transferring club ownership is not possible. Want a new club? Create one.'}</Text>
           </View>
         )}
 
@@ -370,7 +369,6 @@ export default function ClubSettingsScreen() {
                 {sharingCoord ? <ActivityIndicator size="small" color={Colors.gray} /> : <ChevronIcon />}
               </TouchableOpacity>
             </View>
-            <Text style={styles.ownerNote}>{lang === 'sk' ? 'Koordinátori môžu iba skenovať QR kódy a potvrdzovať príchody.' : 'Coordinators can only scan QR codes and confirm entries.'}</Text>
           </View>
         )}
 
@@ -461,7 +459,7 @@ const styles = StyleSheet.create({
   title: { fontSize: 20, fontWeight: '700', color: Colors.black, fontFamily: Fonts.bold },
   scroll: { paddingHorizontal: 20, paddingTop: 8 },
 
-  section: { borderWidth: 1, borderColor: Colors.grayBorder, borderRadius: 16, overflow: 'hidden' },
+  section: {},
   list: {},
 
   row: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 16, paddingVertical: 14, gap: 12, backgroundColor: Colors.white },
