@@ -197,7 +197,8 @@ function GoingAvatars({ count, attendees, attending, userProfile, userId }: {
   const sorted = [...others].sort((a, b) => (b.profile?.avatar_url ? 1 : 0) - (a.profile?.avatar_url ? 1 : 0));
 
   const effectiveCount = Math.max(count, isAttending ? 1 : 0);
-  const visible = Math.min(effectiveCount, 3);
+  const maxVisible = Math.min(sorted.length + (isAttending ? 1 : 0), 3);
+  const visible = Math.min(effectiveCount, maxVisible);
   const overflow = effectiveCount - visible;
 
   return (
