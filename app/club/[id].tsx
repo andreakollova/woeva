@@ -48,8 +48,8 @@ export default function ClubDetailScreen() {
 
   const sheetY = useRef(new RNAnimated.Value(800)).current;
   const panResponder = useRef(PanResponder.create({
-    onStartShouldSetPanResponder: () => false,
-    onMoveShouldSetPanResponder: (_, { dy }) => dy > 8,
+    onStartShouldSetPanResponder: () => true,
+    onMoveShouldSetPanResponder: () => true,
     onPanResponderMove: (_, { dy }) => { if (dy > 0) sheetY.setValue(dy); },
     onPanResponderRelease: (_, { dy, vy }) => {
       if (dy > 120 || vy > 0.8) {
@@ -165,15 +165,16 @@ export default function ClubDetailScreen() {
       <Modal visible={showMembersModal} animationType="none" transparent onRequestClose={closeSheet}>
         <View style={styles.modalOverlay}>
           <RNAnimated.View style={[styles.membersSheet, { transform: [{ translateY: sheetY }] }]}>
-            {/* Draggable zone — handle + header */}
-            <View {...panResponder.panHandlers}>
+            {/* Handle — drag zone only */}
+            <View {...panResponder.panHandlers} style={{ alignItems: 'center', paddingTop: 10, paddingBottom: 6 }}>
               <View style={styles.membersSheetHandle} />
-              <View style={styles.membersSheetHeader}>
-                <Text style={styles.membersSheetTitle}>{t.club.membersCount(memberCount)}</Text>
-                <TouchableOpacity onPress={closeSheet} hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}>
-                  <Text style={styles.membersSheetClose}>✕</Text>
-                </TouchableOpacity>
-              </View>
+            </View>
+            {/* Header — not in drag zone so ✕ button works */}
+            <View style={styles.membersSheetHeader}>
+              <Text style={styles.membersSheetTitle}>{t.club.membersCount(memberCount)}</Text>
+              <TouchableOpacity onPress={closeSheet} hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}>
+                <Text style={styles.membersSheetClose}>✕</Text>
+              </TouchableOpacity>
             </View>
             <FlatList
               data={members}

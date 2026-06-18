@@ -1,7 +1,7 @@
-import React, { useEffect, useState, useCallback } from 'react';
+import React, { useEffect, useState, useCallback, useRef } from 'react';
 import {
   View, Text, StyleSheet, ScrollView, TouchableOpacity, Pressable,
-  RefreshControl, Image, Modal, Dimensions,
+  RefreshControl, Image, Modal, Dimensions, Animated as RNAnimated, PanResponder,
 } from 'react-native';
 import { StatusBar, setStatusBarStyle } from 'expo-status-bar';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -334,6 +334,37 @@ export default function HomeScreen() {
   const [userLocation, setUserLocation] = useState<{ lat: number; lng: number } | null>(null);
   const [showCityPicker, setShowCityPicker] = useState(false);
   const [expandedCountries, setExpandedCountries] = useState<Set<string>>(new Set(['SK']));
+
+  const citySheetY = useRef(new RNAnimated.Value(600)).current;
+  const cityPanResponder = useRef(PanResponder.create({
+    onStartShouldSetPanResponder: () => true,
+    onMoveShouldSetPanResponder: () => true,
+    onPanResponderMove: (_, { dy }) => { if (dy > 0) citySheetY.setValue(dy); },
+    onPanResponderRelease: (_, { dy, vy }) => {
+      if (dy > 100 || vy > 0.8) {
+        RNAnimated.timing(citySheetY, { toValue: 600, duration: 220, useNativeDriver: true }).start(() => {
+          setShowCityPicker(false);
+          citySheetY.setValue(600);
+        });
+      } else {
+        RNAnimated.spring(citySheetY, { toValue: 0, useNativeDriver: true }).start();
+      }
+    },
+  })).current;
+
+  useEffect(() => {
+    if (showCityPicker) {
+      citySheetY.setValue(600);
+      (RNAnimated.spring(citySheetY, { toValue: 0, useNativeDriver: true, tension: 65, friction: 11 } as any) as any).start();
+    }
+  }, [showCityPicker]);
+
+  function closeCitySheet() {
+    RNAnimated.timing(citySheetY, { toValue: 600, duration: 220, useNativeDriver: true }).start(() => {
+      setShowCityPicker(false);
+      citySheetY.setValue(600);
+    });
+  }
   const [unreadNotifs, setUnreadNotifs] = useState(0);
   const [availableCities, setAvailableCities] = useState<any[]>([]);
 
@@ -809,54 +840,58 @@ export default function HomeScreen() {
       </ScrollView>
 
       {/* City picker modal */}
-      <Modal visible={showCityPicker} transparent animationType="slide" onRequestClose={() => setShowCityPicker(false)}>
+      <Modal visible={showCityPicker} transparent animationType="none" onRequestClose={closeCitySheet}>
         <View style={styles.cityModalBg}>
-          <Pressable style={StyleSheet.absoluteFill} onPress={() => setShowCityPicker(false)} />
-          <ScrollView
-            style={styles.cityModalSheet}
-            contentContainerStyle={styles.cityModalContent}
-            bounces={false}
-            showsVerticalScrollIndicator={false}
-          >
-            <View style={styles.cityModalHandle} />
-            <Text style={styles.cityModalTitle}>{t.home.selectCity}</Text>
-            {(availableCities.length > 0 ? availableCities : FALLBACK_CITIES).map((country) => {
-              const isExpanded = expandedCountries.has(country.code);
-              return (
-                <View key={country.code}>
-                  <TouchableOpacity
-                    style={styles.countryRow}
-                    onPress={() => {
-                      setExpandedCountries(prev => {
-                        const next = new Set(prev);
-                        isExpanded ? next.delete(country.code) : next.add(country.code);
-                        return next;
-                      });
-                    }}
-                    activeOpacity={0.7}
-                  >
-                    <Text style={styles.countryFlag}>{country.flag}</Text>
-                    <Text style={styles.countryName}>{countryNames[country.code] ?? country.name}</Text>
-                    <Svg width={16} height={16} viewBox="0 0 24 24" fill="none" style={{ transform:[{ rotate: isExpanded ? '180deg' : '0deg' }] }}>
-                      <Path d="M6 9l6 6 6-6" stroke={Colors.gray} strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" />
-                    </Svg>
-                  </TouchableOpacity>
-                  {isExpanded && country.cities.map((c: string) => (
+          <Pressable style={StyleSheet.absoluteFill} onPress={closeCitySheet} />
+          <RNAnimated.View style={[styles.cityModalSheet, { transform: [{ translateY: citySheetY }] }]}>
+            {/* Handle — drag zone */}
+            <View {...cityPanResponder.panHandlers} style={styles.cityModalHandleZone}>
+              <View style={styles.cityModalHandle} />
+            </View>
+            <ScrollView
+              contentContainerStyle={styles.cityModalContent}
+              bounces={false}
+              showsVerticalScrollIndicator={false}
+            >
+              <Text style={styles.cityModalTitle}>{t.home.selectCity}</Text>
+              {(availableCities.length > 0 ? availableCities : FALLBACK_CITIES).map((country) => {
+                const isExpanded = expandedCountries.has(country.code);
+                return (
+                  <View key={country.code}>
                     <TouchableOpacity
-                      key={c}
-                      style={[styles.cityModalRow, city === c && styles.cityModalRowActive]}
-                      onPress={() => selectCity(c)}
+                      style={styles.countryRow}
+                      onPress={() => {
+                        setExpandedCountries(prev => {
+                          const next = new Set(prev);
+                          isExpanded ? next.delete(country.code) : next.add(country.code);
+                          return next;
+                        });
+                      }}
                       activeOpacity={0.7}
                     >
-                      <Text style={[styles.cityModalLabel, city === c && styles.cityModalLabelActive]}>{cityDisplay[c] ?? c}</Text>
-                      {city === c && <View style={styles.cityModalCheck}><Text style={styles.cityModalCheckText}>✓</Text></View>}
+                      <Text style={styles.countryFlag}>{country.flag}</Text>
+                      <Text style={styles.countryName}>{countryNames[country.code] ?? country.name}</Text>
+                      <Svg width={16} height={16} viewBox="0 0 24 24" fill="none" style={{ transform:[{ rotate: isExpanded ? '180deg' : '0deg' }] }}>
+                        <Path d="M6 9l6 6 6-6" stroke={Colors.gray} strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" />
+                      </Svg>
                     </TouchableOpacity>
-                  ))}
-                </View>
-              );
-            })}
-            <View style={{ height: 20 }} />
-          </ScrollView>
+                    {isExpanded && country.cities.map((c: string) => (
+                      <TouchableOpacity
+                        key={c}
+                        style={[styles.cityModalRow, city === c && styles.cityModalRowActive]}
+                        onPress={() => selectCity(c)}
+                        activeOpacity={0.7}
+                      >
+                        <Text style={[styles.cityModalLabel, city === c && styles.cityModalLabelActive]}>{cityDisplay[c] ?? c}</Text>
+                        {city === c && <View style={styles.cityModalCheck}><Text style={styles.cityModalCheckText}>✓</Text></View>}
+                      </TouchableOpacity>
+                    ))}
+                  </View>
+                );
+              })}
+              <View style={{ height: 20 }} />
+            </ScrollView>
+          </RNAnimated.View>
         </View>
       </Modal>
     </View>
@@ -958,8 +993,9 @@ const styles = StyleSheet.create({
   seeAllArrowText: { fontSize:11, fontWeight:'800', color:Colors.black },
   cityModalBg: { flex:1, backgroundColor:'rgba(0,0,0,0.4)', justifyContent:'flex-end' },
   cityModalSheet: { backgroundColor:Colors.white, borderTopLeftRadius:28, borderTopRightRadius:28, maxHeight:'75%' },
-  cityModalContent: { paddingHorizontal:24, paddingTop:16 },
-  cityModalHandle: { width:36, height:4, borderRadius:2, backgroundColor:Colors.grayBorder, alignSelf:'center', marginBottom:20 },
+  cityModalHandleZone: { alignItems:'center', paddingTop:12, paddingBottom:8 },
+  cityModalHandle: { width:36, height:4, borderRadius:2, backgroundColor:Colors.grayBorder },
+  cityModalContent: { paddingHorizontal:24, paddingTop:8 },
   cityModalTitle: { fontSize:18, fontWeight:'700', fontFamily:Fonts.bold, color:Colors.black, marginBottom:12 },
   countryRow: { flexDirection:'row', alignItems:'center', gap:10, paddingVertical:14, borderBottomWidth:1, borderBottomColor:Colors.grayBorder },
   countryFlag: { fontSize:20 },

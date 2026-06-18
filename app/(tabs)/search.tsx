@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { useFocusEffect } from 'expo-router';
-import { View, Text, StyleSheet, TextInput, ScrollView, TouchableOpacity, Modal, Pressable, Image } from 'react-native';
+import { View, Text, StyleSheet, TextInput, ScrollView, TouchableOpacity, Modal, Pressable, Image, PanResponder } from 'react-native';
 import { StatusBar, setStatusBarStyle } from 'expo-status-bar';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
@@ -42,6 +42,11 @@ export default function SearchScreen() {
   const [mapClubs, setMapClubs] = useState<ClubWithLocation[]>([]);
   const [showFilter, setShowFilter] = useState(false);
   const [selectedTags, setSelectedTags] = useState<string[]>([]);
+  const filterPanResponder = useRef(PanResponder.create({
+    onStartShouldSetPanResponder: () => true,
+    onMoveShouldSetPanResponder: () => true,
+    onPanResponderRelease: (_, { dy, vy }) => { if (dy > 80 || vy > 0.8) setShowFilter(false); },
+  })).current;
   const [priceFilter, setPriceFilter] = useState<PriceFilter>('all');
   const [headerHeight, setHeaderHeight] = useState(insets.top + 220);
   const mapRef = useRef<MapView>(null);
@@ -399,17 +404,13 @@ export default function SearchScreen() {
       )}
 
       {/* Filter modal */}
-      <Modal visible={showFilter} transparent animationType="slide" onRequestClose={() => setShowFilter(false)}>
+      <Modal visible={showFilter} transparent animationType="none" onRequestClose={() => setShowFilter(false)}>
         <Pressable style={styles.modalBackdrop} onPress={() => setShowFilter(false)} />
         <Animated.View
           entering={FadeIn.duration(180)}
           style={[styles.filterSheet, { paddingBottom: insets.bottom + 20 }]}
         >
-          <View
-            onStartShouldSetResponder={() => true}
-            onMoveShouldSetResponder={(_, { dy }) => dy > 5}
-            onResponderRelease={(_, { dy }) => { if (dy > 60) setShowFilter(false); }}
-          >
+          <View {...filterPanResponder.panHandlers}>
             <View style={styles.filterHandle} />
           </View>
 

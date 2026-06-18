@@ -1,5 +1,5 @@
-import React, { useEffect, useState, useCallback } from 'react';
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Pressable, RefreshControl, Image, ImageStyle, Modal, Alert, Share, Linking, Platform, ActivityIndicator } from 'react-native';
+import React, { useEffect, useState, useCallback, useRef } from 'react';
+import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Pressable, RefreshControl, Image, ImageStyle, Modal, Alert, Share, Linking, Platform, ActivityIndicator, PanResponder } from 'react-native';
 import { StatusBar, setStatusBarStyle } from 'expo-status-bar';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useRouter, useFocusEffect } from 'expo-router';
@@ -259,6 +259,11 @@ function TicketCard({ event, userId, userAvatar, userName, isPast, onPress, onDe
   const { t, lang } = useTranslations();
   const [qrModal, setQrModal] = useState(false);
   const [optionsModal, setOptionsModal] = useState(false);
+  const optionsPanResponder = useRef(PanResponder.create({
+    onStartShouldSetPanResponder: () => true,
+    onMoveShouldSetPanResponder: () => true,
+    onPanResponderRelease: (_, { dy, vy }) => { if (dy > 60 || vy > 0.8) setOptionsModal(false); },
+  })).current;
   const [goingCount, setGoingCount] = useState(event.going_count ?? 0);
   const [loadingWallet, setLoadingWallet] = useState(false);
 
@@ -334,9 +339,7 @@ function TicketCard({ event, userId, userAvatar, userName, isPast, onPress, onDe
           <View style={styles.optionsSheet}>
             <View
               style={{ paddingTop: 8, alignItems: 'center', marginBottom: 4 }}
-              onStartShouldSetResponder={() => true}
-              onMoveShouldSetResponder={(_, { dy }) => dy > 5}
-              onResponderRelease={(_, { dy }) => { if (dy > 60) setOptionsModal(false); }}
+              {...optionsPanResponder.panHandlers}
             >
               <View style={styles.optionsHandle} />
             </View>
