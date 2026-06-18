@@ -314,6 +314,10 @@ export default function HomeScreen() {
   const cityDisplay = lang === 'sk' ? CITY_DISPLAY_SK : CITY_DISPLAY_EN;
   const avatarInitial = (profile?.name || (user as any)?.user_metadata?.full_name || '?').charAt(0).toUpperCase();
 
+  const scrollRef = useRef<any>(null);
+  const savedScrollY = useRef(0);
+  const prevFilterCity = useRef({ filter: '', city: null as string | null });
+
   const [events, setEvents] = useState<any[]>([]);
   const [nextWeekSeed, setNextWeekSeed] = useState(() => Math.random());
   const [showAllNearby, setShowAllNearby] = useState(false);
@@ -414,6 +418,11 @@ export default function HomeScreen() {
     setStatusBarStyle('dark');
     setNextWeekSeed(Math.random());
     if (city === null) return;
+    // Reset scroll position when filter or city changes (new search context)
+    if (prevFilterCity.current.filter !== filter || prevFilterCity.current.city !== city) {
+      savedScrollY.current = 0;
+      prevFilterCity.current = { filter, city };
+    }
     loadData();
     refetchProfile();
     if (user) {
@@ -502,9 +511,19 @@ export default function HomeScreen() {
       setAttendedKeywords(kws);
     }
     setLoading(false);
+    // Restore scroll position when returning from a child screen (e.g. event detail)
+    if (savedScrollY.current > 0) {
+      const y = savedScrollY.current;
+      requestAnimationFrame(() => {
+        setTimeout(() => { scrollRef.current?.scrollTo({ y, animated: false }); }, 80);
+      });
+    }
   }
 
-  async function onRefresh() { setRefreshing(true); await loadData(); setRefreshing(false); }
+  async function onRefresh() {
+    savedScrollY.current = 0;
+    setRefreshing(true); await loadData(); setRefreshing(false);
+  }
 
   async function selectCity(c: string) {
     setCity(c); setShowCityPicker(false);
@@ -613,9 +632,12 @@ export default function HomeScreen() {
     <View style={[styles.container, { paddingTop: insets.top }]}>
       <StatusBar style="light" />
       <ScrollView
+        ref={scrollRef}
         contentContainerStyle={{ paddingBottom: insets.bottom + 80 }}
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={Colors.lime} />}
         showsVerticalScrollIndicator={false}
+        onScroll={e => { savedScrollY.current = e.nativeEvent.contentOffset.y; }}
+        scrollEventThrottle={100}
       >
         {/* Top bar */}
         <View style={styles.topBar}>
