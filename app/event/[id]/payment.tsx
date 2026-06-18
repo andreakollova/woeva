@@ -16,7 +16,10 @@ import { useTranslations } from '@/context/LanguageContext';
 import { scheduleEventReminders } from '@/lib/scheduleReminders';
 
 export default function PaymentScreen() {
-  const { id } = useLocalSearchParams<{ id: string }>();
+  const { id: rawId } = useLocalSearchParams<{ id: string }>();
+  const eventId = rawId?.split('_')[0]; // strip occurrence suffix
+  const id = eventId; // alias for existing code
+  const occurrenceDate = rawId?.includes('_') ? rawId.slice(eventId.length + 1) : null;
   const insets = useSafeAreaInsets();
   const router = useRouter();
   const { user, profile } = useAuth();
@@ -121,11 +124,11 @@ export default function PaymentScreen() {
         eventId: id,
       });
     }
-    scheduleEventReminders(id, event.date, event.time, event.title);
+    scheduleEventReminders(id, occurrenceDate ?? event.date, event.time, event.title);
     setShowSuccess(true);
     checkScale.value = withSpring(1, { damping: 12, stiffness: 180 });
     textOpacity.value = withDelay(300, withTiming(1, { duration: 400 }));
-    setTimeout(() => router.replace(`/event/${id}`), 2400);
+    setTimeout(() => router.replace(`/event/${rawId}`), 2400);
   }
 
   if (!event) return null;

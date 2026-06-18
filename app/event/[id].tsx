@@ -189,7 +189,7 @@ export default function EventDetailScreen() {
       await supabase.from('events').update({ going_count: (event?.going_count ?? 0) + 1 }).eq('id', id);
       setEvent(prev => prev ? { ...prev, going_count: (prev.going_count ?? 0) + 1 } : prev);
       if (event?.date && event?.time) {
-        scheduleEventReminders(id, event.date, event.time, event.title).catch(() => {});
+        scheduleEventReminders(id, occurrenceDate ?? event.date, event.time, event.title).catch(() => {});
       }
       if (event?.creator_id && event.creator_id !== user.id) {
         supabase.functions.invoke('notify-creator', {
@@ -198,7 +198,7 @@ export default function EventDetailScreen() {
       }
       setIsAttending(true); setLoading(false); setToast(true); load();
     } else {
-      router.push(`/event/${id}/payment`);
+      router.push(`/event/${rawId}/payment`);
     }
   }
 
@@ -779,7 +779,7 @@ export default function EventDetailScreen() {
               <View style={s.hairline} />
               <TouchableOpacity
                 style={s.buyAnotherRow}
-                onPress={() => router.push(`/event/${id}/payment`)}
+                onPress={() => router.push(`/event/${rawId}/payment`)}
                 activeOpacity={0.7}
               >
                 <View style={s.buyAnotherIcon}>
