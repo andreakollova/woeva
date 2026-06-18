@@ -29,6 +29,21 @@ serve(async (req) => {
     console.log('discord-activity-notify body:', JSON.stringify(body));
 
     // Direct call (e.g. from delete-account) — has a `type` field at root
+    if (body.type === 'co_admin_delete_attempt') {
+      const { admin_name, club_name, creator_name } = body;
+      await sendEmbed({
+        title: '⚠️ Co-admin sa pokúsil vymazať klub',
+        color: 0xF97316,
+        fields: [
+          { name: 'Klub', value: club_name ?? '—', inline: false },
+          { name: 'Co-admin', value: admin_name ?? '—', inline: true },
+          { name: 'Vlastník', value: creator_name ?? '—', inline: true },
+        ],
+        timestamp: new Date().toISOString(),
+      });
+      return new Response('ok');
+    }
+
     if (body.type === 'account_deleted') {
       const { name, email, event_count, club_count, attendee_count } = body;
       await sendEmbed({

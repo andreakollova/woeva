@@ -42,6 +42,7 @@ export default function ClubSettingsScreen() {
   const { lang } = useTranslations();
 
   const [club, setClub] = useState<{ id: string; name: string; creator_id: string } | null>(null);
+  const [creatorName, setCreatorName] = useState('');
   const [isCreator, setIsCreator] = useState(false);
   const [isCoAdmin, setIsCoAdmin] = useState(false);
   const [deleting, setDeleting] = useState(false);
@@ -62,7 +63,17 @@ export default function ClubSettingsScreen() {
       supabase.from('club_members').select('user_id, profile:profiles(name, avatar_url)').eq('club_id', id).eq('role', 'admin').eq('status', 'approved'),
     ]);
     setClub(clubData ?? null);
-    setAdmins(((adminData ?? []) as any[]).map(m => ({ user_id: m.user_id, name: m.profile?.name ?? '', avatar_url: m.profile?.avatar_url ?? null })));
+    const adminList = ((adminData ?? []) as any[]).map(m => ({ user_id: m.user_id, name: m.profile?.name ?? '', avatar_url: m.profile?.avatar_url ?? null }));
+    setAdmins(adminList);
+    if (clubData) {
+      const ownerInList = adminList.find(a => a.user_id === clubData.creator_id);
+      if (ownerInList) {
+        setCreatorName(ownerInList.name);
+      } else {
+        const { data: ownerProfile } = await supabase.from('profiles').select('name').eq('id', clubData.creator_id).single();
+        setCreatorName(ownerProfile?.name ?? '');
+      }
+    }
     if (user && clubData) {
       setIsCreator(clubData.creator_id === user.id);
       setIsCoAdmin(memberData?.role === 'admin' && clubData.creator_id !== user.id);
@@ -117,6 +128,25 @@ export default function ClubSettingsScreen() {
 
   async function handleDelete() {
     if (!club) return;
+    if (isCoAdmin && !isCreator) {
+      const ownerLabel = creatorName ? `${creatorName}` : (lang === 'sk' ? 'vlastník' : 'the owner');
+      Alert.alert(
+        lang === 'sk' ? 'Nemôžeš vymazať klub' : 'Cannot delete club',
+        lang === 'sk'
+          ? `Klub môže vymazať iba vlastník — ${ownerLabel}. Ak máš problém, napíš nám na admin@woeva.com.`
+          : `Only the owner (${ownerLabel}) can delete this club. If you have an issue, contact admin@woeva.com.`,
+        [{ text: 'OK', style: 'cancel' }]
+      );
+      const { data: { session } } = await supabase.auth.getSession();
+      const supabaseUrl = process.env.EXPO_PUBLIC_SUPABASE_URL;
+      const anonKey = process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY;
+      fetch(`${supabaseUrl}/functions/v1/discord-activity-notify`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${anonKey}` },
+        body: JSON.stringify({ type: 'co_admin_delete_attempt', admin_name: session?.user?.email ?? 'neznámy', club_name: club.name, creator_name: creatorName }),
+      }).catch(() => {});
+      return;
+    }
     Alert.alert(
       lang === 'sk' ? `Vymazať klub?` : 'Delete club?',
       lang === 'sk'
