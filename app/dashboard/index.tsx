@@ -1578,19 +1578,21 @@ export default function DashboardScreen() {
                         <View style={{ flex: 1 }}>
                           <Text style={s.listName} numberOfLines={1}>{e.title}</Text>
                           <Text style={s.listSub}>{dateLine}{e.capacity != null ? `  ·  ${going}/${e.capacity}` : ''}</Text>
-                          {e.paid_count > 0 && (
-                            <Text style={s.listRevenue}>{lang === 'sk' ? 'Naskenované' : 'Scanned'} {e.scan_count}/{e.paid_count}{(e.price ?? 0) > 0 ? `  ·  €${Number(e.price).toFixed(2)}` : ''}</Text>
+                          {going > 0 && (
+                            <Text style={s.listRevenue}>
+                              {lang === 'sk' ? 'Naskenované' : 'Scanned'} {e.scan_count}/{going}{(e.price ?? 0) > 0 ? `  ·  €${Number(e.price).toFixed(2)}` : ''}
+                            </Text>
                           )}
-                          {e.paid_count === 0 && (e.price ?? 0) > 0 && <Text style={s.listRevenue}>€{Number(e.price).toFixed(2)}</Text>}
+                          {going === 0 && (e.price ?? 0) > 0 && <Text style={s.listRevenue}>€{Number(e.price).toFixed(2)}</Text>}
                         </View>
                       </TouchableOpacity>
                       {e.status === 'cancelled' && <View style={s.cancelledBadge}><Text style={s.cancelledBadgeText}>{t.dashboard.cancelled}</Text></View>}
                       {e.status !== 'cancelled' && (
                         <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
-                          <View style={s.goingBadge}>
+                          <TouchableOpacity style={s.goingBadge} onPress={() => openAttendees(e)} activeOpacity={0.7}>
                             <Text style={s.goingNum}>{going}</Text>
                             <Text style={s.goingLabel}>{goingLabel(going, lang)}</Text>
-                          </View>
+                          </TouchableOpacity>
                           <TouchableOpacity
                             style={s.shareBtn}
                             onPress={() => Share.share({ url: `https://woeva.com/share-event?id=${e.id}`, message: `https://woeva.com/share-event?id=${e.id}` })}
