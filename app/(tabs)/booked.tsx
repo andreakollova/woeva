@@ -120,25 +120,29 @@ export default function BookedScreen() {
               text: t.tickets.yesLeave,
               style: 'destructive',
               onPress: async () => {
-                await supabase.from('event_attendees').delete().eq('id', event.attendee_id!);
-                cancelEventReminders(event.id).catch(() => {});
-                setEvents(prev => prev.filter(e => e.id !== event.id));
-                if (event.creator_id) {
-                  supabase.from('notifications').insert({
-                    user_id: event.creator_id, type: 'leave',
-                    title: event.title,
-                    body: `${profile?.name ?? 'Účastník'} zrušil/a svoju účasť.`,
-                    data: { event_id: event.id },
-                  }).then(() => {});
-                  notify.leftEvent({
-                    creatorId: event.creator_id,
-                    creatorEmail: '',
-                    attendeeName: profile?.name ?? 'An attendee',
-                    eventTitle: event.title,
-                    eventId: event.id,
-                    clubId: (event as any).club_id ?? undefined,
-                    leavingUserId: user?.id,
-                  });
+                try {
+                  await supabase.from('event_attendees').delete().eq('id', event.attendee_id!);
+                  cancelEventReminders(event.id).catch(() => {});
+                  setEvents(prev => prev.filter(e => e.id !== event.id));
+                  if (event.creator_id) {
+                    supabase.from('notifications').insert({
+                      user_id: event.creator_id, type: 'leave',
+                      title: event.title,
+                      body: `${profile?.name ?? 'Účastník'} zrušil/a svoju účasť.`,
+                      data: { event_id: event.id },
+                    }).then(() => {});
+                    notify.leftEvent({
+                      creatorId: event.creator_id,
+                      creatorEmail: '',
+                      attendeeName: profile?.name ?? 'An attendee',
+                      eventTitle: event.title,
+                      eventId: event.id,
+                      clubId: (event as any).club_id ?? undefined,
+                      leavingUserId: user?.id,
+                    }).catch(() => {});
+                  }
+                } catch (err) {
+                  Alert.alert(t.common.error, 'Nepodarilo sa odhlásiť. Skús znova.');
                 }
               },
             },
@@ -362,7 +366,7 @@ function TicketCard({ event, userId, userAvatar, userName, isPast, onPress, onDe
               </TouchableOpacity>
             ) : null}
 
-            {!isPast && onLeave && isFree && (
+            {!isPast && onLeave && (
               <TouchableOpacity style={styles.optionsRow} onPress={() => { setOptionsModal(false); onLeave(); }} activeOpacity={0.7}>
                 <View style={styles.optionsIconBox}>
                   <Svg width={18} height={18} viewBox="0 0 24 24" fill="none">
