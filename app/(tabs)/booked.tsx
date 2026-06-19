@@ -16,6 +16,7 @@ import { useAuth } from '@/context/AuthContext';
 import { notify } from '@/lib/notify';
 import { cancelEventReminders } from '@/lib/scheduleReminders';
 import { useTranslations } from '@/context/LanguageContext';
+import { generateAttendeeReceipt } from '@/lib/generateInvoice';
 
 type BookedEvent = Event & { attendee_id?: string };
 
@@ -336,6 +337,26 @@ function TicketCard({ event, userId, userAvatar, userName, isPast, onPress, onDe
     ]);
   }
 
+  async function handleDownloadReceipt() {
+    try {
+      const Print = require('expo-print');
+      const Sharing = require('expo-sharing');
+      const receiptNum = `W-${event.id.slice(0, 8).toUpperCase()}`;
+      const html = generateAttendeeReceipt(
+        event.title,
+        event.date,
+        event.venue ?? null,
+        event.price ?? 0,
+        userName,
+        receiptNum,
+      );
+      const { uri } = await Print.printToFileAsync({ html, base64: false });
+      await Sharing.shareAsync(uri, { mimeType: 'application/pdf', dialogTitle: `Doklad ${receiptNum}` });
+    } catch {
+      Alert.alert('Chyba', 'Nepodarilo sa vygenerovať doklad.');
+    }
+  }
+
   return (
     <TouchableOpacity onPress={onPress} activeOpacity={0.92} style={styles.ticket}>
       {/* Options modal */}
@@ -378,6 +399,22 @@ function TicketCard({ event, userId, userAvatar, userName, isPast, onPress, onDe
                 <View style={styles.optionsRowBody}>
                   <Text style={styles.optionsRowLabel}>{t.tickets.leaveEvent}</Text>
                   <Text style={styles.optionsRowSub}>{t.tickets.leaveEventSub}</Text>
+                </View>
+              </TouchableOpacity>
+            )}
+
+            {!isFree && (
+              <TouchableOpacity style={styles.optionsRow} onPress={() => { setOptionsModal(false); handleDownloadReceipt(); }} activeOpacity={0.7}>
+                <View style={styles.optionsIconBox}>
+                  <Svg width={18} height={18} viewBox="0 0 24 24" fill="none">
+                    <Path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" stroke={Colors.black} strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" />
+                    <Path d="M7 10l5 5 5-5" stroke={Colors.black} strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" />
+                    <Path d="M12 15V3" stroke={Colors.black} strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" />
+                  </Svg>
+                </View>
+                <View style={styles.optionsRowBody}>
+                  <Text style={styles.optionsRowLabel}>{lang === 'sk' ? 'Stiahnuť doklad' : 'Download receipt'}</Text>
+                  <Text style={styles.optionsRowSub}>{lang === 'sk' ? 'PDF potvrdenie o platbe' : 'PDF payment confirmation'}</Text>
                 </View>
               </TouchableOpacity>
             )}
