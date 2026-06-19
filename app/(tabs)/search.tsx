@@ -38,6 +38,7 @@ export default function SearchScreen() {
   const [clubResults, setClubResults] = useState<ClubWithLocation[]>([]);
   const [searched, setSearched] = useState(false);
   const [mode, setMode] = useState<'map' | 'list'>('map');
+  const [cityFilter, setCityFilter] = useState<string | null>(profile?.city ?? null);
   const [tab, setTab] = useState<Tab>('events');
   const [mapEvents, setMapEvents] = useState<Event[]>([]);
   const [mapClubs, setMapClubs] = useState<ClubWithLocation[]>([]);
@@ -67,6 +68,12 @@ export default function SearchScreen() {
       (RNAnimated.spring(filterSheetY, { toValue: 0, useNativeDriver: true, tension: 65, friction: 11 } as any) as any).start();
     }
   }, [showFilter]);
+
+  useEffect(() => { setCityFilter(profile?.city ?? null); }, [profile?.city]);
+
+  useEffect(() => {
+    if (query.trim() && searched) handleSearch(query);
+  }, [cityFilter]);
 
   function closeFilter() {
     RNAnimated.timing(filterSheetY, { toValue: 600, duration: 220, useNativeDriver: true }).start(() => {
@@ -202,22 +209,26 @@ export default function SearchScreen() {
     const q = (searchQuery ?? query).trim();
     if (!q) return;
     if (tab === 'events') {
-      const { data } = await supabase
+      let dbq = supabase
         .from('events')
         .select('*, attendees:event_attendees(profile:profiles(id, name, avatar_url))')
         .or(`title.ilike.%${q}%,category.ilike.%${q}%,venue.ilike.%${q}%`)
         .limit(20);
+      if (cityFilter) dbq = dbq.ilike('city', `%${cityFilter}%`);
+      const { data } = await dbq;
       let filtered = expandRecurringEvents(((data ?? []) as any).filter((e: any) => e.status !== 'cancelled'));
       if (selectedTags.length > 0) filtered = filtered.filter((e: Event) => selectedTags.some(tag => e.tags?.includes(tag) || e.category === tag));
       if (priceFilter === 'paid') filtered = filtered.filter((e: Event) => !e.is_free);
       if (priceFilter === 'free') filtered = filtered.filter((e: Event) => e.is_free);
       setResults(filtered);
     } else {
-      const { data } = await supabase
+      let dbq = supabase
         .from('clubs')
         .select('*')
         .or(`name.ilike.%${q}%,tagline.ilike.%${q}%,category.ilike.%${q}%`)
         .limit(20);
+      if (cityFilter) dbq = dbq.ilike('city', `%${cityFilter}%`);
+      const { data } = await dbq;
       let filtered = (data ?? []) as ClubWithLocation[];
       if (selectedTags.length > 0) filtered = filtered.filter(c => c.name?.startsWith('Woeva Picks') || selectedTags.some(tag => c.tags?.includes(tag) || c.category === tag));
       setClubResults(filtered);
@@ -374,58 +385,88 @@ export default function SearchScreen() {
       {/* List results */}
       {mode === 'list' && searched && (
         <View style={[styles.listContainer, { paddingTop: headerHeight }]}>
-          <TouchableOpacity
-            style={styles.backToMap}
-            onPress={() => { setMode('map'); setSearched(false); setQuery(''); }}
-            activeOpacity={0.8}
+          <ScrollView
+            keyboardShouldPersistTaps="handled"
+            contentContainerStyle={{ paddingBottom: insets.bottom + 80 }}
           >
-            <Text style={styles.backToMapText}>← {t.search.discover}</Text>
-          </TouchableOpacity>
-          <ScrollView contentContainerStyle={[styles.results, { paddingBottom: insets.bottom + 80 }]}>
-            {tab === 'events' && (
-              results.length === 0 ? (
-                <Animated.View entering={FadeInDown} style={styles.empty}>
-                  <Text style={styles.emptyTitle}>{t.search.nothingMatches}</Text>
-                  <Text style={styles.emptyText}>{t.search.nothingMatchesFor(query)}</Text>
-                  <View style={styles.emptyActions}>
-                    <Button label={t.search.startClub(query)} onPress={() => router.push('/club/create')} variant="lime" />
-                    <Button label={t.search.browsePopular} onPress={() => { setMode('map'); setSearched(false); setQuery(''); }} variant="ghost" />
-                  </View>
-                </Animated.View>
-              ) : (
-                results.map((event, i) => (
-                  <Animated.View key={event.id} entering={FadeInDown.delay(i * 50)}>
-                    <EventCard event={event} />
-                    {i < results.length - 1 && <View style={styles.divider} />}
+            {/* Back + city filter */}
+            <View style={styles.listTopBar}>
+              <TouchableOpacity
+                style={styles.backToMap}
+                onPress={() => { setMode('map'); setSearched(false); setQuery(''); }}
+                activeOpacity={0.8}
+              >
+                <Text style={styles.backToMapText}>← {t.search.discover}</Text>
+              </TouchableOpacity>
+            </View>
+
+            {/* City filter chips */}
+            <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.cityFilterRow}>
+              {profile?.city && (
+                <TouchableOpacity
+                  style={[styles.cityChip, cityFilter === profile.city && styles.cityChipActive]}
+                  onPress={() => setCityFilter(profile.city!)}
+                  activeOpacity={0.7}
+                >
+                  <Text style={[styles.cityChipText, cityFilter === profile.city && styles.cityChipTextActive]}>{profile.city}</Text>
+                </TouchableOpacity>
+              )}
+              <TouchableOpacity
+                style={[styles.cityChip, cityFilter === null && styles.cityChipActive]}
+                onPress={() => setCityFilter(null)}
+                activeOpacity={0.7}
+              >
+                <Text style={[styles.cityChipText, cityFilter === null && styles.cityChipTextActive]}>Všetky mestá</Text>
+              </TouchableOpacity>
+            </ScrollView>
+
+            {/* Results */}
+            <View style={styles.results}>
+              {tab === 'events' && (
+                results.length === 0 ? (
+                  <Animated.View entering={FadeInDown} style={styles.empty}>
+                    <Text style={styles.emptyTitle}>{t.search.nothingMatches}</Text>
+                    <Text style={styles.emptyText}>{t.search.nothingMatchesFor(query)}</Text>
+                    <View style={styles.emptyActions}>
+                      <Button label={t.search.startClub(query)} onPress={() => router.push('/club/create')} variant="lime" />
+                      <Button label={t.search.browsePopular} onPress={() => { setMode('map'); setSearched(false); setQuery(''); }} variant="ghost" />
+                    </View>
                   </Animated.View>
-                ))
-              )
-            )}
-            {tab === 'clubs' && (
-              clubResults.length === 0 ? (
-                <Animated.View entering={FadeInDown} style={styles.empty}>
-                  <Text style={styles.emptyTitle}>{t.search.nothingMatches}</Text>
-                  <Text style={styles.emptyText}>{t.search.nothingMatchesFor(query)}</Text>
-                  <View style={styles.emptyActions}>
-                    <Button label={t.search.startClub(query)} onPress={() => router.push('/club/create')} variant="lime" />
-                  </View>
-                </Animated.View>
-              ) : (
-                clubResults.map((club, i) => (
-                  <Animated.View key={club.id} entering={FadeInDown.delay(i * 50)}>
-                    <TouchableOpacity style={styles.clubRow} onPress={() => router.push(`/club/${club.id}`)} activeOpacity={0.8}>
-                      <View style={styles.clubRowDot} />
-                      <View style={{ flex: 1 }}>
-                        <Text style={styles.clubRowName}>{clubDisplayName(club.name)}</Text>
-                        {club.tagline ? <Text style={styles.clubRowTagline}>{club.tagline}</Text> : null}
-                      </View>
-                      <Text style={styles.clubRowMembers}>{club.member_count} členov</Text>
-                    </TouchableOpacity>
-                    {i < clubResults.length - 1 && <View style={styles.divider} />}
+                ) : (
+                  results.map((event, i) => (
+                    <Animated.View key={event.id} entering={FadeInDown.delay(i * 50)}>
+                      <EventCard event={event} />
+                      {i < results.length - 1 && <View style={styles.divider} />}
+                    </Animated.View>
+                  ))
+                )
+              )}
+              {tab === 'clubs' && (
+                clubResults.length === 0 ? (
+                  <Animated.View entering={FadeInDown} style={styles.empty}>
+                    <Text style={styles.emptyTitle}>{t.search.nothingMatches}</Text>
+                    <Text style={styles.emptyText}>{t.search.nothingMatchesFor(query)}</Text>
+                    <View style={styles.emptyActions}>
+                      <Button label={t.search.startClub(query)} onPress={() => router.push('/club/create')} variant="lime" />
+                    </View>
                   </Animated.View>
-                ))
-              )
-            )}
+                ) : (
+                  clubResults.map((club, i) => (
+                    <Animated.View key={club.id} entering={FadeInDown.delay(i * 50)}>
+                      <TouchableOpacity style={styles.clubRow} onPress={() => router.push(`/club/${club.id}`)} activeOpacity={0.8}>
+                        <View style={styles.clubRowDot} />
+                        <View style={{ flex: 1 }}>
+                          <Text style={styles.clubRowName}>{clubDisplayName(club.name)}</Text>
+                          {club.tagline ? <Text style={styles.clubRowTagline}>{club.tagline}</Text> : null}
+                        </View>
+                        <Text style={styles.clubRowMembers}>{club.member_count} členov</Text>
+                      </TouchableOpacity>
+                      {i < clubResults.length - 1 && <View style={styles.divider} />}
+                    </Animated.View>
+                  ))
+                )
+              )}
+            </View>
           </ScrollView>
         </View>
       )}
@@ -569,14 +610,22 @@ const styles = StyleSheet.create({
     borderWidth: 2, borderColor: Colors.white,
   },
   clubPinText: { fontSize: 12, color: Colors.white },
+  listTopBar: { paddingHorizontal: 20, paddingTop: 16, paddingBottom: 4 },
   backToMap: {
-    flexDirection: 'row', alignItems: 'center',
-    marginHorizontal: 20, marginBottom: 8, alignSelf: 'flex-start',
+    alignSelf: 'flex-start',
     backgroundColor: Colors.black, borderRadius: 50,
     paddingHorizontal: 16, paddingVertical: 8,
   },
   backToMapText: { fontSize: 13, fontWeight: '700', color: Colors.white, fontFamily: Fonts.semibold },
-  results: { padding: 20, paddingBottom: 40 },
+  cityFilterRow: { paddingHorizontal: 20, paddingVertical: 12, gap: 8 },
+  cityChip: {
+    paddingHorizontal: 16, paddingVertical: 8, borderRadius: 50,
+    backgroundColor: Colors.grayLight, borderWidth: 1.5, borderColor: Colors.grayBorder,
+  },
+  cityChipActive: { backgroundColor: Colors.black, borderColor: Colors.black },
+  cityChipText: { fontSize: 13, fontWeight: '600', color: Colors.gray, fontFamily: Fonts.semibold },
+  cityChipTextActive: { color: Colors.white },
+  results: { paddingHorizontal: 20, paddingBottom: 20 },
   divider: { height: 1, backgroundColor: Colors.grayBorder, marginVertical: 4 },
   empty: { paddingTop: 60, alignItems: 'center', gap: 12 },
   emptyTitle: { fontSize: 22, fontWeight: '700', color: Colors.black },
