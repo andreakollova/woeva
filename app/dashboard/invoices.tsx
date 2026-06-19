@@ -24,7 +24,7 @@ function calcRevenue(price: number, onlineCount: number, doorCount: number) {
   const onlineGross = price * onlineCount;
   const doorGross = price * doorCount;
   const gross = onlineGross + doorGross;
-  const woevaFeePerTicket = onlineCount > 0 ? Math.max(Math.round(price * 0.05 * 100) / 100, 0.50) : 0;
+  const woevaFeePerTicket = onlineCount > 0 ? Math.round((price * 0.04 + 0.50) * 100) / 100 : 0;
   const woeva_fee = Math.round(woevaFeePerTicket * onlineCount * 100) / 100;
   const stripe_fee = onlineCount > 0 ? Math.round((onlineGross * STRIPE_PCT + onlineCount * STRIPE_FIXED) * 100) / 100 : 0;
   const onlineNet = Math.max(0, Math.round((onlineGross - woeva_fee) * 100) / 100);

@@ -32,10 +32,10 @@ import { notify } from '@/lib/notify';
 import { useTranslations } from '@/context/LanguageContext';
 
 // ─── Constants ────────────────────────────────────────────────────────────────
-const WOEVA_FEE = 0.035;         // 3.5% Woeva platform fee
+const WOEVA_FEE_PCT = 0.04;      // 4% Woeva platform fee
+const WOEVA_FEE_FIXED = 0.50;    // €0.50 Woeva fixed fee per ticket
 const STRIPE_PCT = 0.015;        // 1.5% Stripe EU fee
 const STRIPE_FIXED = 0.25;       // €0.25 Stripe fixed fee
-const PLATFORM_FEE_PCT = 5;      // ~5% total displayed to organizers
 
 // ─── Payment method icons ──────────────────────────────────────────────────────
 function PayMethodIcon({ method }: { method: 'visa' | 'mc' | 'amex' | 'apple' | 'gpay' }) {
@@ -156,8 +156,8 @@ function calcRevenue(price: number, onlineCount: number, doorCount: number) {
   const gross = onlineGross + doorGross;
 
   // Application fee per ticket — must match create-payment-intent edge function exactly:
-  // Math.max(Math.round(price_cents * 0.05), 50) converted back to euros
-  const woevaFeePerTicket = onlineCount > 0 ? Math.max(Math.round(price * 0.05 * 100) / 100, 0.50) : 0;
+  // 4% + €0.50 per ticket
+  const woevaFeePerTicket = onlineCount > 0 ? Math.round((price * WOEVA_FEE_PCT + WOEVA_FEE_FIXED) * 100) / 100 : 0;
   const woeva_fee = Math.round(woevaFeePerTicket * onlineCount * 100) / 100;
 
   // Stripe fee is paid by the platform (Woeva), not deducted from vendor payout in destination charges
@@ -1723,19 +1723,19 @@ export default function DashboardScreen() {
                   {/* Fee dropdown */}
                   <TouchableOpacity style={s.feeToggle} onPress={() => setShowFeeInfo(v => !v)} activeOpacity={0.7}>
                     <Text style={s.feeToggleText}>
-                      {lang === 'sk' ? `O poplatkoch (~${PLATFORM_FEE_PCT}% z online lístkov)` : `About fees (~${PLATFORM_FEE_PCT}% on online tickets)`}
+                      {lang === 'sk' ? 'O poplatkoch (4 % + €0,50 / lístok)' : 'About fees (4% + €0.50 / ticket)'}
                     </Text>
                     <Text style={s.feeToggleArrow}>{showFeeInfo ? '▲' : '▼'}</Text>
                   </TouchableOpacity>
                   {showFeeInfo && (
                     <View style={s.feeBox}>
                       {(lang === 'sk' ? [
-                        ['Stripe (1,5 % + 0,25 €)', 'Poplatok za spracovanie platby kartou, Apple Pay, Google Pay.'],
-                        ['Woeva (3,5 %)', 'Pokrýva prevádzku serverov, aplikácie a podpory.'],
+                        ['Woeva (4 % + €0,50 / lístok)', 'Servisný poplatok za každý predaný online lístok.'],
+                        ['Stripe', 'Poplatok za spracovanie platby kartou, Apple Pay, Google Pay — hradí Woeva.'],
                         ['Výplaty', 'Automaticky každý pondelok na tvoj bankový účet.'],
                       ] : [
-                        ['Stripe (1.5% + €0.25)', 'Card processing fee — Visa, Mastercard, Apple Pay, Google Pay.'],
-                        ['Woeva (3.5%)', 'Covers servers, the app, and support so we can keep running.'],
+                        ['Woeva (4% + €0.50 / ticket)', 'Service fee per online ticket sold.'],
+                        ['Stripe', 'Card processing fee — Visa, Mastercard, Apple Pay, Google Pay — covered by Woeva.'],
                         ['Payouts', 'Automatically every Monday to your bank account.'],
                       ]).map(([label, val]) => (
                         <View key={label} style={s.feeRow}>
@@ -1745,8 +1745,8 @@ export default function DashboardScreen() {
                       ))}
                       <Text style={s.feeExampleText}>
                         {lang === 'sk'
-                          ? 'Príklad: event za 5 € → poplatok 0,25 €'
-                          : 'Example: €5 event → €0.25 fee'}
+                          ? 'Príklad: lístok za €10 → poplatok €0,90'
+                          : 'Example: €10 ticket → €0.90 fee'}
                       </Text>
                     </View>
                   )}

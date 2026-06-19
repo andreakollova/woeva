@@ -73,8 +73,8 @@ serve(async (req) => {
       return new Response(JSON.stringify({ error: 'Organizer payment not set up' }), { status: 422, headers: corsHeaders });
     }
 
-    // 5% platform fee (minimum €0.50 to cover costs)
-    const applicationFee = Math.max(Math.round(amount * 0.05), 50);
+    // 4% + €0.50 platform fee per ticket
+    const applicationFee = Math.round(amount * 0.04) + 50;
 
     const paymentIntent = await stripe.paymentIntents.create({
       amount,
