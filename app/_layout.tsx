@@ -35,8 +35,8 @@ function NotificationHandler() {
     if (!response || loading) return;
     const data = response.notification.request.content.data as any;
     if (!data) return;
-    if (data.type === 'chat' && data.event_id) {
-      router.push(`/chat/${data.event_id}`);
+    if (data.type === 'event_chat' && data.room_id) {
+      router.push(`/chat/${data.room_id}`);
     } else if (data.event_id) {
       router.push(`/event/${data.event_id}`);
     }
