@@ -152,10 +152,7 @@ export default function NotificationsScreen() {
 
   function handleTap(n: Notification) {
     if ((n.type === 'admin_invite' || n.type === 'coordinator_invite') && n.data?.action) {
-      Alert.alert(n.title, n.body ?? '', [
-        { text: t.common.decline, style: 'destructive', onPress: () => handleInvite(n, false) },
-        { text: t.common.accept, onPress: () => handleInvite(n, true) },
-      ]);
+      handleInvite(n, true);
       return;
     }
     const eventId = n.data?.event_id;
@@ -224,7 +221,7 @@ export default function NotificationsScreen() {
                 {n.body ? <Text style={styles.rowBody}>{n.body}</Text> : null}
                 {(n.type === 'admin_invite' || n.type === 'coordinator_invite') && !n.read && (
                   <View style={styles.inviteActions}>
-                    <TouchableOpacity style={styles.declineInviteBtn} onPress={() => handleInvite(n, false)} activeOpacity={0.7}>
+                    <TouchableOpacity style={styles.declineInviteBtn} onPress={() => Alert.alert(lang === 'sk' ? 'Odmietnuť pozvánku?' : 'Decline invite?', lang === 'sk' ? 'Si si istý/á?' : 'Are you sure?', [{ text: lang === 'sk' ? 'Späť' : 'Back', style: 'cancel' }, { text: lang === 'sk' ? 'Odmietnuť' : 'Decline', style: 'destructive', onPress: () => handleInvite(n, false) }])} activeOpacity={0.7}>
                       <Text style={styles.declineInviteBtnText}>{t.common.decline}</Text>
                     </TouchableOpacity>
                     <TouchableOpacity style={styles.acceptInviteBtn} onPress={() => handleInvite(n, true)} activeOpacity={0.7}>
