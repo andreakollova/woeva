@@ -261,8 +261,8 @@ const styles = StyleSheet.create({
   inviteActions: { flexDirection: 'row', gap: 8, marginTop: 8 },
   acceptInviteBtn: { backgroundColor: Colors.lime, borderRadius: 20, paddingHorizontal: 14, paddingVertical: 6 },
   acceptInviteBtnText: { fontSize: 12, fontWeight: '600', color: Colors.black, fontFamily: Fonts.semibold },
-  declineInviteBtn: { backgroundColor: Colors.grayLight, borderRadius: 20, paddingHorizontal: 14, paddingVertical: 6 },
-  declineInviteBtnText: { fontSize: 12, fontWeight: '500', color: Colors.gray, fontFamily: Fonts.medium },
+  declineInviteBtn: { backgroundColor: Colors.black, borderRadius: 20, paddingHorizontal: 14, paddingVertical: 6 },
+  declineInviteBtnText: { fontSize: 12, fontWeight: '600', color: Colors.white, fontFamily: Fonts.semibold },
   empty: { flex: 1, alignItems: 'center', justifyContent: 'center', paddingTop: 80, gap: 12 },
   emptyText: { fontSize: 15, color: Colors.gray, fontFamily: Fonts.regular },
 });
