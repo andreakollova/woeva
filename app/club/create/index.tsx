@@ -1,7 +1,7 @@
-import React, { useState } from 'react';
+import React, { useState, useCallback } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, ScrollView, KeyboardAvoidingView, Platform, Image, Alert, TextInput, Modal, Pressable } from 'react-native';
-import { StatusBar } from 'expo-status-bar';
-import { useRouter } from 'expo-router';
+import { StatusBar, setStatusBarStyle } from 'expo-status-bar';
+import { useRouter, useFocusEffect } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import * as ImagePicker from 'expo-image-picker';
 import { Colors } from '@/constants/colors';
@@ -29,6 +29,7 @@ const D = {
 export default function CreateClubScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
+  useFocusEffect(useCallback(() => { setStatusBarStyle('light'); }, []));
   const { user, profile } = useAuth();
   const { t } = useTranslations();
   const { categories } = useCategories();
