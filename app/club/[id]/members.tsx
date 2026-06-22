@@ -49,6 +49,17 @@ export default function ClubMembersScreen() {
 
   useEffect(() => { load(); }, [id, user]);
 
+  // Realtime: refresh when club_members or coordinators change
+  useEffect(() => {
+    if (!id) return;
+    const ch = supabase
+      .channel(`members_${id}`)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'club_members', filter: `club_id=eq.${id}` }, () => load())
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'coordinators', filter: `club_id=eq.${id}` }, () => load())
+      .subscribe();
+    return () => { supabase.removeChannel(ch); };
+  }, [id]);
+
   async function load() {
     const [{ data: clubData }, { data: adminData }, { data: coordData }, { data: allMembers }] = await Promise.all([
       supabase.from('clubs').select('id, name, creator_id').eq('id', id).single(),
