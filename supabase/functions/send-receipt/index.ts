@@ -97,8 +97,8 @@ serve(async (req) => {
     // Increment going_count using service role (buyer may not have RLS permission to update events)
     await admin.from('events').update({ going_count: (event.going_count ?? 0) + qty }).eq('id', eventId);
 
-    // Log revenue — matches create-payment-intent: 5% platform fee, minimum €0.50 per transaction
-    const woeva_fee = parseFloat(Math.max(Math.round(totalAmount * 0.05 * 100) / 100, 0.50).toFixed(2));
+    // Log revenue — matches create-payment-intent: 4% + €0.50 per ticket
+    const woeva_fee = parseFloat((Math.round(totalAmount * 0.04 * 100) / 100 + 0.50 * qty).toFixed(2));
     const stripe_fee = parseFloat((totalAmount * 0.015 + 0.25).toFixed(2));
     const net = parseFloat((woeva_fee - stripe_fee).toFixed(2)); // Woeva's profit after paying Stripe
     await admin.from('platform_revenue').insert({

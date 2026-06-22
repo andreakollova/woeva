@@ -51,7 +51,7 @@ serve(async (req) => {
 
     const events_data = Object.values(eventMap).map(e => {
       const stripe_fee = parseFloat((e.gross * 0.015 + 0.25 * e.paid_count).toFixed(2));
-      const woeva_fee = parseFloat((e.gross * 0.05).toFixed(2));
+      const woeva_fee = parseFloat((e.gross * 0.04 + 0.50 * e.paid_count).toFixed(2));
       const net = parseFloat((e.gross - stripe_fee - woeva_fee).toFixed(2));
       return { ...e, stripe_fee, woeva_fee, net };
     });

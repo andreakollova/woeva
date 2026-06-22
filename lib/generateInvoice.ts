@@ -117,7 +117,7 @@ export function generateCreatorInvoice(
         <th style="text-align:center">POČET</th>
         <th style="text-align:right">Hrubý príjem</th>
         <th style="text-align:right">Stripe poplatok</th>
-        <th style="text-align:right">Woeva (3.5%)</th>
+        <th style="text-align:right">Poplatok Woeva (4 % + €0,50 / lístok)</th>
         <th style="text-align:right">Čistý príjem</th>
       </tr>
     </thead>
@@ -129,12 +129,12 @@ export function generateCreatorInvoice(
   <div class="totals">
     <div class="totals-row"><span>Hrubý príjem</span><span>${fmt(totalGross)}</span></div>
     <div class="totals-row"><span>Stripe (1.5% + €0.25)</span><span style="color:#888">- ${fmt(totalStripe)}</span></div>
-    <div class="totals-row"><span>Woeva (3.5%)</span><span style="color:#888">- ${fmt(totalWoeva)}</span></div>
+    <div class="totals-row"><span>Poplatok Woeva (4 % + €0,50 / lístok)</span><span style="color:#888">- ${fmt(totalWoeva)}</span></div>
     <div class="totals-row total"><span>Celkový čistý príjem</span><span>${fmt(totalNet)}</span></div>
   </div>
 
   <div class="note">
-    <strong>Podmienky výplaty:</strong> Výplaty sú spracovávané automaticky cez Stripe Connect každý pondelok. Môže trvať 2–5 pracovných dní, kým suma dorazí na váš bankový účet. Stripe poplatok je 1.5% + €0.25 za transakciu. Poplatok platformy Woeva je 3.5% z hrubého príjmu.
+    <strong>Podmienky výplaty:</strong> Výplaty sú spracovávané automaticky cez Stripe Connect každý pondelok. Môže trvať 2–5 pracovných dní, kým suma dorazí na váš bankový účet. Stripe poplatok je 1.5% + €0.25 za transakciu. Poplatok Woeva je 4 % z ceny lístka + €0,50 za každý predaný lístok.
   </div>
 
   <div class="footer">Woeva — woeva.app &nbsp;·&nbsp; Generované automaticky ${today}</div>
@@ -237,7 +237,7 @@ export function generateFormalInvoice(
         <th style="text-align:center">POČET</th>
         <th style="text-align:right">Hrubý príjem</th>
         <th style="text-align:right">Stripe poplatok</th>
-        <th style="text-align:right">Woeva (3.5%)</th>
+        <th style="text-align:right">Poplatok Woeva (4 % + €0,50 / lístok)</th>
         <th style="text-align:right">Čistý výnos</th>
       </tr>
     </thead>
@@ -249,7 +249,7 @@ export function generateFormalInvoice(
   <div class="totals">
     <div class="totals-row"><span>Hrubý príjem</span><span>${fmt(totalGross)}</span></div>
     <div class="totals-row"><span>Stripe (1.5% + €0.25)</span><span style="color:#888">− ${fmt(totalStripe)}</span></div>
-    <div class="totals-row"><span>Woeva (3.5%)</span><span style="color:#888">− ${fmt(totalWoeva)}</span></div>
+    <div class="totals-row"><span>Poplatok Woeva (4 % + €0,50 / lístok)</span><span style="color:#888">− ${fmt(totalWoeva)}</span></div>
     <div class="totals-row total"><span>Suma na úhradu</span><span>${fmt(totalNet)}</span></div>
   </div>
 

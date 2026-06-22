@@ -353,7 +353,7 @@ export default function AdminBillingScreen() {
                   <Text style={[styles.amountValue, { color: Colors.gray }]}>− {fmt(selected.stripe_fee)}</Text>
                 </View>
                 <View style={styles.amountRow}>
-                  <Text style={styles.amountLabel}>Woeva poplatok (5%)</Text>
+                  <Text style={styles.amountLabel}>Poplatok Woeva (4 % + €0,50 / lístok)</Text>
                   <Text style={[styles.amountValue, { color: Colors.gray }]}>− {fmt(selected.woeva_fee)}</Text>
                 </View>
                 <View style={[styles.amountRow, styles.amountRowTotal]}>
