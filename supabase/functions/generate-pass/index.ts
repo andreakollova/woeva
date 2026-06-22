@@ -45,15 +45,14 @@ async function buildPass(supabase: any, userId: string, event_id: string): Promi
 
   const venueLabel = [event.venue, event.city].filter(Boolean).join(', ');
 
-  // Format date as YYYY-MM-DD regardless of how it comes from the DB
+  // Format date as DD.MM.YYYY for display
   let dateValue = event.date as string | undefined;
   if (dateValue) {
-    const d = new Date(dateValue);
+    const d = new Date(dateValue + 'T00:00:00');
     if (!isNaN(d.getTime())) {
-      const y = d.getUTCFullYear();
-      const m = String(d.getUTCMonth() + 1).padStart(2, '0');
-      const day = String(d.getUTCDate()).padStart(2, '0');
-      dateValue = `${y}-${m}-${day}`;
+      const day = String(d.getDate()).padStart(2, '0');
+      const m = String(d.getMonth() + 1).padStart(2, '0');
+      dateValue = `${day}.${m}.${d.getFullYear()}`;
     }
   }
 
@@ -82,11 +81,11 @@ async function buildPass(supabase: any, userId: string, event_id: string): Promi
       ],
       primaryFields: [{ key: 'event', label: 'EVENT', value: event.title }],
       secondaryFields: [
-        ...(dateValue ? [{ key: 'date', label: 'DATE', value: dateValue }] : []),
-        ...(event.time ? [{ key: 'time', label: 'TIME', value: event.time, textAlignment: 'PKTextAlignmentRight' }] : []),
+        ...(dateValue ? [{ key: 'date', label: 'DÁTUM', value: dateValue }] : []),
+        ...(event.time ? [{ key: 'time', label: 'ČAS', value: event.time, textAlignment: 'PKTextAlignmentRight' }] : []),
       ],
       auxiliaryFields: [
-        ...(venueLabel ? [{ key: 'venue', label: 'VENUE', value: venueLabel }] : []),
+        ...(venueLabel ? [{ key: 'venue', label: 'MIESTO', value: venueLabel }] : []),
       ],
       backFields: [
         { key: 'ticketId', label: 'ID LÍSTKA', value: attendee.id },
