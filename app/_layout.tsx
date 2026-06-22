@@ -37,6 +37,8 @@ function NotificationHandler() {
     if (!data) return;
     if (data.type === 'event_chat' && data.room_id) {
       router.push(`/chat/${data.room_id}`);
+    } else if (data.type === 'admin_invite' || data.type === 'coordinator_invite' || data.action === 'admin_invite' || data.action === 'coordinator_invite') {
+      router.push('/notifications');
     } else if (data.event_id) {
       router.push(`/event/${data.event_id}`);
     }
