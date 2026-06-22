@@ -23,6 +23,7 @@ import { CATEGORY_SK } from '@/types';
 
 type Tab = 'events' | 'clubs';
 type PriceFilter = 'all' | 'paid' | 'free';
+type DateFilter = 'all' | 'today' | 'tomorrow' | 'week';
 
 type ClubWithLocation = Club & { lat?: number | null; lng?: number | null; address?: string | null };
 
@@ -40,6 +41,7 @@ export default function SearchScreen() {
   const [mode, setMode] = useState<'map' | 'list'>('map');
   const [cityFilter, setCityFilter] = useState<string | null>(profile?.city ?? null);
   const [tab, setTab] = useState<Tab>('events');
+  const [dateFilter, setDateFilter] = useState<DateFilter>('all');
   const [mapEvents, setMapEvents] = useState<Event[]>([]);
   const [mapClubs, setMapClubs] = useState<ClubWithLocation[]>([]);
   const [showFilter, setShowFilter] = useState(false);
@@ -190,13 +192,22 @@ export default function SearchScreen() {
   }
 
   const filteredMapEvents = useCallback(() => {
+    const now = new Date();
+    const todayStr = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
+    const tom = new Date(now); tom.setDate(tom.getDate() + 1);
+    const tomorrowStr = `${tom.getFullYear()}-${String(tom.getMonth() + 1).padStart(2, '0')}-${String(tom.getDate()).padStart(2, '0')}`;
+    const weekEnd = new Date(now); weekEnd.setDate(weekEnd.getDate() + 7);
+    const weekEndStr = `${weekEnd.getFullYear()}-${String(weekEnd.getMonth() + 1).padStart(2, '0')}-${String(weekEnd.getDate()).padStart(2, '0')}`;
     return mapEvents.filter(e => {
+      if (dateFilter === 'today' && e.date?.slice(0, 10) !== todayStr) return false;
+      if (dateFilter === 'tomorrow' && e.date?.slice(0, 10) !== tomorrowStr) return false;
+      if (dateFilter === 'week' && (e.date?.slice(0, 10) < todayStr || e.date?.slice(0, 10) > weekEndStr)) return false;
       if (selectedTags.length > 0 && !selectedTags.some(tag => e.tags?.includes(tag) || e.category === tag)) return false;
       if (priceFilter === 'paid' && e.is_free) return false;
       if (priceFilter === 'free' && !e.is_free) return false;
       return true;
     });
-  }, [mapEvents, selectedTags, priceFilter]);
+  }, [mapEvents, selectedTags, priceFilter, dateFilter]);
 
   const filteredMapClubs = useCallback(() => {
     return mapClubs.filter(c => {
@@ -379,6 +390,22 @@ export default function SearchScreen() {
               </TouchableOpacity>
             )}
           </View>
+
+          {/* Date filter pills — events only */}
+          {tab === 'events' && (
+            <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.datePillsRow}>
+              {([['all', 'Všetky'], ['today', 'Dnes'], ['tomorrow', 'Zajtra'], ['week', 'Tento týždeň']] as [DateFilter, string][]).map(([key, label]) => (
+                <TouchableOpacity
+                  key={key}
+                  style={[styles.datePill, dateFilter === key && styles.datePillActive]}
+                  onPress={() => setDateFilter(key)}
+                  activeOpacity={0.7}
+                >
+                  <Text style={[styles.datePillText, dateFilter === key && styles.datePillTextActive]}>{label}</Text>
+                </TouchableOpacity>
+              ))}
+            </ScrollView>
+          )}
         </View>
       </View>
 
@@ -595,6 +622,11 @@ const styles = StyleSheet.create({
   },
   searchInput: { flex: 1, fontSize: 15, color: Colors.white, fontFamily: Fonts.regular },
   searchClear: { fontSize: 13, color: 'rgba(255,255,255,0.4)', paddingLeft: 8 },
+  datePillsRow: { paddingTop: 10, paddingBottom: 2, gap: 6 },
+  datePill: { paddingHorizontal: 14, paddingVertical: 7, borderRadius: 50, backgroundColor: 'rgba(255,255,255,0.08)' },
+  datePillActive: { backgroundColor: Colors.lime },
+  datePillText: { fontSize: 13, fontWeight: '600', color: 'rgba(255,255,255,0.5)', fontFamily: Fonts.semibold },
+  datePillTextActive: { color: Colors.black },
   listContainer: { flex: 1, backgroundColor: Colors.white },
   pin: {
     backgroundColor: Colors.lime,
