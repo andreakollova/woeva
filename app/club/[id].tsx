@@ -201,7 +201,15 @@ export default function ClubDetailScreen() {
     );
   }
 
-  if (!club) return <View style={{ flex: 1, backgroundColor: Colors.white }} />;
+  if (!club) return (
+    <View style={{ flex: 1, backgroundColor: Colors.white, alignItems: 'center', justifyContent: 'center', padding: 32 }}>
+      <View style={{ position: 'absolute', top: insets.top + 8, left: 16 }}>
+        <BackButton onPress={() => router.canGoBack() ? router.back() : router.replace('/(tabs)/')} />
+      </View>
+      <Text style={{ fontSize: 20, fontWeight: '700', fontFamily: Fonts.bold, color: Colors.black, marginBottom: 8 }}>Klub neexistuje</Text>
+      <Text style={{ fontSize: 14, color: Colors.gray, textAlign: 'center', fontFamily: Fonts.regular }}>Tento klub bol vymazaný alebo nebol nájdený.</Text>
+    </View>
+  );
 
   const initial = (club.name ?? '?').charAt(0).toUpperCase();
   const visibleMembers = members.slice(0, 4);
