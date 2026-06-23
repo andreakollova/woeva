@@ -88,10 +88,11 @@ function TabBar({ state, descriptors, navigation }: any) {
   };
   const [myClubs, setMyClubs] = useState<{ id: string; name: string }[]>([]);
   const [adminClubs, setAdminClubs] = useState<{ id: string; name: string }[]>([]);
+  const [hasCoordinations, setHasCoordinations] = useState(false);
   const [showMenu, setShowMenu] = useState(false);
 
   useEffect(() => {
-    if (!user) { setMyClubs([]); setAdminClubs([]); return; }
+    if (!user) { setMyClubs([]); setAdminClubs([]); setHasCoordinations(false); return; }
     supabase.from('clubs').select('id, name').eq('creator_id', user.id)
       .then(({ data }) => setMyClubs(data ?? []));
     supabase.from('club_members').select('club:clubs(id, name)')
@@ -100,6 +101,8 @@ function TabBar({ state, descriptors, navigation }: any) {
         const clubs = ((data ?? []) as any[]).map(m => m.club).filter(Boolean);
         setAdminClubs(clubs.filter((c: any) => c.id));
       });
+    supabase.from('coordinators').select('id').eq('user_id', user.id).eq('status', 'active').limit(1)
+      .then(({ data }) => setHasCoordinations((data ?? []).length > 0));
   }, [user]);
 
   function handleCreatePress() {
@@ -131,62 +134,26 @@ function TabBar({ state, descriptors, navigation }: any) {
               </View>
             </TouchableOpacity>
 
-            {/* Secondary row */}
+            {/* Top row: Môj klub / Vytvoriť klub + Dashboard */}
             <View style={styles.menuSecondaryRow}>
-              {myClubs.length === 0 && (
+              {myClubs.length === 0 ? (
                 <TouchableOpacity style={styles.menuSecondaryItem} onPress={() => { setShowMenu(false); router.push('/club/create'); }} activeOpacity={0.7}>
                   <Svg width={16} height={16} viewBox="0 0 24 24" fill="none">
-                    <Path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2" stroke={Colors.gray} strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round" />
-                    <Circle cx={9} cy={7} r={4} stroke={Colors.gray} strokeWidth={1.8} />
-                    <Path d="M23 21v-2a4 4 0 0 0-3-3.87" stroke={Colors.gray} strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round" />
-                    <Path d="M16 3.13a4 4 0 0 1 0 7.75" stroke={Colors.gray} strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round" />
+                    <Path d="M12 5v14M5 12h14" stroke={Colors.gray} strokeWidth={1.8} strokeLinecap="round" />
                   </Svg>
                   <Text style={styles.menuSecondaryTitle}>{t.club.createClub}</Text>
                 </TouchableOpacity>
-              )}
-              {myClubs.length === 1 && (
-                <TouchableOpacity style={styles.menuSecondaryItem} onPress={() => { setShowMenu(false); setTimeout(() => router.push(`/club/${myClubs[0].id}` as any), 150); }} activeOpacity={0.7}>
-                  <Svg width={16} height={16} viewBox="0 0 24 24" fill="none">
-                    <Path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2" stroke={Colors.gray} strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round" />
-                    <Circle cx={9} cy={7} r={4} stroke={Colors.gray} strokeWidth={1.8} />
-                    <Path d="M23 21v-2a4 4 0 0 0-3-3.87" stroke={Colors.gray} strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round" />
-                    <Path d="M16 3.13a4 4 0 0 1 0 7.75" stroke={Colors.gray} strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round" />
-                  </Svg>
-                  <Text style={styles.menuSecondaryTitle}>{t.club.myClub}</Text>
-                </TouchableOpacity>
-              )}
-              {myClubs.length >= 2 && (
-                <TouchableOpacity style={styles.menuSecondaryItem} onPress={() => { setShowMenu(false); router.push('/dashboard'); }} activeOpacity={0.7}>
+              ) : (
+                <TouchableOpacity style={styles.menuSecondaryItem} onPress={() => { setShowMenu(false); setTimeout(() => myClubs.length === 1 ? router.push(`/club/${myClubs[0].id}` as any) : router.push('/dashboard'), 150); }} activeOpacity={0.7}>
                   <Svg width={16} height={16} viewBox="0 0 24 24" fill="none">
                     <Path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2" stroke={Colors.gray} strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round" />
                     <Circle cx={9} cy={7} r={4} stroke={Colors.gray} strokeWidth={1.8} />
                   </Svg>
-                  <Text style={styles.menuSecondaryTitle}>{t.settings.myClubs} ({myClubs.length})</Text>
+                  <Text style={styles.menuSecondaryTitle}>{myClubs.length === 1 ? t.club.myClub : `${t.settings.myClubs} (${myClubs.length})`}</Text>
                 </TouchableOpacity>
               )}
-
-              {/* Admin clubs */}
-              {adminClubs.length > 0 && (
-                <>
-                  <View style={styles.menuSecondaryDivider} />
-                  {adminClubs.map(club => (
-                    <TouchableOpacity key={club.id} style={styles.menuSecondaryItem} onPress={() => { setShowMenu(false); setTimeout(() => router.push(`/club/${club.id}` as any), 150); }} activeOpacity={0.7}>
-                      <Svg width={16} height={16} viewBox="0 0 24 24" fill="none">
-                        <Path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5" stroke={Colors.gray} strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round" />
-                      </Svg>
-                      <Text style={styles.menuSecondaryTitle}>Správca · {club.name}</Text>
-                    </TouchableOpacity>
-                  ))}
-                </>
-              )}
-
-              {/* Dashboard - always visible */}
               <View style={styles.menuSecondaryDivider} />
-              <TouchableOpacity
-                style={styles.menuSecondaryItem}
-                onPress={() => { setShowMenu(false); router.push('/dashboard'); }}
-                activeOpacity={0.7}
-              >
+              <TouchableOpacity style={styles.menuSecondaryItem} onPress={() => { setShowMenu(false); router.push('/dashboard'); }} activeOpacity={0.7}>
                 <Svg width={16} height={16} viewBox="0 0 24 24" fill="none">
                   <Rect x={3} y={12} width={4} height={9} rx={1} stroke={Colors.gray} strokeWidth={1.8} />
                   <Rect x={10} y={7} width={4} height={14} rx={1} stroke={Colors.gray} strokeWidth={1.8} />
@@ -195,6 +162,46 @@ function TabBar({ state, descriptors, navigation }: any) {
                 <Text style={styles.menuSecondaryTitle}>Dashboard</Text>
               </TouchableOpacity>
             </View>
+
+            {/* Bottom row: Správca + Koordinátor (with divider) */}
+            {(adminClubs.length > 0 || hasCoordinations) && (
+              <>
+                <View style={{ height: 1, backgroundColor: Colors.grayBorder, marginTop: 4 }} />
+                <View style={[styles.menuSecondaryRow, { borderTopWidth: 0, paddingTop: 8, marginTop: 0 }]}>
+                  {adminClubs.length > 0 && hasCoordinations ? (
+                    <>
+                      <TouchableOpacity style={styles.menuSecondaryItem} onPress={() => { setShowMenu(false); router.push({ pathname: '/dashboard', params: { tab: 'home' } } as any); }} activeOpacity={0.7}>
+                        <Svg width={16} height={16} viewBox="0 0 24 24" fill="none">
+                          <Path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5" stroke={Colors.gray} strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round" />
+                        </Svg>
+                        <Text style={styles.menuSecondaryTitle}>Správca</Text>
+                      </TouchableOpacity>
+                      <View style={styles.menuSecondaryDivider} />
+                      <TouchableOpacity style={styles.menuSecondaryItem} onPress={() => { setShowMenu(false); router.push({ pathname: '/dashboard', params: { tab: 'coordinator' } } as any); }} activeOpacity={0.7}>
+                        <Svg width={16} height={16} viewBox="0 0 24 24" fill="none">
+                          <Path d="M3 7V5a2 2 0 0 1 2-2h2M17 3h2a2 2 0 0 1 2 2v2M21 17v2a2 2 0 0 1-2 2h-2M7 21H5a2 2 0 0 1-2-2v-2" stroke={Colors.gray} strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round" />
+                        </Svg>
+                        <Text style={styles.menuSecondaryTitle}>Koordinátor</Text>
+                      </TouchableOpacity>
+                    </>
+                  ) : adminClubs.length > 0 ? (
+                    <TouchableOpacity style={[styles.menuSecondaryItem, { justifyContent: 'center' }]} onPress={() => { setShowMenu(false); router.push({ pathname: '/dashboard', params: { tab: 'home' } } as any); }} activeOpacity={0.7}>
+                      <Svg width={16} height={16} viewBox="0 0 24 24" fill="none">
+                        <Path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5" stroke={Colors.gray} strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round" />
+                      </Svg>
+                      <Text style={styles.menuSecondaryTitle}>Správca</Text>
+                    </TouchableOpacity>
+                  ) : (
+                    <TouchableOpacity style={[styles.menuSecondaryItem, { justifyContent: 'center' }]} onPress={() => { setShowMenu(false); router.push({ pathname: '/dashboard', params: { tab: 'coordinator' } } as any); }} activeOpacity={0.7}>
+                      <Svg width={16} height={16} viewBox="0 0 24 24" fill="none">
+                        <Path d="M3 7V5a2 2 0 0 1 2-2h2M17 3h2a2 2 0 0 1 2 2v2M21 17v2a2 2 0 0 1-2 2h-2M7 21H5a2 2 0 0 1-2-2v-2" stroke={Colors.gray} strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round" />
+                      </Svg>
+                      <Text style={styles.menuSecondaryTitle}>Koordinátor</Text>
+                    </TouchableOpacity>
+                  )}
+                </View>
+              </>
+            )}
           </View>
         </Pressable>
       </Modal>
