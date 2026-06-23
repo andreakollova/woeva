@@ -1,4 +1,5 @@
 import React, { useState, useCallback, useMemo, useRef } from 'react';
+import { setStatusBarStyle } from 'expo-status-bar';
 import {
   View, Text, StyleSheet, ScrollView, TouchableOpacity, Pressable,
   Image, Alert, ActivityIndicator, Modal, TextInput, Platform, FlatList, KeyboardAvoidingView, RefreshControl, Share, PanResponder, Animated as RNAnimated, Easing,
@@ -619,6 +620,7 @@ export default function DashboardScreen() {
   const [scanProcessing, setScanProcessing] = useState(false);
 
   useFocusEffect(useCallback(() => {
+    setStatusBarStyle('dark');
     load();
     if (user) {
       supabase.from('notifications').select('id', { count: 'exact', head: true })

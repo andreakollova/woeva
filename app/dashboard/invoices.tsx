@@ -4,6 +4,7 @@ import {
   ActivityIndicator, Alert,
 } from 'react-native';
 import Svg, { Path } from 'react-native-svg';
+import { setStatusBarStyle } from 'expo-status-bar';
 import { useFocusEffect } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Colors } from '@/constants/colors';
@@ -75,7 +76,7 @@ export default function InvoicesScreen() {
   const [selectedMonth, setSelectedMonth] = useState<string | null>(null);
   const [exporting, setExporting] = useState(false);
 
-  useFocusEffect(useCallback(() => { load(); }, [user]));
+  useFocusEffect(useCallback(() => { setStatusBarStyle('dark'); load(); }, [user]));
 
   async function load() {
     if (!user) return;
