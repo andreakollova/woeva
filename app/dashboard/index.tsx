@@ -472,6 +472,35 @@ export default function DashboardScreen() {
     supabase.from('check_ins').delete().eq('event_id', eventId).eq('user_id', userId).then(() => {});
   }
 
+  // Realtime check-ins: sync across multiple admins/coordinators
+  React.useEffect(() => {
+    const eventIds = events.map(e => e.id);
+    if (eventIds.length === 0) return;
+    const ch = supabase
+      .channel('checkins_realtime')
+      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'check_ins' }, (payload: any) => {
+        const { event_id, user_id } = payload.new;
+        if (!eventIds.includes(event_id)) return;
+        setCheckedIn(prev => {
+          if (prev[event_id]?.has(user_id)) return prev;
+          const s = new Set(prev[event_id] ?? []);
+          s.add(user_id);
+          return { ...prev, [event_id]: s };
+        });
+      })
+      .on('postgres_changes', { event: 'DELETE', schema: 'public', table: 'check_ins' }, (payload: any) => {
+        const { event_id, user_id } = payload.old;
+        if (!eventIds.includes(event_id)) return;
+        setCheckedIn(prev => {
+          const s = new Set(prev[event_id] ?? []);
+          s.delete(user_id);
+          return { ...prev, [event_id]: s };
+        });
+      })
+      .subscribe();
+    return () => { supabase.removeChannel(ch); };
+  }, [events.length]);
+
   // Reload members when selected club changes
   React.useEffect(() => {
     const id = selectedClubId ?? clubs[0]?.id;
