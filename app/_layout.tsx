@@ -35,13 +35,19 @@ function NotificationHandler() {
     if (!response || loading) return;
     const data = response.notification.request.content.data as any;
     if (!data) return;
-    if (data.type === 'event_chat' && data.room_id) {
-      router.push(`/chat/${data.room_id}`);
-    } else if (data.type === 'admin_invite' || data.type === 'coordinator_invite' || data.action === 'admin_invite' || data.action === 'coordinator_invite') {
-      router.push('/notifications');
-    } else if (data.event_id) {
-      router.push(`/event/${data.event_id}`);
-    }
+    // Delay navigation to ensure router is mounted (cold start from killed state)
+    const timer = setTimeout(() => {
+      try {
+        if (data.type === 'event_chat' && data.room_id) {
+          router.push(`/chat/${data.room_id}`);
+        } else if (data.type === 'admin_invite' || data.type === 'coordinator_invite' || data.action === 'admin_invite' || data.action === 'coordinator_invite') {
+          router.push('/notifications');
+        } else if (data.event_id) {
+          router.push(`/event/${data.event_id}`);
+        }
+      } catch {}
+    }, 600);
+    return () => clearTimeout(timer);
   }, [response, loading]);
 
   return null;
