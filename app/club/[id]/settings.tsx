@@ -306,6 +306,7 @@ export default function ClubSettingsScreen() {
       <View style={styles.header}>
         <BackButton />
         <Text style={styles.title}>{lang === 'sk' ? 'Nastavenia klubu' : 'Club settings'}</Text>
+        <View style={{ width: 36 }} />
       </View>
 
       <ScrollView
@@ -395,8 +396,8 @@ export default function ClubSettingsScreen() {
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: Colors.white },
-  header: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 20, paddingBottom: 16, gap: 12 },
-  title: { fontSize: 20, fontWeight: '700', color: Colors.black, fontFamily: Fonts.bold },
+  header: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 16, paddingVertical: 10, marginBottom: 16 },
+  title: { fontSize: 17, fontWeight: '700', color: Colors.black, fontFamily: Fonts.bold, position: 'absolute', left: 0, right: 0, textAlign: 'center' },
   scroll: { paddingHorizontal: 20, paddingTop: 8 },
 
   section: {},

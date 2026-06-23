@@ -267,6 +267,7 @@ export default function ClubMembersScreen() {
       <View style={st.header}>
         <BackButton />
         <Text style={st.title}>{lang === 'sk' ? 'Vedenie klubu a správcovia' : 'Club leadership & admins'}</Text>
+        <View style={{ width: 36 }} />
       </View>
 
       <ScrollView contentContainerStyle={{ paddingBottom: insets.bottom + 40, paddingHorizontal: 20, paddingTop: 12 }} showsVerticalScrollIndicator={false}>
@@ -495,8 +496,8 @@ export default function ClubMembersScreen() {
 
 const st = StyleSheet.create({
   container: { flex: 1, backgroundColor: Colors.white },
-  header: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 20, paddingBottom: 14, gap: 12 },
-  title: { fontSize: 18, fontWeight: '700', color: Colors.black, fontFamily: Fonts.bold, flex: 1 },
+  header: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 16, paddingVertical: 10, marginBottom: 16 },
+  title: { fontSize: 17, fontWeight: '700', color: Colors.black, fontFamily: Fonts.bold, position: 'absolute' as const, left: 0, right: 0, textAlign: 'center' as const },
 
   sectionLabel: { fontSize: 11, fontWeight: '600', color: Colors.gray, letterSpacing: 0.6, textTransform: 'uppercase', marginBottom: 4, fontFamily: Fonts.semibold },
   sectionDesc: { fontSize: 13, color: Colors.gray, fontFamily: Fonts.regular, lineHeight: 18, marginBottom: 14 },

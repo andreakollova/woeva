@@ -26,6 +26,7 @@ export default function AboutScreen() {
       <View style={styles.header}>
         <BackButton />
         <Text style={styles.title}>{t.about.about}</Text>
+        <View style={{ width: 36 }} />
       </View>
 
       <ScrollView contentContainerStyle={[styles.scroll, { paddingBottom: insets.bottom + 40 }]}>
@@ -79,10 +80,10 @@ export default function AboutScreen() {
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: Colors.white },
-  header: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 20, paddingBottom: 16, gap: 12 },
+  header: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 16, paddingVertical: 10, marginBottom: 16 },
   backBtn: { padding: 4 },
   backIcon: { fontSize: 20, color: Colors.black },
-  title: { fontSize: 20, fontWeight: '700', color: Colors.black },
+  title: { fontSize: 17, fontWeight: '700', color: Colors.black, fontFamily: Fonts.bold, position: 'absolute' as const, left: 0, right: 0, textAlign: 'center' as const },
   scroll: { paddingHorizontal: 20 },
   appCard: { alignItems: 'center', paddingVertical: 24, gap: 6, marginBottom: 24 },
   iconBox: { width: 72, height: 72, borderRadius: 16, marginBottom: 8 },
