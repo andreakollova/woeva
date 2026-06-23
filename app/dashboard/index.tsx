@@ -300,7 +300,7 @@ export default function DashboardScreen() {
   const { t, lang } = useTranslations();
   const { width: screenWidth } = useWindowDimensions();
   const chartWidth = screenWidth - 40;
-  const { tab: tabParam } = useLocalSearchParams<{ tab?: string }>();
+  const { tab: tabParam, openEvent: openEventParam } = useLocalSearchParams<{ tab?: string; openEvent?: string }>();
 
   const [activeTab, setActiveTab] = useState<DashTab>((['home','payouts','stats','scan'].includes(tabParam as string) ? tabParam as DashTab : 'home'));
   const [unreadNotifs, setUnreadNotifs] = useState(0);
@@ -633,6 +633,11 @@ export default function DashboardScreen() {
     if (!loading) {
       if (billing) setShowPayoutsSetup(true);
       else if (tabParam === 'payouts') setTimeout(() => setShowBillingModal(true), 500);
+      // Auto-open attendees for coordinator invite flow
+      if (openEventParam) {
+        const ev = events.find(e => e.id === openEventParam || e.id.startsWith(openEventParam));
+        if (ev) setTimeout(() => openAttendees(ev), 400);
+      }
     }
   }, [loading]);
 

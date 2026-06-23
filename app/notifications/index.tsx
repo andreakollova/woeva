@@ -137,7 +137,12 @@ export default function NotificationsScreen() {
         await supabase.from('club_members').update({ status: 'approved' })
           .eq('club_id', clubId).eq('user_id', user.id).eq('role', 'admin');
       }
-      Alert.alert(t.notif.welcomeAboard, isCoord ? 'Si teraz koordinátor. Nájdeš skener v Dashboarde.' : t.notif.welcomeAboardMsg);
+      if (isCoord) {
+        const eventId = invite?.event_id;
+        router.replace({ pathname: '/dashboard', params: eventId ? { openEvent: eventId } : {} } as any);
+      } else {
+        Alert.alert(t.notif.welcomeAboard, t.notif.welcomeAboardMsg);
+      }
     } else {
       if (token) {
         await supabase.from('pending_invites').update({ status: 'declined' }).eq('token', token);
