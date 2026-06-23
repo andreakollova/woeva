@@ -87,12 +87,19 @@ function TabBar({ state, descriptors, navigation }: any) {
     dashboard: 'Dashboard',
   };
   const [myClubs, setMyClubs] = useState<{ id: string; name: string }[]>([]);
+  const [adminClubs, setAdminClubs] = useState<{ id: string; name: string }[]>([]);
   const [showMenu, setShowMenu] = useState(false);
 
   useEffect(() => {
-    if (!user) { setMyClubs([]); return; }
+    if (!user) { setMyClubs([]); setAdminClubs([]); return; }
     supabase.from('clubs').select('id, name').eq('creator_id', user.id)
       .then(({ data }) => setMyClubs(data ?? []));
+    supabase.from('club_members').select('club:clubs(id, name)')
+      .eq('user_id', user.id).eq('role', 'admin').eq('status', 'approved')
+      .then(({ data }) => {
+        const clubs = ((data ?? []) as any[]).map(m => m.club).filter(Boolean);
+        setAdminClubs(clubs.filter((c: any) => c.id));
+      });
   }, [user]);
 
   function handleCreatePress() {
@@ -156,6 +163,21 @@ function TabBar({ state, descriptors, navigation }: any) {
                   </Svg>
                   <Text style={styles.menuSecondaryTitle}>{t.settings.myClubs} ({myClubs.length})</Text>
                 </TouchableOpacity>
+              )}
+
+              {/* Admin clubs */}
+              {adminClubs.length > 0 && (
+                <>
+                  <View style={styles.menuSecondaryDivider} />
+                  {adminClubs.map(club => (
+                    <TouchableOpacity key={club.id} style={styles.menuSecondaryItem} onPress={() => { setShowMenu(false); setTimeout(() => router.push(`/club/${club.id}` as any), 150); }} activeOpacity={0.7}>
+                      <Svg width={16} height={16} viewBox="0 0 24 24" fill="none">
+                        <Path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5" stroke={Colors.gray} strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round" />
+                      </Svg>
+                      <Text style={styles.menuSecondaryTitle}>Správca · {club.name}</Text>
+                    </TouchableOpacity>
+                  ))}
+                </>
               )}
 
               {/* Dashboard - always visible */}
