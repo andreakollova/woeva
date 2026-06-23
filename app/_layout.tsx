@@ -7,7 +7,7 @@ import { StyleSheet } from 'react-native';
 import { AuthProvider, useAuth } from '@/context/AuthContext';
 import { LanguageProvider } from '@/context/LanguageContext';
 import * as Notifications from 'expo-notifications';
-import { useEffect } from 'react';
+import { useEffect, useRef } from 'react';
 import { Platform } from 'react-native';
 
 Notifications.setNotificationHandler({
@@ -30,7 +30,7 @@ function NotificationHandler() {
   const router = useRouter();
   const response = Notifications.useLastNotificationResponse();
   const { loading } = useAuth();
-  const handledRef = React.useRef<string | null>(null);
+  const handledRef = useRef<string | null>(null);
 
   useEffect(() => {
     if (!response || loading) return;
