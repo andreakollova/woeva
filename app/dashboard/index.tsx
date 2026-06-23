@@ -97,7 +97,7 @@ function PayMethodIcon({ method }: { method: 'visa' | 'mc' | 'amex' | 'apple' | 
 }
 
 // ─── Types ────────────────────────────────────────────────────────────────────
-type DashTab = 'home' | 'payouts' | 'stats' | 'scan';
+type DashTab = 'home' | 'payouts' | 'stats' | 'scan' | 'coordinator';
 
 type Member = {
   id: string; user_id: string; created_at: string;
@@ -1136,18 +1136,24 @@ export default function DashboardScreen() {
     );
   }
 
-  // ── Coordinator mode: user has no admin clubs, only coordinator assignments ──
-  if (clubs.length === 0 && myCoordinations.length > 0) {
+  // ── Coordinator mode: no clubs OR coordinator tab selected ──
+  if ((clubs.length === 0 && myCoordinations.length > 0) || (activeTab === 'coordinator' && myCoordinations.length > 0)) {
     return (
       <View style={[s.container, { paddingTop: insets.top }]}>
         <View style={s.topBar}>
           {activeTab === 'scan'
-            ? <TouchableOpacity onPress={() => { setScannedTicket(null); setActiveTab('home'); }} style={s.backBtn} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
+            ? <TouchableOpacity onPress={() => { setScannedTicket(null); setActiveTab(clubs.length > 0 ? 'coordinator' : 'home'); }} style={s.backBtn} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
                 <Svg width={22} height={22} viewBox="0 0 24 24" fill="none">
                   <Path d="M19 12H5M12 5l-7 7 7 7" stroke={Colors.black} strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" />
                 </Svg>
               </TouchableOpacity>
-            : <BackButton />}
+            : clubs.length > 0
+              ? <TouchableOpacity onPress={() => setActiveTab('home')} style={s.backBtn} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
+                  <Svg width={22} height={22} viewBox="0 0 24 24" fill="none">
+                    <Path d="M19 12H5M12 5l-7 7 7 7" stroke={Colors.black} strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" />
+                  </Svg>
+                </TouchableOpacity>
+              : <BackButton />}
           <Text style={s.pageTitle}>Koordinátor</Text>
           <View style={{ width: 36 }} />
         </View>
@@ -2513,6 +2519,16 @@ export default function DashboardScreen() {
             </Svg>
             <Text style={[s.bottomNavLabel, activeTab === 'stats' && s.bottomNavLabelActive]}>{t.dashboard.statsTab}</Text>
           </TouchableOpacity>
+
+          {/* Coordinator tab — only if user has coordinator assignments */}
+          {myCoordinations.length > 0 && (
+            <TouchableOpacity style={s.bottomNavItem} onPress={() => setActiveTab('coordinator')} activeOpacity={0.7}>
+              <Svg width={22} height={22} viewBox="0 0 24 24" fill="none">
+                <Path d="M3 7V5a2 2 0 0 1 2-2h2M17 3h2a2 2 0 0 1 2 2v2M21 17v2a2 2 0 0 1-2 2h-2M7 21H5a2 2 0 0 1-2-2v-2" stroke={activeTab === 'coordinator' ? Colors.black : 'rgba(0,0,0,0.35)'} strokeWidth={activeTab === 'coordinator' ? 2.5 : 1.8} strokeLinecap="round" strokeLinejoin="round" />
+              </Svg>
+              <Text style={[s.bottomNavLabel, activeTab === 'coordinator' && s.bottomNavLabelActive]}>Koordinátor</Text>
+            </TouchableOpacity>
+          )}
 
           {/* Payouts */}
           <TouchableOpacity style={s.bottomNavItem} onPress={() => setActiveTab('payouts')} activeOpacity={0.7}>
