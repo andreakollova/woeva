@@ -746,6 +746,10 @@ export default function EventDetailScreen() {
                       ? <TouchableOpacity style={s.joinPillFollow} onPress={async (e) => {
                           e.stopPropagation?.();
                           await supabase.from('club_members').insert({ club_id: event.club!.id, user_id: user.id, role: 'member', status: 'approved', city: event.city ?? null });
+                          await supabase.from('clubs').update({ member_count: (event.club as any)?.member_count ? (event.club as any).member_count + 1 : 1 }).eq('id', event.club!.id);
+                          supabase.functions.invoke('notify-creator', {
+                            body: { type: 'club_join', clubId: event.club!.id, attendeeName: profile?.name?.split(' ')[0] ?? 'Niekto' },
+                          }).catch(err => console.warn('notify-creator failed:', err));
                           setIsMember(true);
                         }}><Text style={s.joinPillFollowText}>+ {t.event.joinPlus}</Text></TouchableOpacity>
                       : <Svg width={16} height={16} viewBox="0 0 24 24" fill="none"><Path d="M9 18l6-6-6-6" stroke={Colors.gray} strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" /></Svg>
