@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, ScrollView, KeyboardAvoidingView, Platform, Image, Alert, Modal, Pressable, TextInput } from 'react-native';
-import { StatusBar } from 'expo-status-bar';
+import { StatusBar, setStatusBarStyle } from 'expo-status-bar';
 import * as FileSystem from 'expo-file-system/legacy';
 import { useRouter } from 'expo-router';
 import { useFocusEffect } from 'expo-router';
@@ -39,6 +39,7 @@ export default function CreateStep2Screen() {
 
   // Re-read draft every time screen gets focus — so cleared draft (after publish) shows blank fields
   useFocusEffect(useCallback(() => {
+    setStatusBarStyle('dark');
     setTitle(draft2.title);
     setTagline(draft2.tagline);
     setTags([...draft2.tags]);

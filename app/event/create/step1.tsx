@@ -1,6 +1,7 @@
-import React from 'react';
+import React, { useCallback } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
-import { useRouter } from 'expo-router';
+import { setStatusBarStyle } from 'expo-status-bar';
+import { useRouter, useFocusEffect } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Animated, { FadeInUp } from 'react-native-reanimated';
 import { Colors } from '@/constants/colors';
@@ -10,6 +11,7 @@ export default function CreateStep1Screen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const { t } = useTranslations();
+  useFocusEffect(useCallback(() => { setStatusBarStyle('dark'); }, []));
 
   return (
     <View style={[styles.container, { paddingBottom: insets.bottom + 24 }]}>

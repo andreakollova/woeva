@@ -2,7 +2,7 @@ import React, { useState, useEffect, useCallback } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, ScrollView, KeyboardAvoidingView, Platform, Alert, Modal, Pressable, Image, TextInput, Animated } from 'react-native';
 import Svg, { Path } from 'react-native-svg';
 import * as WebBrowser from 'expo-web-browser';
-import { StatusBar } from 'expo-status-bar';
+import { StatusBar, setStatusBarStyle } from 'expo-status-bar';
 import * as FileSystem from 'expo-file-system/legacy';
 import * as ImagePicker from 'expo-image-picker';
 import { useRouter, useLocalSearchParams, useFocusEffect } from 'expo-router';
@@ -93,6 +93,7 @@ export default function CreateStep3Screen() {
   const [showRegOpensTime, setShowRegOpensTime] = useState(false);
 
   useFocusEffect(useCallback(() => {
+    setStatusBarStyle('dark');
     if (!user) return;
     supabase
       .from('stripe_accounts')

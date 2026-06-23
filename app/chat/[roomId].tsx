@@ -1,8 +1,9 @@
 import { BackButton } from '@/components/ui/BackButton';
-import React, { useEffect, useState, useRef } from 'react';
+import React, { useEffect, useState, useRef, useCallback } from 'react';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { View, Text, StyleSheet, FlatList, TextInput, TouchableOpacity, KeyboardAvoidingView, Platform, Image, Alert, ScrollView, Keyboard } from 'react-native';
-import { useLocalSearchParams } from 'expo-router';
+import { setStatusBarStyle } from 'expo-status-bar';
+import { useLocalSearchParams, useFocusEffect } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Colors } from '@/constants/colors';
 import { Fonts } from '@/constants/fonts';
@@ -18,6 +19,7 @@ const QUICK_EMOJIS = ['☕', '👍', '🙌', '😂', '🏃', '🚀', '❤️', '
 export default function ChatScreen() {
   const { roomId } = useLocalSearchParams<{ roomId: string }>();
   const insets = useSafeAreaInsets();
+  useFocusEffect(useCallback(() => { setStatusBarStyle('dark'); }, []));
   const { user, profile } = useAuth();
   const { t: tr } = useTranslations();
   const [messages, setMessages] = useState<Message[]>([]);
