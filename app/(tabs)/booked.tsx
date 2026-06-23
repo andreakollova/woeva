@@ -243,7 +243,7 @@ export default function BookedScreen() {
 
                 onPress={() => router.push(`/event/${event.id}`)}
                 onDelete={() => handleDeleteTicket(event)}
-                onLeave={() => handleLeaveEvent(event)}
+                onLeave={(event.is_free || !event.price) ? () => handleLeaveEvent(event) : undefined}
               />
             </Animated.View>
           ))

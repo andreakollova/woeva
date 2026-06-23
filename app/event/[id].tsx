@@ -211,9 +211,7 @@ export default function EventDetailScreen() {
     if (!cancelReason || !event) return;
     setCancelling(true);
 
-    const eventStart = new Date(`${occurrenceDate ?? event.date}T${event.time}`);
-    const hoursUntil = (eventStart.getTime() - Date.now()) / 3600000;
-    const refundEligible = hoursUntil >= 48;
+    // Refund is always issued when organizer cancels
 
     await supabase.from('events').update({
       status: 'cancelled',
@@ -256,7 +254,7 @@ export default function EventDetailScreen() {
         attendeeEmails: [], // emails require service role - handled server-side if needed
       });
 
-      if (refundEligible && !event.is_free && hasPaidWithIntent) {
+      if (!event.is_free && hasPaidWithIntent) {
         await supabase.functions.invoke('refund-event', { body: { event_id: id } });
       }
     }

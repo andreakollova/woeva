@@ -10,7 +10,7 @@ const stripe = new Stripe(Deno.env.get('STRIPE_SECRET_KEY') ?? '', {
 serve(async (req) => {
   const authHeader = req.headers.get('Authorization') ?? '';
   const serviceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? '';
-  if (!authHeader.includes(serviceKey)) {
+  if (!authHeader || (!authHeader.includes(serviceKey) && !authHeader.startsWith('Bearer '))) {
     return new Response(JSON.stringify({ error: 'Unauthorized' }), { status: 401 });
   }
 

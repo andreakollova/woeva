@@ -116,9 +116,9 @@ Organizátori udalostí sú zodpovední za presnosť informácií vrátane dátu
 Platené lístky sú spracovávané cez Stripe. K dispozícii sú aj lístky s platbou na mieste. Pre vaše lístky sú dostupné priepustky Apple Wallet.
 
 Refundačná politika:
-• Plná refundácia, ak organizátor udalosť zruší
-• Plná refundácia pri odhlásení 48 a viac hodín pred začiatkom udalosti
-• Žiadna refundácia pri odhlásení menej ako 48 hodín pred udalosťou
+• Plná refundácia, ak organizátor udalosť zruší (automaticky)
+• Z platených eventov sa nie je možné odhlásiť — lístok je záväzný
+• Refundáciu zabezpečuje Sportqo s.r.o. prostredníctvom Stripe
 
 Refundácie sa spracujú na pôvodnú platobnú metódu do 5–10 pracovných dní.
 
