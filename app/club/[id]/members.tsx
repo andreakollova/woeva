@@ -153,7 +153,7 @@ export default function ClubMembersScreen() {
         .eq('id', profileId).or('notifications_enabled.is.null,notifications_enabled.eq.true').single();
       if (inviteeProfile?.push_token?.startsWith('ExponentPushToken[')) {
         await supabase.functions.invoke('send-push', {
-          body: { tokens: [inviteeProfile.push_token], title, body, data: { club_id: id } },
+          body: { tokens: [inviteeProfile.push_token], title, body, data: { club_id: id, type: 'admin_invite', action: 'admin_invite' } },
         });
       }
       setShowAdminSearch(false);
@@ -187,7 +187,7 @@ export default function ClubMembersScreen() {
         .eq('id', profileId).or('notifications_enabled.is.null,notifications_enabled.eq.true').single();
       if (inviteeProfile?.push_token?.startsWith('ExponentPushToken[')) {
         await supabase.functions.invoke('send-push', {
-          body: { tokens: [inviteeProfile.push_token], title, body, data: { club_id: id } },
+          body: { tokens: [inviteeProfile.push_token], title, body, data: { club_id: id, type: 'coordinator_invite', action: 'coordinator_invite' } },
         });
       }
       setShowCoordSearch(false);

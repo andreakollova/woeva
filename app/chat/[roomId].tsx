@@ -193,7 +193,7 @@ export default function ChatScreen() {
 
         if (tokens.length > 0) {
           supabase.functions.invoke('send-push', {
-            body: { tokens, title: pushTitle, body: pushBody, data: { event_id: roomId, type: 'chat' } },
+            body: { tokens, title: pushTitle, body: pushBody, data: { room_id: roomId, event_id: roomId, type: 'event_chat' } },
           });
         }
       }
@@ -214,7 +214,7 @@ export default function ChatScreen() {
 
       if (adminTokens.length > 0) {
         supabase.functions.invoke('send-push', {
-          body: { tokens: adminTokens, title: pushTitle, body: pushBody, data: { event_id: roomId, type: 'chat' } },
+          body: { tokens: adminTokens, title: pushTitle, body: pushBody, data: { room_id: roomId, event_id: roomId, type: 'event_chat' } },
         });
       }
     }
