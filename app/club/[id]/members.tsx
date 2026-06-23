@@ -1,7 +1,8 @@
 import { BackButton } from '@/components/ui/BackButton';
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useCallback } from 'react';
 import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Alert, Image, Share, ActivityIndicator, Modal, TextInput } from 'react-native';
-import { useLocalSearchParams } from 'expo-router';
+import { setStatusBarStyle } from 'expo-status-bar';
+import { useLocalSearchParams, useFocusEffect } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Svg, { Path } from 'react-native-svg';
 import { Colors } from '@/constants/colors';
@@ -48,6 +49,7 @@ export default function ClubMembersScreen() {
   const [sendingCoordInvite, setSendingCoordInvite] = useState<string | null>(null);
 
   useEffect(() => { load(); }, [id, user]);
+  useFocusEffect(useCallback(() => { setStatusBarStyle('dark'); }, []));
 
   // Realtime: refresh when club_members or coordinators change
   useEffect(() => {
@@ -261,7 +263,7 @@ export default function ClubMembersScreen() {
   }
 
   return (
-    <View style={[st.container, { paddingTop: insets.top }]}>
+    <View style={[st.container, { paddingTop: insets.top + 5 }]}>
       <View style={st.header}>
         <BackButton />
         <Text style={st.title}>{lang === 'sk' ? 'Vedenie klubu a správcovia' : 'Club leadership & admins'}</Text>
