@@ -1244,36 +1244,18 @@ export default function DashboardScreen() {
                   <Text style={s.listSub}>{(() => { const n = attendeesEvent ? (attendeesEvent.is_free ? realGoing(attendeesEvent, user!.id) : attendeesEvent.paid_count) : 0; return `${n} ${goingLabel(n, lang)}`; })()}</Text>
                 </View>
               </View>
-              {/* Action buttons */}
-              <View style={{ flexDirection: 'row', gap: 8, marginTop: 12 }}>
-                <TouchableOpacity
-                  style={{ flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, backgroundColor: Colors.grayLight, borderRadius: 12, paddingVertical: 10 }}
-                  onPress={() => { closeAttendees(); setTimeout(() => openCoordInvite(), 350); }}
-                  activeOpacity={0.7}
-                >
-                  <Text style={{ fontSize: 13, fontWeight: '600', fontFamily: Fonts.semibold, color: Colors.black }}>+ Koordinátor</Text>
-                </TouchableOpacity>
-                <TouchableOpacity
-                  style={{ flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, backgroundColor: Colors.grayLight, borderRadius: 12, paddingVertical: 10 }}
-                  onPress={async () => {
-                    if (!attendees.length) return;
-                    try {
-                      const Print = require('expo-print');
-                      const Sharing = require('expo-sharing');
-                      const rows = attendees.map((a, i) => {
-                        const isIn = checkedIn[attendeesEvent?.id ?? '']?.has(a.id);
-                        return `<tr><td>${i + 1}</td><td>${a.name || '?'}</td><td>${isIn ? '✓' : '—'}</td></tr>`;
-                      }).join('');
-                      const html = `<html><head><style>body{font-family:-apple-system,sans-serif;padding:24px}h2{margin-bottom:4px}table{width:100%;border-collapse:collapse;margin-top:16px}th,td{text-align:left;padding:8px 12px;border-bottom:1px solid #eee}th{font-size:12px;color:#888;text-transform:uppercase}</style></head><body><h2>${attendeesEvent?.title ?? ''}</h2><p style="color:#888;font-size:13px">${attendees.length} účastníkov</p><table><thead><tr><th>#</th><th>Meno</th><th>Príchod</th></tr></thead><tbody>${rows}</tbody></table></body></html>`;
-                      const { uri } = await Print.printToFileAsync({ html, base64: false });
-                      await Sharing.shareAsync(uri, { mimeType: 'application/pdf', dialogTitle: `Zoznam - ${attendeesEvent?.title}` });
-                    } catch { Alert.alert('Chyba', 'Nepodarilo sa vygenerovať PDF.'); }
-                  }}
-                  activeOpacity={0.7}
-                >
-                  <Text style={{ fontSize: 13, fontWeight: '600', fontFamily: Fonts.semibold, color: Colors.black }}>↓ PDF zoznam</Text>
-                </TouchableOpacity>
-              </View>
+              {/* Scan QR button — coordinator only */}
+              <TouchableOpacity
+                style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, backgroundColor: Colors.black, borderRadius: 14, paddingVertical: 12, marginTop: 12 }}
+                onPress={() => { closeAttendees(); setTimeout(() => setActiveTab('scan'), 350); }}
+                activeOpacity={0.7}
+              >
+                <Svg width={18} height={18} viewBox="0 0 24 24" fill="none">
+                  <Path d="M3 7V5a2 2 0 0 1 2-2h2M17 3h2a2 2 0 0 1 2 2v2M21 17v2a2 2 0 0 1-2 2h-2M7 21H5a2 2 0 0 1-2-2v-2" stroke={Colors.white} strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" />
+                  <Path d="M8 7h2v2H8zM14 7h2v2h-2zM8 13h2v2H8zM14 13h2v2h-2z" fill={Colors.white} />
+                </Svg>
+                <Text style={{ fontSize: 14, fontWeight: '700', fontFamily: Fonts.bold, color: Colors.white }}>Skenovať QR</Text>
+              </TouchableOpacity>
 
               {loadingAttendees
                 ? <ActivityIndicator color={Colors.black} style={{ marginTop: 24 }} />
@@ -2386,15 +2368,23 @@ export default function DashboardScreen() {
                     </View>
                     <Text style={{ fontSize: 14, fontFamily: Fonts.medium, color: Colors.black }}>Pridať koordinátora</Text>
                   </TouchableOpacity>
-                  {attendees.length > 0 && (
-                    <TouchableOpacity style={s.exportBtn} onPress={exportAttendeesPdf} activeOpacity={0.7}>
-                      <Svg width={14} height={14} viewBox="0 0 24 24" fill="none">
-                        <Path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" stroke={Colors.black} strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" />
-                        <Path d="M7 10l5 5 5-5M12 15V3" stroke={Colors.black} strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" />
+                  <View style={{ flexDirection: 'row', gap: 8, alignItems: 'center' }}>
+                    <TouchableOpacity style={{ width: 36, height: 36, borderRadius: 18, backgroundColor: Colors.grayLight, alignItems: 'center', justifyContent: 'center' }} onPress={() => { closeAttendees(); setTimeout(() => setActiveTab('scan'), 350); }} activeOpacity={0.7}>
+                      <Svg width={16} height={16} viewBox="0 0 24 24" fill="none">
+                        <Path d="M3 7V5a2 2 0 0 1 2-2h2M17 3h2a2 2 0 0 1 2 2v2M21 17v2a2 2 0 0 1-2 2h-2M7 21H5a2 2 0 0 1-2-2v-2" stroke={Colors.black} strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" />
+                        <Path d="M8 7h2v2H8zM14 7h2v2h-2zM8 13h2v2H8zM14 13h2v2h-2z" fill={Colors.black} />
                       </Svg>
-                      <Text style={s.exportBtnText}>PDF</Text>
                     </TouchableOpacity>
-                  )}
+                    {attendees.length > 0 && (
+                      <TouchableOpacity style={s.exportBtn} onPress={exportAttendeesPdf} activeOpacity={0.7}>
+                        <Svg width={14} height={14} viewBox="0 0 24 24" fill="none">
+                          <Path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" stroke={Colors.black} strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" />
+                          <Path d="M7 10l5 5 5-5M12 15V3" stroke={Colors.black} strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" />
+                        </Svg>
+                        <Text style={s.exportBtnText}>PDF</Text>
+                      </TouchableOpacity>
+                    )}
+                  </View>
                 </View>
               </>
             )}
