@@ -154,9 +154,12 @@ export default function EventDetailScreen() {
         .gt('created_at', lastRead ?? '1970-01-01T00:00:00Z');
       setUnreadCount(count ?? 0);
       if (data?.club_id) {
-        const { data: mem } = await supabase.from('club_members').select('id, role').eq('club_id', data.club_id).eq('user_id', user.id).eq('status', 'approved').single();
+        const [{ data: mem }, { data: coord }] = await Promise.all([
+          supabase.from('club_members').select('id, role').eq('club_id', data.club_id).eq('user_id', user.id).eq('status', 'approved').single(),
+          supabase.from('coordinators').select('id').eq('club_id', data.club_id).eq('user_id', user.id).eq('status', 'active').limit(1).maybeSingle(),
+        ]);
         setIsMember(!!mem);
-        setIsClubAdmin(mem?.role === 'admin');
+        setIsClubAdmin(mem?.role === 'admin' || !!coord);
       }
     }
   }

@@ -28,6 +28,7 @@ export default function ChatScreen() {
   const [headerSub, setHeaderSub] = useState('');
   const [profileCache, setProfileCache] = useState<ProfileCache>({});
   const [adminIds, setAdminIds] = useState<Set<string>>(new Set());
+  const [coordIds, setCoordIds] = useState<Set<string>>(new Set());
   const [muted, setMuted] = useState(false);
   const [keyboardVisible, setKeyboardVisible] = useState(false);
   const listRef = useRef<FlatList>(null);
@@ -128,17 +129,18 @@ export default function ChatScreen() {
 
     // Collect admin IDs: creator + club admins
     const admins = new Set<string>();
+    const coords = new Set<string>();
     admins.add(data.creator_id);
     if (data.club_id) {
-      const { data: members } = await supabase
-        .from('club_members')
-        .select('user_id')
-        .eq('club_id', data.club_id)
-        .eq('role', 'admin')
-        .eq('status', 'approved');
+      const [{ data: members }, { data: coordMembers }] = await Promise.all([
+        supabase.from('club_members').select('user_id').eq('club_id', data.club_id).eq('role', 'admin').eq('status', 'approved'),
+        supabase.from('coordinators').select('user_id').eq('club_id', data.club_id).eq('status', 'active'),
+      ]);
       (members ?? []).forEach((m: any) => admins.add(m.user_id));
+      (coordMembers ?? []).forEach((c: any) => coords.add(c.user_id));
     }
     setAdminIds(admins);
+    setCoordIds(coords);
   }
 
   async function sendMessage(content?: string) {
@@ -178,8 +180,9 @@ export default function ChatScreen() {
     const pushBody = `${senderFirst}: ${msg.length > 60 ? msg.slice(0, 60) + '…' : msg}`;
     const pushTitle = `Nova správa - ${eventTitle || 'Chat'}`;
 
-    if (adminIds.has(user.id)) {
-      // Admin wrote → push to attendees
+    const isStaff = adminIds.has(user.id) || coordIds.has(user.id);
+    if (isStaff) {
+      // Admin/coordinator wrote → push to attendees
       const attendeeIds = (attendees ?? []).map((a: any) => a.user_id);
       if (attendeeIds.length > 0) {
         const { data: pushProfiles } = await supabase
@@ -199,24 +202,24 @@ export default function ChatScreen() {
           });
         }
       }
-    } else if (adminIds.size > 0) {
-      // Attendee wrote → push to creator / admins
-      const adminIdList = Array.from(adminIds);
-      const { data: adminProfiles } = await supabase
+    } else if (adminIds.size > 0 || coordIds.size > 0) {
+      // Attendee wrote → push to creator / admins / coordinators
+      const staffIds = [...new Set([...Array.from(adminIds), ...Array.from(coordIds)])];
+      const { data: staffProfiles } = await supabase
         .from('profiles')
         .select('push_token, muted_chats')
-        .in('id', adminIdList)
+        .in('id', staffIds)
         .neq('id', user.id)
         .not('push_token', 'is', null);
 
-      const adminTokens = (adminProfiles ?? [])
+      const staffTokens = (staffProfiles ?? [])
         .filter((p: any) => !(p.muted_chats ?? []).includes(roomId))
         .map((p: any) => p.push_token)
         .filter((t: string) => t?.startsWith('ExponentPushToken['));
 
-      if (adminTokens.length > 0) {
+      if (staffTokens.length > 0) {
         supabase.functions.invoke('send-push', {
-          body: { tokens: adminTokens, title: pushTitle, body: pushBody, data: { room_id: roomId, event_id: roomId, type: 'event_chat' } },
+          body: { tokens: staffTokens, title: pushTitle, body: pushBody, data: { room_id: roomId, event_id: roomId, type: 'event_chat' } },
         });
       }
     }
@@ -246,6 +249,7 @@ export default function ChatScreen() {
     const initial = firstName.charAt(0).toUpperCase();
     const avatarUrl = isMe ? (profile?.avatar_url ?? sender?.avatar_url ?? null) : (sender?.avatar_url ?? null);
     const isAdmin = adminIds.has(item.sender_id);
+    const isCoord = !isAdmin && coordIds.has(item.sender_id);
 
     const Avatar = (
       <View style={styles.senderAvatarWrap}>
@@ -267,6 +271,11 @@ export default function ChatScreen() {
             {isAdmin && (
               <View style={styles.adminBadge}>
                 <Text style={styles.adminBadgeText}>★ {tr.chat.admin}</Text>
+              </View>
+            )}
+            {isCoord && (
+              <View style={[styles.adminBadge, { backgroundColor: 'rgba(0,0,0,0.06)' }]}>
+                <Text style={[styles.adminBadgeText, { color: Colors.gray }]}>koordinátor</Text>
               </View>
             )}
             <Text style={styles.msgTimeInline}>
