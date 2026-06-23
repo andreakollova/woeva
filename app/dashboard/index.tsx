@@ -1186,23 +1186,37 @@ export default function DashboardScreen() {
               />
             ) : null}
             {scannedTicket && (
-              <View style={s.scanResultCard}>
-                <View style={s.scanAvatarWrap}>
-                  {scannedTicket.avatar_url ? <Image source={{ uri: scannedTicket.avatar_url }} style={s.scanAvatar} /> : <View style={[s.scanAvatar, { backgroundColor: Colors.grayLight, alignItems: 'center', justifyContent: 'center' }]}><Text style={{ fontSize: 24 }}>{scannedTicket.userName.charAt(0).toUpperCase()}</Text></View>}
+              <View style={s.scanResult}>
+                <View style={s.scanResultTop}>
+                  <View style={[s.scanResultDot, { backgroundColor: scannedTicket.valid ? Colors.lime : '#FF3B30' }]} />
+                  <View style={s.scanResultAvatar}>
+                    {scannedTicket.avatar_url
+                      ? <Image source={{ uri: scannedTicket.avatar_url }} style={StyleSheet.absoluteFill as any} />
+                      : <Text style={s.scanResultInitial}>{scannedTicket.userName.charAt(0).toUpperCase()}</Text>
+                    }
+                  </View>
+                  <View style={{ flex: 1 }}>
+                    <Text style={s.scanResultName}>{scannedTicket.userName}</Text>
+                    <Text style={s.scanResultEvent} numberOfLines={1}>{scannedTicket.eventTitle}</Text>
+                    <Text style={[s.scanResultStatus, { color: scannedTicket.valid ? '#22C55E' : '#FF3B30' }]}>
+                      {scannedTicket.valid ? t.dashboard.validTicket : t.dashboard.notRegistered}
+                    </Text>
+                  </View>
+                  <TouchableOpacity onPress={() => setScannedTicket(null)} style={s.scanResultClose}><Text style={{ fontSize: 20, color: Colors.gray }}>✕</Text></TouchableOpacity>
                 </View>
-                <Text style={s.scanResultName}>{scannedTicket.userName}</Text>
-                <Text style={s.scanResultEvent}>{scannedTicket.eventTitle}</Text>
-                {scannedTicket.valid
-                  ? <TouchableOpacity style={[s.scanCheckInBtn, checkedIn[scannedTicket.eventId]?.has(scannedTicket.userId) && s.scanCheckInBtnDone]} onPress={() => {
+                {scannedTicket.valid && (
+                  <TouchableOpacity
+                    style={[s.scanCheckInBtn, checkedIn[scannedTicket.eventId]?.has(scannedTicket.userId) && s.scanCheckInBtnDone]}
+                    onPress={() => {
                       if (checkedIn[scannedTicket!.eventId]?.has(scannedTicket!.userId)) { setScannedTicket(null); return; }
                       markCheckedIn(scannedTicket!.eventId, scannedTicket!.userId);
                       setTimeout(() => setScannedTicket(null), 1200);
                     }} activeOpacity={0.8}>
-                      <Text style={s.scanCheckInBtnText}>{checkedIn[scannedTicket.eventId]?.has(scannedTicket.userId) ? t.dashboard.checkedIn : t.dashboard.checkIn}</Text>
-                    </TouchableOpacity>
-                  : <View style={s.scanInvalidBadge}><Text style={s.scanInvalidText}>{t.dashboard.invalidTicket}</Text></View>
-                }
-                <TouchableOpacity onPress={() => setScannedTicket(null)} style={s.scanCloseBtn}><Text style={s.scanCloseBtnText}>{t.dashboard.scanNext}</Text></TouchableOpacity>
+                    <Text style={s.scanCheckInBtnText}>
+                      {checkedIn[scannedTicket.eventId]?.has(scannedTicket.userId) ? t.dashboard.checkedIn : t.dashboard.confirmArrival}
+                    </Text>
+                  </TouchableOpacity>
+                )}
               </View>
             )}
           </View>
