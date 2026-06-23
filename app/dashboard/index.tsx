@@ -707,7 +707,7 @@ export default function DashboardScreen() {
         (ciData ?? []).forEach((ci: any) => { if (!initCI[ci.event_id]) initCI[ci.event_id] = new Set(); initCI[ci.event_id].add(ci.user_id); });
         setCheckedIn(initCI);
       }
-      setEvents(coordEvs.map(e => ({ ...e, paid_count: 0, online_count: 0, door_count: 0, scan_count: 0, net_revenue: 0, platform_fee: 0, gross_revenue: 0 })) as EventRow[]);
+      setEvents(coordEvs.map(e => ({ ...e, paid_count: e.going_count ?? 0, online_count: 0, door_count: 0, scan_count: 0, net_revenue: 0, platform_fee: 0, gross_revenue: 0 })) as EventRow[]);
       setLoading(false);
       return;
     }
@@ -1257,7 +1257,7 @@ export default function DashboardScreen() {
               <View style={{ flexDirection: 'row', alignItems: 'flex-start', justifyContent: 'space-between', marginBottom: 4 }}>
                 <View style={{ flex: 1, marginRight: 12 }}>
                   <Text style={s.billingSheetTitle}>{attendeesEvent?.title}</Text>
-                  <Text style={s.listSub}>{(() => { const n = attendeesEvent ? (attendeesEvent.is_free ? realGoing(attendeesEvent, user!.id) : attendeesEvent.paid_count) : 0; return `${n} ${goingLabel(n, lang)}`; })()}</Text>
+                  <Text style={s.listSub}>{(() => { const n = attendeesEvent ? Math.max(attendeesEvent.going_count ?? 0, attendeesEvent.paid_count ?? 0, attendees.length) : 0; return `${n} ${goingLabel(n, lang)}`; })()}</Text>
                 </View>
               </View>
               {/* Scan QR button — coordinator only */}
