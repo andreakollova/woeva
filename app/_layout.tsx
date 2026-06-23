@@ -29,30 +29,49 @@ import {
 function NotificationHandler() {
   const router = useRouter();
   const response = Notifications.useLastNotificationResponse();
-  const { loading } = useAuth();
+  const { loading, user } = useAuth();
+  const navigatedRef = React.useRef(false);
 
   useEffect(() => {
     if (!response || loading) return;
+    // Prevent double navigation
+    const responseId = response.notification.request.identifier;
+    if (navigatedRef.current) return;
+
     const data = response.notification.request.content.data as any;
     if (!data) return;
-    // Delay navigation to ensure router is mounted (cold start from killed state)
-    const timer = setTimeout(() => {
+
+    function getRoute(): string | null {
+      if (data.type === 'event_chat' && (data.room_id || data.event_id)) return `/chat/${data.room_id || data.event_id}`;
+      if ((data.type === 'admin_invite' || data.type === 'coordinator_invite' || data.action === 'admin_invite' || data.action === 'coordinator_invite') && data.club_id) return `/club/${data.club_id}`;
+      if (data.type === 'admin_accepted' || data.type === 'coordinator_accepted') return `/club/${data.club_id}/members`;
+      if (data.event_id) return `/event/${data.event_id}`;
+      if (data.club_id) return `/club/${data.club_id}`;
+      return null;
+    }
+
+    const route = getRoute();
+    if (!route) return;
+
+    // Retry navigation with increasing delays for cold start
+    let attempt = 0;
+    function tryNavigate() {
+      attempt++;
       try {
-        if (data.type === 'event_chat' && (data.room_id || data.event_id)) {
-          router.push(`/chat/${data.room_id || data.event_id}`);
-        } else if ((data.type === 'admin_invite' || data.type === 'coordinator_invite' || data.action === 'admin_invite' || data.action === 'coordinator_invite') && data.club_id) {
-          router.push(`/club/${data.club_id}`);
-        } else if (data.type === 'admin_accepted' || data.type === 'coordinator_accepted') {
-          router.push(`/club/${data.club_id}/members`);
-        } else if (data.event_id) {
-          router.push(`/event/${data.event_id}`);
-        } else if (data.club_id) {
-          router.push(`/club/${data.club_id}`);
-        }
-      } catch {}
-    }, 600);
+        router.push(route as any);
+        navigatedRef.current = true;
+      } catch {
+        if (attempt < 4) setTimeout(tryNavigate, attempt * 500);
+      }
+    }
+
+    // Initial delay: 800ms for warm start, retries handle cold start
+    const timer = setTimeout(tryNavigate, 800);
     return () => clearTimeout(timer);
   }, [response, loading]);
+
+  // Reset ref when response changes
+  useEffect(() => { navigatedRef.current = false; }, [response]);
 
   return null;
 }
