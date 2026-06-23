@@ -176,7 +176,7 @@ export default function ClubDetailScreen() {
     // Notify all club admins via server-side edge function (service role bypasses RLS)
     supabase.functions.invoke('notify-creator', {
       body: { type: 'club_join', clubId: id, attendeeName: profile?.name?.split(' ')[0] ?? 'Niekto' },
-    }).catch(() => {});
+    }).catch(e => console.warn('notify-creator failed:', e));
     setIsMember(true);
     setLoading(false);
     setShowJoinCelebration(true);
