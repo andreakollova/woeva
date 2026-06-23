@@ -1113,7 +1113,7 @@ export default function DashboardScreen() {
       <View style={[s.container, { paddingTop: insets.top }]}>
         <View style={s.topBar}>
           {activeTab === 'scan'
-            ? <TouchableOpacity onPress={() => setActiveTab('home')} style={s.backBtn} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
+            ? <TouchableOpacity onPress={() => { setScannedTicket(null); setActiveTab('home'); }} style={s.backBtn} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
                 <Svg width={22} height={22} viewBox="0 0 24 24" fill="none">
                   <Path d="M19 12H5M12 5l-7 7 7 7" stroke={Colors.black} strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" />
                 </Svg>
@@ -1365,7 +1365,7 @@ export default function DashboardScreen() {
         {/* Top bar */}
         <View style={s.topBar}>
           {activeTab === 'scan'
-            ? <TouchableOpacity onPress={() => setActiveTab('home')} style={s.backBtn} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
+            ? <TouchableOpacity onPress={() => { setScannedTicket(null); setActiveTab('home'); }} style={s.backBtn} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
                 <Svg width={22} height={22} viewBox="0 0 24 24" fill="none">
                   <Path d="M19 12H5M12 5l-7 7 7 7" stroke={Colors.black} strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" />
                 </Svg>
@@ -2503,7 +2503,7 @@ export default function DashboardScreen() {
 const s = StyleSheet.create({
   container: { flex: 1, backgroundColor: Colors.white },
   scroll: { paddingHorizontal: 20 },
-  topBar: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingVertical: 10, marginBottom: 16 },
+  topBar: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingVertical: 10, paddingHorizontal: 16, marginBottom: 16 },
   pageTitle: { fontSize: 17, fontWeight: '700', fontFamily: Fonts.bold, color: Colors.black, position: 'absolute', left: 0, right: 0, textAlign: 'center' },
 
   sectionTitle: { fontSize: 11, fontWeight: '700', color: Colors.gray, letterSpacing: 0.8, textTransform: 'uppercase', marginBottom: 10 },
