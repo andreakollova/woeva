@@ -26,27 +26,17 @@ import {
   Inter_800ExtraBold,
 } from '@expo-google-fonts/inter';
 
-// Global pending route — survives component remounts during cold start
-let _pendingRoute: string | null = null;
-
 function NotificationHandler() {
   const router = useRouter();
   const response = Notifications.useLastNotificationResponse();
   const { loading } = useAuth();
-  const [appReady, setAppReady] = React.useState(false);
   const handledRef = React.useRef<string | null>(null);
 
-  // Mark app as ready after initial render cycle completes
-  React.useEffect(() => {
-    const timer = setTimeout(() => setAppReady(true), 1500);
-    return () => clearTimeout(timer);
-  }, []);
-
-  // Extract route from notification response
   useEffect(() => {
     if (!response || loading) return;
     const id = response.notification.request.identifier;
     if (handledRef.current === id) return;
+    handledRef.current = id;
 
     const data = response.notification.request.content.data as any;
     if (!data) return;
@@ -57,36 +47,11 @@ function NotificationHandler() {
     else if ((data.type === 'admin_accepted' || data.type === 'coordinator_accepted') && data.club_id) route = `/club/${data.club_id}/members`;
     else if (data.event_id) route = `/event/${data.event_id}`;
     else if (data.club_id) route = `/club/${data.club_id}`;
-
     if (!route) return;
-    _pendingRoute = route;
-    handledRef.current = id;
+
+    // Wait for navigation tree to be fully mounted, then navigate
+    setTimeout(() => { try { router.push(route as any); } catch {} }, 1500);
   }, [response, loading]);
-
-  // Navigate when app is ready AND there's a pending route
-  useEffect(() => {
-    if (!appReady || !_pendingRoute) return;
-    const route = _pendingRoute;
-    _pendingRoute = null;
-    // Use InteractionManager to wait for all UI to settle
-    const { InteractionManager } = require('react-native');
-    InteractionManager.runAfterInteractions(() => {
-      try { router.push(route as any); } catch {}
-    });
-  }, [appReady, _pendingRoute]);
-
-  // Re-check pending route periodically (handles race conditions)
-  useEffect(() => {
-    if (!appReady) return;
-    const interval = setInterval(() => {
-      if (_pendingRoute) {
-        const route = _pendingRoute;
-        _pendingRoute = null;
-        try { router.push(route as any); } catch {}
-      }
-    }, 500);
-    return () => clearInterval(interval);
-  }, [appReady]);
 
   return null;
 }
