@@ -753,10 +753,9 @@ export default function DashboardScreen() {
     const firstClubId = allClubs[0]?.id;
     if (firstClubId) await loadMembers(firstClubId);
 
-    const BOT_ID = '00000000-0000-0000-0000-000000000001';
     if (eventsData && eventsData.length > 0) {
       const { data: allAtts } = await supabase
-        .from('event_attendees').select('event_id, user_id, payment_intent_id, paid, occurrence_date')
+        .from('event_attendees').select('event_id, user_id, payment_intent_id, paid, occurrence_date, profile:profiles(avatar_url)')
         .in('event_id', eventsData.map(e => e.id));
 
       const onlineCounts: Record<string, number> = {};
@@ -764,7 +763,7 @@ export default function DashboardScreen() {
       const totalCounts: Record<string, number> = {};
       const newOccurrenceCounts: Record<string, number> = {};
       (allAtts ?? []).forEach((a: any) => {
-        if (a.user_id === BOT_ID) return;
+        if ((a.profile?.avatar_url ?? '').includes('/bots/')) return;
         totalCounts[a.event_id] = (totalCounts[a.event_id] ?? 0) + 1;
         // Per-occurrence count for recurring events
         const occKey = a.occurrence_date ? `${a.event_id}_${a.occurrence_date}` : a.event_id;

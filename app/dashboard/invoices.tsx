@@ -101,16 +101,15 @@ export default function InvoicesScreen() {
     const paidEvents = (eventsData ?? []).filter((e: any) => !e.is_free && (e.price ?? 0) > 0);
 
     if (paidEvents.length > 0) {
-      const BOT_ID = '00000000-0000-0000-0000-000000000001';
       const { data: attsData } = await supabase
         .from('event_attendees')
-        .select('event_id, user_id, payment_intent_id, paid')
+        .select('event_id, user_id, payment_intent_id, paid, profile:profiles(avatar_url)')
         .in('event_id', paidEvents.map((e: any) => e.id));
 
       const onlineCounts: Record<string, number> = {};
       const doorCounts: Record<string, number> = {};
       (attsData ?? []).forEach((a: any) => {
-        if (a.user_id === BOT_ID || !a.paid) return;
+        if ((a.profile?.avatar_url ?? '').includes('/bots/') || !a.paid) return;
         if (a.payment_intent_id) onlineCounts[a.event_id] = (onlineCounts[a.event_id] ?? 0) + 1;
         else doorCounts[a.event_id] = (doorCounts[a.event_id] ?? 0) + 1;
       });

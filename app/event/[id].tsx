@@ -130,10 +130,10 @@ export default function EventDetailScreen() {
       seen.add(a.user_id);
       return true;
     });
-    const BOT_ID = '00000000-0000-0000-0000-000000000001';
-    const botPresent = unique.some((a: any) => a.user_id === BOT_ID);
-    setBotGoingAdjust(botPresent ? 1 : 0);
-    setAttendees(unique.filter((a: any) => a.user_id !== BOT_ID) as any);
+    const isBot = (a: any) => a.user_id === '00000000-0000-0000-0000-000000000001' || (a.profile?.avatar_url ?? '').includes('/bots/');
+    const botCount = unique.filter(isBot).length;
+    setBotGoingAdjust(botCount > 0 ? botCount : 0);
+    setAttendees(unique.filter((a: any) => !isBot(a)) as any);
 
     if (user) {
       let myQuery = supabase.from('event_attendees').select('id').eq('event_id', id).eq('user_id', user.id);
