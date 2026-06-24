@@ -4,6 +4,7 @@ import { View, Text, StyleSheet, TouchableOpacity, ScrollView, Linking, Image } 
 import { useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Colors } from '@/constants/colors';
+import { Fonts } from '@/constants/fonts';
 import { useTranslations } from '@/context/LanguageContext';
 
 export default function AboutScreen() {
