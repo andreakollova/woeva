@@ -18,7 +18,7 @@ import { cancelEventReminders } from '@/lib/scheduleReminders';
 import { useTranslations } from '@/context/LanguageContext';
 import { generateAttendeeReceipt } from '@/lib/generateInvoice';
 
-type BookedEvent = Event & { attendee_id?: string };
+type BookedEvent = Event & { attendee_id?: string; payment_intent_id?: string | null };
 
 
 export default function BookedScreen() {
@@ -40,11 +40,11 @@ export default function BookedScreen() {
 
     const { data } = await supabase
       .from('event_attendees')
-      .select('id, event:events(*, club:clubs(id, name, cover_url), creator:profiles!creator_id(id, name), attendees:event_attendees(profile:profiles(id, name, avatar_url)))')
+      .select('id, payment_intent_id, event:events(*, club:clubs(id, name, cover_url), creator:profiles!creator_id(id, name), attendees:event_attendees(profile:profiles(id, name, avatar_url)))')
       .eq('user_id', user.id);
 
     const allEvents: BookedEvent[] = (data ?? [])
-      .map((r: any) => ({ ...r.event, attendee_id: r.id }))
+      .map((r: any) => ({ ...r.event, attendee_id: r.id, payment_intent_id: r.payment_intent_id }))
       .filter((e: any) => e?.id)
       .filter((e: any) => e.status !== 'cancelled');
 
@@ -403,7 +403,7 @@ function TicketCard({ event, userId, userAvatar, userName, isPast, onPress, onDe
               </TouchableOpacity>
             )}
 
-            {!isFree && (
+            {!isFree && event.payment_intent_id && (
               <TouchableOpacity style={styles.optionsRow} onPress={() => { setOptionsModal(false); handleDownloadReceipt(); }} activeOpacity={0.7}>
                 <View style={styles.optionsIconBox}>
                   <Svg width={18} height={18} viewBox="0 0 24 24" fill="none">
