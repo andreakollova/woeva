@@ -43,7 +43,7 @@ export default function ClubSettingsScreen() {
   const { user } = useAuth();
   const { lang } = useTranslations();
 
-  const [club, setClub] = useState<{ id: string; name: string; creator_id: string } | null>(null);
+  const [club, setClub] = useState<{ id: string; name: string; creator_id: string; logo_url?: string | null; cover_url?: string | null } | null>(null);
   const [creatorName, setCreatorName] = useState('');
   const [isCreator, setIsCreator] = useState(false);
   const [isCoAdmin, setIsCoAdmin] = useState(false);
@@ -58,7 +58,7 @@ export default function ClubSettingsScreen() {
 
   async function load() {
     const [{ data: clubData }, { data: memberData }, { data: adminData }, { data: coordData }] = await Promise.all([
-      supabase.from('clubs').select('id, name, creator_id').eq('id', id).single(),
+      supabase.from('clubs').select('id, name, creator_id, logo_url, cover_url').eq('id', id).single(),
       user
         ? supabase.from('club_members').select('role').eq('club_id', id).eq('user_id', user.id).eq('status', 'approved').maybeSingle()
         : Promise.resolve({ data: null }),
@@ -313,6 +313,20 @@ export default function ClubSettingsScreen() {
         contentContainerStyle={[styles.scroll, { paddingBottom: insets.bottom + 40 }]}
         showsVerticalScrollIndicator={false}
       >
+        {/* Club identity card */}
+        {club && (
+          <View style={styles.clubCard}>
+            {club.logo_url ? (
+              <Image source={{ uri: club.logo_url }} style={styles.clubCardLogo} />
+            ) : (
+              <View style={[styles.clubCardLogo, styles.clubCardLogoFallback]}>
+                <Text style={styles.clubCardInitial}>{club.name.charAt(0).toUpperCase()}</Text>
+              </View>
+            )}
+            <Text style={styles.clubCardName} numberOfLines={1}>{club.name}</Text>
+          </View>
+        )}
+
         {/* Notification toggles */}
         <View style={[styles.section, { marginBottom: 16 }]}>
           <Text style={styles.sectionLabel}>{lang === 'sk' ? 'MOJE NOTIFIKÁCIE' : 'MY NOTIFICATIONS'}</Text>
@@ -399,6 +413,11 @@ const styles = StyleSheet.create({
   header: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 16, paddingVertical: 10, marginBottom: 16 },
   title: { fontSize: 17, fontWeight: '700', color: Colors.black, fontFamily: Fonts.bold, flex: 1, textAlign: 'center' },
   scroll: { paddingHorizontal: 20, paddingTop: 8 },
+  clubCard: { flexDirection: 'row', alignItems: 'center', gap: 12, backgroundColor: Colors.grayLight, borderRadius: 16, padding: 14, marginBottom: 20 },
+  clubCardLogo: { width: 44, height: 44, borderRadius: 12, overflow: 'hidden' },
+  clubCardLogoFallback: { backgroundColor: Colors.black, alignItems: 'center', justifyContent: 'center' },
+  clubCardInitial: { fontSize: 20, fontWeight: '800', color: Colors.lime, fontFamily: Fonts.extrabold },
+  clubCardName: { fontSize: 17, fontWeight: '700', color: Colors.black, fontFamily: Fonts.bold, flex: 1 },
 
   section: {},
   list: {},
