@@ -312,6 +312,7 @@ export default function DashboardScreen() {
   const pillsScrollRef = useRef<any>(null);
   const carouselRef = useRef<any>(null);
   const pillLayoutsRef = useRef<number[]>([]);
+  const isScrollingProgrammatically = useRef(false);
   const [members, setMembers] = useState<Member[]>([]);
   const [events, setEvents] = useState<EventRow[]>([]);
   const [coordEvents, setCoordEvents] = useState<EventRow[]>([]);
@@ -1494,7 +1495,21 @@ export default function DashboardScreen() {
               <TouchableOpacity style={s.bellBtn} onPress={() => {
                 const club = selectedClub ?? clubs[0];
                 if (!club) return;
-                router.push(`/club/${club.id}/settings` as any);
+                if (!selectedClubId || selectedClubId === '__individual__') {
+                  const clubIdx = clubs.findIndex(c => c.id === club.id);
+                  const cw = screenWidth - 72;
+                  isScrollingProgrammatically.current = true;
+                  carouselRef.current?.scrollTo({ x: (clubIdx + 1) * (cw + 12), animated: true });
+                  const pillX = pillLayoutsRef.current[clubIdx + 1] ?? 0;
+                  pillsScrollRef.current?.scrollTo({ x: Math.max(0, pillX - 20), animated: true });
+                  setSelectedClubId(club.id);
+                  setTimeout(() => {
+                    isScrollingProgrammatically.current = false;
+                    router.push(`/club/${club.id}/settings` as any);
+                  }, 400);
+                } else {
+                  router.push(`/club/${club.id}/settings` as any);
+                }
               }}>
                 <Svg width={20} height={20} viewBox="0 0 24 24" fill="none">
                   <Path d="M12 15a3 3 0 1 0 0-6 3 3 0 0 0 0 6z" stroke={Colors.black} strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round" />
@@ -1583,6 +1598,7 @@ export default function DashboardScreen() {
                   contentOffset={{ x: 0, y: 0 }}
                   scrollEventThrottle={16}
                   onScroll={(e) => {
+                    if (isScrollingProgrammatically.current) return;
                     const idx = Math.round(e.nativeEvent.contentOffset.x / (CARD_WIDTH + CARD_GAP));
                     const item = allItems[idx];
                     if (!item) return;
@@ -1592,6 +1608,7 @@ export default function DashboardScreen() {
                     const pillX = pillLayoutsRef.current[idx] ?? 0;
                     pillsScrollRef.current?.scrollTo({ x: Math.max(0, pillX - 20), animated: true });
                   }}
+                  onMomentumScrollEnd={() => { isScrollingProgrammatically.current = false; }}
                 >
                   {/* Overview card */}
                   <View style={[s.clubCard, { width: CARD_WIDTH, backgroundColor: Colors.black, justifyContent: 'center', paddingHorizontal: 20 }]}>
