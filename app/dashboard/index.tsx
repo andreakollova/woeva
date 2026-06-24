@@ -791,7 +791,7 @@ export default function DashboardScreen() {
       clubIds.length > 0
         ? supabase.from('events')
             .select('id, title, date, time, going_count, cover_url, cover_urls, club_id, creator_id, price, is_free, status, is_recurring, recurring_end_date, capacity')
-            .or(`creator_id.eq.${user.id},club_id.in.(${clubIds.join(',')})`)
+            .or(`and(creator_id.eq.${user.id},club_id.is.null),club_id.in.(${clubIds.join(',')})`)
             .order('date', { ascending: false })
         : supabase.from('events')
             .select('id, title, date, time, going_count, cover_url, cover_urls, club_id, creator_id, price, is_free, status, is_recurring, recurring_end_date, capacity')
