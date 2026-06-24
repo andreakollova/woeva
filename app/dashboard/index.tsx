@@ -738,6 +738,10 @@ export default function DashboardScreen() {
       if (!allClubs.find(c => c.id === ac.id)) allClubs.push(ac);
     }
     setClubs(allClubs);
+    // Default to first club (not "Všetky") unless already set or param override
+    if (!selectedClubId && !selectClubParam && allClubs.length > 0) {
+      setSelectedClubId(allClubs[0].id);
+    }
 
     // Fetch coordinator assignments for this user
     const { data: coordData } = await supabase
@@ -1490,7 +1494,12 @@ export default function DashboardScreen() {
           <Text style={s.pageTitle} pointerEvents="none">{activeTab === 'scan' ? t.dashboard.scanQR : t.dashboard.dashboard}</Text>
           <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
             {clubs.length > 0 && activeTab !== 'scan' && (
-              <TouchableOpacity style={s.bellBtn} onPress={() => { const club = selectedClub ?? clubs[0]; if (club) router.push(`/club/${club.id}/settings` as any); }}>
+              <TouchableOpacity style={s.bellBtn} onPress={() => {
+                const club = selectedClub ?? clubs[0];
+                if (!club) return;
+                if (!selectedClubId) setSelectedClubId(club.id);
+                router.push(`/club/${club.id}/settings` as any);
+              }}>
                 <Svg width={20} height={20} viewBox="0 0 24 24" fill="none">
                   <Path d="M12 15a3 3 0 1 0 0-6 3 3 0 0 0 0 6z" stroke={Colors.black} strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round" />
                   <Path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z" stroke={Colors.black} strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round" />

@@ -305,7 +305,7 @@ export default function ClubSettingsScreen() {
     <View style={[styles.container, { paddingTop: insets.top }]}>
       <View style={styles.header}>
         <BackButton />
-        <Text style={styles.title}>{lang === 'sk' ? 'Nastavenia klubu' : 'Club settings'}</Text>
+        <Text style={styles.title} numberOfLines={1}>{lang === 'sk' ? `Nastavenia: ${club?.name ?? 'klubu'}` : `Settings: ${club?.name ?? 'club'}`}</Text>
         <View style={{ width: 36 }} />
       </View>
 
@@ -397,7 +397,7 @@ export default function ClubSettingsScreen() {
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: Colors.white },
   header: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 16, paddingVertical: 10, marginBottom: 16 },
-  title: { fontSize: 17, fontWeight: '700', color: Colors.black, fontFamily: Fonts.bold, position: 'absolute', left: 0, right: 0, textAlign: 'center' },
+  title: { fontSize: 17, fontWeight: '700', color: Colors.black, fontFamily: Fonts.bold, flex: 1, textAlign: 'center' },
   scroll: { paddingHorizontal: 20, paddingTop: 8 },
 
   section: {},
