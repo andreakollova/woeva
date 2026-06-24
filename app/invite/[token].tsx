@@ -69,9 +69,10 @@ export default function InviteScreen() {
     setAccepting(true);
     try {
       if (invite.role === 'admin') {
-        await supabase.from('club_members').upsert(
-          { club_id: invite.club_id, user_id: user.id, role: 'admin', status: 'approved' },
-          { onConflict: 'club_id,user_id' }
+        // Delete existing membership first (RLS blocks upsert UPDATE for non-admins)
+        await supabase.from('club_members').delete().eq('club_id', invite.club_id).eq('user_id', user.id);
+        await supabase.from('club_members').insert(
+          { club_id: invite.club_id, user_id: user.id, role: 'admin', status: 'approved' }
         );
       } else {
         await supabase.from('coordinators').upsert(
