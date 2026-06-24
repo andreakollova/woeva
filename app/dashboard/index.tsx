@@ -740,6 +740,10 @@ export default function DashboardScreen() {
       if (!allClubs.find(c => c.id === ac.id)) allClubs.push(ac);
     }
     setClubs(allClubs);
+    // Reset selectedClubId if the selected club no longer exists
+    if (selectedClubId && selectedClubId !== '__individual__' && !allClubs.find(c => c.id === selectedClubId)) {
+      setSelectedClubId(null);
+    }
 
     // Fetch coordinator assignments for this user
     const { data: coordData } = await supabase
