@@ -735,12 +735,20 @@ export default function DashboardScreen() {
         for (const e of (clEv ?? [])) { if (!coordEvs.find(x => x.id === e.id)) coordEvs.push(e); }
       }
       if (coordEvs.length > 0) {
-        const { data: ciData } = await supabase.from('check_ins').select('event_id, user_id').in('event_id', coordEvs.map(e => e.id));
+        const [{ data: ciData }, { data: attData }] = await Promise.all([
+          supabase.from('check_ins').select('event_id, user_id').in('event_id', coordEvs.map(e => e.id)),
+          supabase.from('event_attendees').select('event_id').in('event_id', coordEvs.map(e => e.id)),
+        ]);
         const initCI: Record<string, Set<string>> = {};
         (ciData ?? []).forEach((ci: any) => { if (!initCI[ci.event_id]) initCI[ci.event_id] = new Set(); initCI[ci.event_id].add(ci.user_id); });
         setCheckedIn(initCI);
+        // Count real attendees per event
+        const attCounts: Record<string, number> = {};
+        (attData ?? []).forEach((a: any) => { attCounts[a.event_id] = (attCounts[a.event_id] ?? 0) + 1; });
+        setEvents(coordEvs.map(e => ({ ...e, paid_count: Math.max(attCounts[e.id] ?? 0, e.going_count ?? 0), going_count: Math.max(attCounts[e.id] ?? 0, e.going_count ?? 0), online_count: 0, door_count: 0, scan_count: 0, net_revenue: 0, platform_fee: 0, gross_revenue: 0 })) as EventRow[]);
+      } else {
+        setEvents(coordEvs.map(e => ({ ...e, paid_count: e.going_count ?? 0, online_count: 0, door_count: 0, scan_count: 0, net_revenue: 0, platform_fee: 0, gross_revenue: 0 })) as EventRow[]);
       }
-      setEvents(coordEvs.map(e => ({ ...e, paid_count: e.going_count ?? 0, online_count: 0, door_count: 0, scan_count: 0, net_revenue: 0, platform_fee: 0, gross_revenue: 0 })) as EventRow[]);
       setLoading(false);
       return;
     }
