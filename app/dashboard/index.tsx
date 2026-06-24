@@ -310,6 +310,7 @@ export default function DashboardScreen() {
   const [clubs, setClubs] = useState<Club[]>([]);
   const [selectedClubId, setSelectedClubId] = useState<string | null>(null);
   const pillsScrollRef = useRef<any>(null);
+  const carouselRef = useRef<any>(null);
   const pillLayoutsRef = useRef<number[]>([]);
   const [members, setMembers] = useState<Member[]>([]);
   const [events, setEvents] = useState<EventRow[]>([]);
@@ -1523,21 +1524,21 @@ export default function DashboardScreen() {
             <TouchableOpacity
               style={[s.viewFilterChip, !selectedClubId && s.viewFilterChipActive]}
               onLayout={e => { pillLayoutsRef.current[0] = e.nativeEvent.layout.x; }}
-              onPress={() => setSelectedClubId(null)} activeOpacity={0.7}>
+              onPress={() => { setSelectedClubId(null); const cw = screenWidth - 72; carouselRef.current?.scrollTo({ x: 0, animated: true }); }} activeOpacity={0.7}>
               <Text style={[s.viewFilterText, !selectedClubId && s.viewFilterTextActive]}>{t.home.all}</Text>
             </TouchableOpacity>
             {clubs.map((c, ci) => (
               <TouchableOpacity key={c.id}
                 style={[s.viewFilterChip, selectedClubId === c.id && s.viewFilterChipActive]}
                 onLayout={e => { pillLayoutsRef.current[ci + 1] = e.nativeEvent.layout.x; }}
-                onPress={() => setSelectedClubId(c.id)} activeOpacity={0.7}>
+                onPress={() => { setSelectedClubId(c.id); const cw = screenWidth - 72; carouselRef.current?.scrollTo({ x: (ci + 1) * (cw + 12), animated: true }); }} activeOpacity={0.7}>
                 <Text style={[s.viewFilterText, selectedClubId === c.id && s.viewFilterTextActive]} numberOfLines={1}>{c.creator_id !== user?.id ? `${c.name} (správca)` : c.name}</Text>
               </TouchableOpacity>
             ))}
             <TouchableOpacity
               style={[s.viewFilterChip, selectedClubId === '__individual__' && s.viewFilterChipActive]}
               onLayout={e => { pillLayoutsRef.current[clubs.length + 1] = e.nativeEvent.layout.x; }}
-              onPress={() => setSelectedClubId('__individual__')} activeOpacity={0.7}>
+              onPress={() => { setSelectedClubId('__individual__'); const cw = screenWidth - 72; carouselRef.current?.scrollTo({ x: (clubs.length + 1) * (cw + 12), animated: true }); }} activeOpacity={0.7}>
               <Text style={[s.viewFilterText, selectedClubId === '__individual__' && s.viewFilterTextActive]}>Individual</Text>
             </TouchableOpacity>
             <TouchableOpacity
@@ -1577,12 +1578,14 @@ export default function DashboardScreen() {
               ];
               return (
                 <ScrollView
+                  ref={carouselRef}
                   horizontal
                   showsHorizontalScrollIndicator={false}
                   snapToInterval={CARD_WIDTH + CARD_GAP}
                   decelerationRate="fast"
                   contentContainerStyle={{ paddingHorizontal: 20, gap: CARD_GAP }}
                   style={{ marginHorizontal: -20, marginBottom: 24 }}
+                  contentOffset={{ x: clubs.length > 0 ? CARD_WIDTH + CARD_GAP : 0, y: 0 }}
                   scrollEventThrottle={16}
                   onScroll={(e) => {
                     const idx = Math.round(e.nativeEvent.contentOffset.x / (CARD_WIDTH + CARD_GAP));
