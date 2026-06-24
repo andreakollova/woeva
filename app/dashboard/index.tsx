@@ -503,25 +503,29 @@ export default function DashboardScreen() {
     return () => { supabase.removeChannel(ch); };
   }, [events.length]);
 
-  // Realtime attendees: update going count for coordinator events
+  // Realtime attendees: update going count for ALL events (admin + coordinator)
   React.useEffect(() => {
-    const ids = coordEvents.map(e => e.id);
+    const ids = [...events.map(e => e.id), ...coordEvents.map(e => e.id)];
     if (ids.length === 0) return;
     const ch = supabase
       .channel(`coord_attendees_${Date.now()}`)
       .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'event_attendees' }, (payload: any) => {
         const eid = payload.new?.event_id;
         if (!ids.includes(eid)) return;
-        setCoordEvents(prev => prev.map(e => e.id === eid ? { ...e, going_count: (e.going_count ?? 0) + 1, paid_count: (e.paid_count ?? 0) + 1 } : e));
+        const bump = (e: EventRow) => e.id === eid ? { ...e, going_count: (e.going_count ?? 0) + 1, paid_count: (e.paid_count ?? 0) + 1 } : e;
+        setEvents(prev => prev.map(bump));
+        setCoordEvents(prev => prev.map(bump));
       })
       .on('postgres_changes', { event: 'DELETE', schema: 'public', table: 'event_attendees' }, (payload: any) => {
         const eid = payload.old?.event_id;
         if (!ids.includes(eid)) return;
-        setCoordEvents(prev => prev.map(e => e.id === eid ? { ...e, going_count: Math.max(0, (e.going_count ?? 1) - 1), paid_count: Math.max(0, (e.paid_count ?? 1) - 1) } : e));
+        const dec = (e: EventRow) => e.id === eid ? { ...e, going_count: Math.max(0, (e.going_count ?? 1) - 1), paid_count: Math.max(0, (e.paid_count ?? 1) - 1) } : e;
+        setEvents(prev => prev.map(dec));
+        setCoordEvents(prev => prev.map(dec));
       })
       .subscribe();
     return () => { supabase.removeChannel(ch); };
-  }, [coordEvents.length]);
+  }, [events.length, coordEvents.length]);
 
   // Reload members when selected club changes
   React.useEffect(() => {
@@ -1278,11 +1282,15 @@ export default function DashboardScreen() {
                     const { data: ticket } = await supabase.from('tickets').select('id, event_id, user_id, profile:profiles(name, avatar_url), event:events(title)').eq('id', ticketId).maybeSingle();
                     if (!ticket) { setScannedTicket({ eventTitle: '?', userName: t.dashboard.unknownTicket, avatar_url: null, valid: false, eventId: '', userId: '' }); return; }
                     setScannedTicket({ eventTitle: (ticket as any).event?.title ?? '?', userName: (ticket as any).profile?.name ?? '?', avatar_url: (ticket as any).profile?.avatar_url ?? null, valid: true, eventId: ticket.event_id, userId: ticket.user_id });
+                    markCheckedIn(ticket.event_id, ticket.user_id);
+                    setTimeout(() => setScannedTicket(null), 1200);
                   } else if (type === 'event') {
                     const eventId = parts[2]; const userId = parts[3];
                     const { data: ev } = await supabase.from('events').select('title').eq('id', eventId).maybeSingle();
                     const { data: prof } = await supabase.from('profiles').select('name, avatar_url').eq('id', userId).maybeSingle();
-                    setScannedTicket({ eventTitle: ev?.title ?? '?', userName: prof?.name ?? '?', avatar_url: (prof as any)?.avatar_url ?? null, valid: !!ev, eventId, userId });
+                    const isValid = !!ev;
+                    setScannedTicket({ eventTitle: ev?.title ?? '?', userName: prof?.name ?? '?', avatar_url: (prof as any)?.avatar_url ?? null, valid: isValid, eventId, userId });
+                    if (isValid) { markCheckedIn(eventId, userId); setTimeout(() => setScannedTicket(null), 1200); }
                   }
                 }}
               />
