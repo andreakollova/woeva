@@ -304,6 +304,7 @@ export default function DashboardScreen() {
   const { tab: tabParam, openEvent: openEventParam, selectClub: selectClubParam } = useLocalSearchParams<{ tab?: string; openEvent?: string; selectClub?: string }>();
 
   const [activeTab, setActiveTab] = useState<DashTab>((['home','payouts','stats','scan','coordinator'].includes(tabParam as string) ? tabParam as DashTab : 'home'));
+  const scanOriginRef = useRef<DashTab>('home');
   const [unreadNotifs, setUnreadNotifs] = useState(0);
   const [loading, setLoading] = useState(true);
   const [clubs, setClubs] = useState<Club[]>([]);
@@ -1153,7 +1154,7 @@ export default function DashboardScreen() {
       <View style={[s.container, { paddingTop: insets.top }]}>
         <View style={s.topBar}>
           {activeTab === 'scan'
-            ? <TouchableOpacity onPress={() => { setScannedTicket(null); setActiveTab('coordinator'); }} style={s.backBtn} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
+            ? <TouchableOpacity onPress={() => { setScannedTicket(null); setActiveTab(scanOriginRef.current); }} style={s.backBtn} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
                 <Svg width={22} height={22} viewBox="0 0 24 24" fill="none">
                   <Path d="M19 12H5M12 5l-7 7 7 7" stroke={Colors.black} strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" />
                 </Svg>
@@ -1207,7 +1208,7 @@ export default function DashboardScreen() {
                       <View style={{ flexDirection: 'row', gap: 8, marginTop: 10 }}>
                         <TouchableOpacity
                           style={{ flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, backgroundColor: Colors.black, borderRadius: 10, paddingVertical: 9 }}
-                          onPress={() => setActiveTab('scan')} activeOpacity={0.7}
+                          onPress={() => { scanOriginRef.current = 'coordinator'; setActiveTab('scan'); }} activeOpacity={0.7}
                         >
                           <Svg width={14} height={14} viewBox="0 0 24 24" fill="none">
                             <Path d="M3 7V5a2 2 0 0 1 2-2h2M17 3h2a2 2 0 0 1 2 2v2M21 17v2a2 2 0 0 1-2 2h-2M7 21H5a2 2 0 0 1-2-2v-2" stroke={Colors.white} strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" />
@@ -1318,7 +1319,7 @@ export default function DashboardScreen() {
               </Svg>
               <Text style={[s.bottomNavLabel, activeTab === 'home' && s.bottomNavLabelActive]}>Eventy</Text>
             </TouchableOpacity>
-            <TouchableOpacity style={s.bottomNavItem} onPress={() => setActiveTab('scan')} activeOpacity={0.7}>
+            <TouchableOpacity style={s.bottomNavItem} onPress={() => { scanOriginRef.current = 'coordinator'; setActiveTab('scan'); }} activeOpacity={0.7}>
               <Svg width={22} height={22} viewBox="0 0 24 24" fill="none">
                 <Rect x="3" y="3" width="6" height="6" rx="1" stroke={activeTab === 'scan' ? Colors.black : 'rgba(0,0,0,0.35)'} strokeWidth={2} />
                 <Rect x="15" y="3" width="6" height="6" rx="1" stroke={activeTab === 'scan' ? Colors.black : 'rgba(0,0,0,0.35)'} strokeWidth={2} />
@@ -1345,7 +1346,7 @@ export default function DashboardScreen() {
               {/* Scan QR button — coordinator only */}
               <TouchableOpacity
                 style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, backgroundColor: Colors.black, borderRadius: 14, paddingVertical: 12, marginTop: 12 }}
-                onPress={() => { closeAttendees(); setTimeout(() => setActiveTab('scan'), 350); }}
+                onPress={() => { closeAttendees(); setTimeout(() => { scanOriginRef.current = 'coordinator'; setActiveTab('scan'); }, 350); }}
                 activeOpacity={0.7}
               >
                 <Svg width={18} height={18} viewBox="0 0 24 24" fill="none">
