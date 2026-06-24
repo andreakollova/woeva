@@ -139,9 +139,9 @@ export default function NotificationsScreen() {
       }
       if (isCoord) {
         const eventId = invite?.event_id;
-        router.replace({ pathname: '/dashboard', params: eventId ? { openEvent: eventId } : {} } as any);
+        router.replace({ pathname: '/dashboard', params: { tab: 'coordinator', ...(eventId ? { openEvent: eventId } : {}) } } as any);
       } else {
-        Alert.alert(t.notif.welcomeAboard, t.notif.welcomeAboardMsg);
+        router.replace({ pathname: '/dashboard', params: { selectClub: clubId } } as any);
       }
     } else {
       if (token) {

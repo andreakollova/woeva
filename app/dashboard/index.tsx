@@ -301,9 +301,9 @@ export default function DashboardScreen() {
   const { t, lang } = useTranslations();
   const { width: screenWidth } = useWindowDimensions();
   const chartWidth = screenWidth - 40;
-  const { tab: tabParam, openEvent: openEventParam } = useLocalSearchParams<{ tab?: string; openEvent?: string }>();
+  const { tab: tabParam, openEvent: openEventParam, selectClub: selectClubParam } = useLocalSearchParams<{ tab?: string; openEvent?: string; selectClub?: string }>();
 
-  const [activeTab, setActiveTab] = useState<DashTab>((['home','payouts','stats','scan'].includes(tabParam as string) ? tabParam as DashTab : 'home'));
+  const [activeTab, setActiveTab] = useState<DashTab>((['home','payouts','stats','scan','coordinator'].includes(tabParam as string) ? tabParam as DashTab : 'home'));
   const [unreadNotifs, setUnreadNotifs] = useState(0);
   const [loading, setLoading] = useState(true);
   const [clubs, setClubs] = useState<Club[]>([]);
@@ -668,6 +668,10 @@ export default function DashboardScreen() {
       if (openEventParam) {
         const ev = events.find(e => e.id === openEventParam || e.id.startsWith(openEventParam));
         if (ev) setTimeout(() => openAttendees(ev), 400);
+      }
+      // Auto-select club from param (admin invite flow)
+      if (selectClubParam && clubs.find(c => c.id === selectClubParam)) {
+        setSelectedClubId(selectClubParam);
       }
     }
   }, [loading]);

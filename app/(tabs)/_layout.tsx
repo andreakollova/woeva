@@ -170,7 +170,7 @@ function TabBar({ state, descriptors, navigation }: any) {
                 <View style={[styles.menuSecondaryRow, { borderTopWidth: 0, paddingTop: 8, marginTop: 0 }]}>
                   {adminClubs.length > 0 && hasCoordinations ? (
                     <>
-                      <TouchableOpacity style={styles.menuSecondaryItem} onPress={() => { setShowMenu(false); router.push({ pathname: '/dashboard', params: { tab: 'home' } } as any); }} activeOpacity={0.7}>
+                      <TouchableOpacity style={styles.menuSecondaryItem} onPress={() => { setShowMenu(false); router.push({ pathname: '/dashboard', params: { selectClub: adminClubs[0]?.id } } as any); }} activeOpacity={0.7}>
                         <Svg width={16} height={16} viewBox="0 0 24 24" fill="none">
                           <Path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5" stroke={Colors.gray} strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round" />
                         </Svg>
