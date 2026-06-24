@@ -109,9 +109,11 @@ export default function OtpScreen() {
 
       {isEmail && (
         <Text style={styles.emailHint}>
-          {lang === 'sk'
-            ? 'Email môže prísť do 5 – 7 minút. Skontroluj aj spam. Ak nechodí, skús prihlásenie cez Google alebo Apple.'
-            : 'Email may take 5 – 7 minutes. Check spam too. If it doesn\'t arrive, try Google or Apple sign-in.'}
+          {lang === 'sk' ? 'Email môže prísť do 5 – 7 minút. Skontroluj aj spam.' : 'Email may take 5 – 7 minutes. Check spam too.'}
+          {'\n'}
+          <Text style={styles.emailHintLink} onPress={() => router.back()}>
+            {lang === 'sk' ? 'Ak sa ti nechce čakať, skús Google alebo Apple' : 'Don\'t want to wait? Try Google or Apple'}
+          </Text>
         </Text>
       )}
 
@@ -153,4 +155,5 @@ const styles = StyleSheet.create({
   resendTimer: { textAlign: 'center', fontSize: 14, color: Colors.gray },
   resendTimerBold: { fontWeight: '700', color: Colors.black },
   emailHint: { fontSize: 13, color: Colors.gray, textAlign: 'center', lineHeight: 19, marginBottom: 20 },
+  emailHintLink: { fontSize: 13, color: Colors.black, fontWeight: '600', textDecorationLine: 'underline' },
 });
