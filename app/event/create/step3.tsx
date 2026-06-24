@@ -323,9 +323,17 @@ export default function CreateStep3Screen() {
       })() : null,
       recurring_open_weekday: isRecurring && hasPublishAt && publishAtWeekday !== null ? publishAtWeekday : null,
       recurring_open_time: isRecurring && hasPublishAt && publishAtWeekday !== null ? `${publishAtTime.getHours().toString().padStart(2, '0')}:${publishAtTime.getMinutes().toString().padStart(2, '0')}` : null,
-      registration_opens_at: hasRegistrationOpens ? (() => {
-        const d = new Date(registrationOpensDate);
-        d.setHours(registrationOpensTime.getHours(), registrationOpensTime.getMinutes(), 0, 0);
+      registration_opens_at: hasPublishAt ? (() => {
+        if (isRecurring && publishAtWeekday !== null) {
+          const d = new Date(date);
+          d.setHours(0, 0, 0, 0);
+          let attempts = 0;
+          while (d.getDay() !== publishAtWeekday && attempts < 7) { d.setDate(d.getDate() - 1); attempts++; }
+          d.setHours(publishAtTime.getHours(), publishAtTime.getMinutes(), 0, 0);
+          return d.toISOString();
+        }
+        const d = new Date(publishAtDate);
+        d.setHours(publishAtTime.getHours(), publishAtTime.getMinutes(), 0, 0);
         return d.toISOString();
       })() : null,
       registration_notified: false,
