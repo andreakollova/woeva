@@ -1217,7 +1217,9 @@ export default function DashboardScreen() {
                             <Path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2" stroke={Colors.black} strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" />
                             <Circle cx={9} cy={7} r={4} stroke={Colors.black} strokeWidth={2} />
                           </Svg>
-                          <Text style={{ fontSize: 12, fontWeight: '600', color: Colors.black, fontFamily: Fonts.semibold }}>{goingCount}</Text>
+                          <Svg width={14} height={14} viewBox="0 0 24 24" fill="none">
+                            <Path d="M8 6h13M8 12h13M8 18h13M3 6h.01M3 12h.01M3 18h.01" stroke={Colors.black} strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" />
+                          </Svg>
                         </TouchableOpacity>
                       </View>
                     </View>
