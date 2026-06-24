@@ -19,7 +19,7 @@
       "config": {
         "googleMapsApiKey": "AIzaSyDhtj5z-Us7Ic01tHuaJxC_mLTZPG3moj0"
       },
-      "buildNumber": "41",
+      "buildNumber": "42",
       "entitlements": {
         "com.apple.developer.in-app-payments": [
           "merchant.com.woeva.app"
@@ -29,7 +29,7 @@
         "NSLocationWhenInUseUsageDescription": "Woeva uses your location to show events near you.",
         "NSCameraUsageDescription": "Woeva uses your camera to upload event photos.",
         "NSPhotoLibraryUsageDescription": "Woeva uses your photo library to upload event photos.",
-"ITSAppUsesNonExemptEncryption": false
+        "ITSAppUsesNonExemptEncryption": false
       },
       "appleTeamId": "J4YGZU25B2"
     },

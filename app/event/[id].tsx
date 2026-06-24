@@ -635,7 +635,7 @@ export default function EventDetailScreen() {
                   </View>
                   <View style={{ flex: 1 }}>
                     <Text style={s.infoText}>{isToday ? t.event.today : `${dayName}, ${dayNum} ${monthName}`}</Text>
-                    {event.time ? <Text style={s.infoSub}>{event.time.substring(0, 5)}{event.capacity != null ? `  ·  ${goingCount >= event.capacity ? (lang === 'sk' ? `Naplnená kapacita ${goingCount}/${event.capacity}` : `Full ${goingCount}/${event.capacity}`) : (lang === 'sk' ? `Prihlásení ${goingCount}/${event.capacity}` : `Registered ${goingCount}/${event.capacity}`)}` : ''}</Text> : null}
+                    {event.time ? <Text style={s.infoSub}>{event.time.substring(0, 5)}{event.capacity != null ? `  ·  ${!isAttending ? (lang === 'sk' ? 'Obmedzená kapacita  ·  ' : 'Limited capacity  ·  ') : ''}${goingCount >= event.capacity ? (lang === 'sk' ? `Prihlásení ${goingCount}/${event.capacity}` : `Registered ${goingCount}/${event.capacity}`) : (lang === 'sk' ? `Prihlásení ${goingCount}/${event.capacity}` : `Registered ${goingCount}/${event.capacity}`)}` : ''}</Text> : null}
                   </View>
                 </View>
 

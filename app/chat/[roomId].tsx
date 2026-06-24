@@ -48,9 +48,8 @@ export default function ChatScreen() {
     loadEventMeta();
     loadMuteState();
 
-    const channelName = `chat:${roomId}:${Date.now()}`;
     const channel = supabase
-      .channel(channelName)
+      .channel(`chat:${roomId}`)
       .on('postgres_changes', {
         event: 'INSERT',
         schema: 'public',
