@@ -486,7 +486,7 @@ export default function EventDetailScreen() {
       <View style={[s.topLeft, { top: insets.top + 10 }]} pointerEvents="box-none">
         <BackButton color={Colors.white} style={s.backBtn} />
       </View>
-      {isCreator && event.status !== 'cancelled' && (
+      {(isCreator || isClubAdmin) && event.status !== 'cancelled' && (
         <View style={[s.topRight, { top: insets.top + 10 }]} pointerEvents="box-none">
           <TouchableOpacity style={s.ctrlPill} onPress={() => router.push(`/event/${id}/edit` as any)}>
             <Svg width={13} height={13} viewBox="0 0 24 24" fill="none">
