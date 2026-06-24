@@ -16,7 +16,7 @@ export default function NotificationsScreen() {
   const insets = useSafeAreaInsets();
   const router = useRouter();
   const { user } = useAuth();
-  const { t } = useTranslations();
+  const { t, lang } = useTranslations();
   const [notifications, setNotifications] = useState<Notification[]>([]);
 
   useFocusEffect(useCallback(() => {

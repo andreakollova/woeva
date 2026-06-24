@@ -442,7 +442,7 @@ export default function ClubMembersScreen() {
                   ? <Image source={{ uri: r.avatar_url }} style={StyleSheet.absoluteFill as any} borderRadius={20} />
                   : <Text style={st.avInitial}>{(r.name || '?').charAt(0).toUpperCase()}</Text>}
               </View>
-              <Text style={[st.rowName, { flex: 1 }]}>{r.name}</Text>
+              <Text style={[st.rowName, { flex: 1 }]}>{(r.name || '?').split(' ')[0]}</Text>
               <TouchableOpacity style={st.inviteActionBtn} onPress={() => inviteAdminFromSearch(r.id, r.name)} disabled={sendingAdminInvite === r.id} activeOpacity={0.8}>
                 {sendingAdminInvite === r.id
                   ? <ActivityIndicator size="small" color={Colors.white} />
@@ -483,7 +483,7 @@ export default function ClubMembersScreen() {
                   ? <Image source={{ uri: r.avatar_url }} style={StyleSheet.absoluteFill as any} borderRadius={20} />
                   : <Text style={st.avInitial}>{(r.name || '?').charAt(0).toUpperCase()}</Text>}
               </View>
-              <Text style={[st.rowName, { flex: 1 }]}>{r.name}</Text>
+              <Text style={[st.rowName, { flex: 1 }]}>{(r.name || '?').split(' ')[0]}</Text>
               <TouchableOpacity style={st.inviteActionBtn} onPress={() => inviteCoordFromSearch(r.id, r.name)} disabled={sendingCoordInvite === r.id} activeOpacity={0.8}>
                 {sendingCoordInvite === r.id
                   ? <ActivityIndicator size="small" color={Colors.white} />
