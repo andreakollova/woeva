@@ -156,8 +156,12 @@ export default function NotificationsScreen() {
   }
 
   function handleTap(n: Notification) {
+    // Invite notifications: don't auto-accept on row tap, just mark as read
     if ((n.type === 'admin_invite' || n.type === 'coordinator_invite') && n.data?.action) {
-      handleInvite(n, true);
+      if (!n.read) {
+        supabase.from('notifications').update({ read: true }).eq('id', n.id);
+        setNotifications(prev => prev.map(x => x.id === n.id ? { ...x, read: true } : x));
+      }
       return;
     }
     const eventId = n.data?.event_id;
@@ -224,7 +228,7 @@ export default function NotificationsScreen() {
                   <Text style={styles.rowTime}>{timeAgo(n.created_at)}</Text>
                 </View>
                 {n.body ? <Text style={styles.rowBody}>{n.body}</Text> : null}
-                {(n.type === 'admin_invite' || n.type === 'coordinator_invite') && !n.read && (
+                {(n.type === 'admin_invite' || n.type === 'coordinator_invite') && n.data?.token && (
                   <View style={styles.inviteActions}>
                     <TouchableOpacity style={styles.declineInviteBtn} onPress={() => Alert.alert(lang === 'sk' ? 'Odmietnuť pozvánku?' : 'Decline invite?', lang === 'sk' ? 'Si si istý/á?' : 'Are you sure?', [{ text: lang === 'sk' ? 'Späť' : 'Back', style: 'cancel' }, { text: lang === 'sk' ? 'Odmietnuť' : 'Decline', style: 'destructive', onPress: () => handleInvite(n, false) }])} activeOpacity={0.7}>
                       <Text style={styles.declineInviteBtnText}>{t.common.decline}</Text>
