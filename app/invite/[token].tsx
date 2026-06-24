@@ -116,7 +116,7 @@ export default function InviteScreen() {
         const eventId = invite.event_id;
         setTimeout(() => router.replace({ pathname: '/dashboard', params: eventId ? { openEvent: eventId } : {} } as any), 1800);
       } else {
-        setTimeout(() => router.replace(`/club/${invite.club_id}` as any), 1800);
+        setTimeout(() => router.replace({ pathname: '/dashboard', params: { selectClub: invite.club_id } } as any), 1800);
       }
     } catch {
       Alert.alert('Chyba', 'Pozvánku sa nepodarilo prijať. Skús to znova.');
