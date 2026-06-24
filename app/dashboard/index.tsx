@@ -695,8 +695,13 @@ export default function DashboardScreen() {
         if (ev) setTimeout(() => openAttendees(ev), 400);
       }
       // Auto-select club from param (admin invite flow)
-      if (selectClubParam && clubs.find(c => c.id === selectClubParam)) {
-        setSelectedClubId(selectClubParam);
+      if (selectClubParam) {
+        if (clubs.find(c => c.id === selectClubParam)) {
+          setSelectedClubId(selectClubParam);
+        } else {
+          // Club not loaded yet (race condition after invite acceptance) — retry
+          setTimeout(() => load(), 1000);
+        }
       }
     }
   }, [loading]);
