@@ -579,10 +579,9 @@ export default function DashboardScreen() {
     if (!attendeesEvent) return;
     const clubId = attendeesEvent.club_id;
     if (!clubId) return;
-    const eventId = coordScope === 'event' ? (attendeesEvent.id.includes('_') ? attendeesEvent.id.split('_')[0] : attendeesEvent.id) : null;
-    await supabase.from('coordinators').upsert({ club_id: clubId, event_id: eventId, user_id: profileId, invited_by: user!.id, status: 'active' }, { onConflict: 'club_id,event_id,user_id' });
-    const scopeLabel = coordScope === 'event' ? attendeesEvent.title : (clubs.find(c => c.id === clubId)?.name ?? 'klub');
-    await supabase.from('notifications').insert({ user_id: profileId, type: 'coordinator_invite', title: 'Bol/a si pridaný/á ako koordinátor', body: `Koordinátor pre: ${scopeLabel}`, data: { club_id: clubId, event_id: eventId, action: 'coordinator_invite' } });
+    await supabase.from('coordinators').upsert({ club_id: clubId, event_id: null, user_id: profileId, invited_by: user!.id, status: 'active' }, { onConflict: 'club_id,event_id,user_id' });
+    const clubName = clubs.find(c => c.id === clubId)?.name ?? 'klub';
+    await supabase.from('notifications').insert({ user_id: profileId, type: 'coordinator_invite', title: 'Bol/a si pridaný/á ako koordinátor', body: `Koordinátor pre: ${clubName}`, data: { club_id: clubId, action: 'coordinator_invite' } });
     closeCoordInvite();
     Alert.alert('Koordinátor pridaný', profileName);
   }
@@ -2526,16 +2525,7 @@ export default function DashboardScreen() {
           <RNAnimated.View style={[s.attendeesSheet, { paddingBottom: insets.bottom + 16, transform: [{ translateY: coordInviteSheetY }] }]} {...coordInvitePan.panHandlers}>
             <View style={{ paddingTop: 12, paddingBottom: 16, alignItems: 'center' }}><View style={s.billingSheetHandle} /></View>
             <Text style={s.billingSheetTitle}>Pridať koordinátora</Text>
-            <Text style={[s.listSub, { marginBottom: 16 }]}>Koordinátor môže iba skenovať QR kódy a potvrdzovať vstupy.</Text>
-            {/* Scope selector */}
-            <View style={{ flexDirection: 'row', backgroundColor: Colors.grayLight, borderRadius: 12, padding: 3, marginBottom: 16 }}>
-              <TouchableOpacity style={[{ flex: 1, paddingVertical: 9, borderRadius: 10, alignItems: 'center' }, coordScope === 'event' && { backgroundColor: Colors.white }]} onPress={() => setCoordScope('event')} activeOpacity={0.7}>
-                <Text style={{ fontSize: 13, fontFamily: coordScope === 'event' ? Fonts.semibold : Fonts.regular, color: Colors.black }}>Iba tento event</Text>
-              </TouchableOpacity>
-              <TouchableOpacity style={[{ flex: 1, paddingVertical: 9, borderRadius: 10, alignItems: 'center' }, coordScope === 'club' && { backgroundColor: Colors.white }]} onPress={() => setCoordScope('club')} activeOpacity={0.7}>
-                <Text style={{ fontSize: 13, fontFamily: coordScope === 'club' ? Fonts.semibold : Fonts.regular, color: Colors.black }}>Všetky eventy klubu</Text>
-              </TouchableOpacity>
-            </View>
+            <Text style={[s.listSub, { marginBottom: 16 }]}>Koordinátor môže skenovať QR kódy a potvrdzovať vstupy na všetkých eventoch klubu.</Text>
             {/* Search */}
             <TextInput
               style={s.inviteInput}

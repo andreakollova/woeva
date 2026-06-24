@@ -111,18 +111,16 @@ export default function ClubMembersScreen() {
     setSharingCoord(true);
     try {
       const { data: myProfile } = await supabase.from('profiles').select('name').eq('id', user.id).single();
-      const eventId = coordScope !== 'all' ? coordScope : null;
       const { data } = await supabase.from('pending_invites').insert({
-        club_id: id, role: 'coordinator', event_id: eventId,
+        club_id: id, role: 'coordinator', event_id: null,
         invited_by: user.id, club_name: club.name, inviter_name: myProfile?.name ?? '',
       }).select('token').single();
       if (!data?.token) throw new Error('no token');
       const url = `https://woeva.com/invite?token=${data.token}`;
-      const scopeLabel = eventId ? (clubEvents.find(e => e.id === eventId)?.title ?? 'event') : club.name;
       await Share.share({
         message: lang === 'sk'
-          ? `${myProfile?.name ?? 'Niekto'} ťa pozýva ako koordinátora pre "${scopeLabel}" vo Woeva. Prijmi pozvánku: ${url}`
-          : `${myProfile?.name ?? 'Someone'} invited you as a coordinator for "${scopeLabel}" on Woeva: ${url}`,
+          ? `${myProfile?.name ?? 'Niekto'} ťa pozýva ako koordinátora pre "${club.name}" vo Woeva. Prijmi pozvánku: ${url}`
+          : `${myProfile?.name ?? 'Someone'} invited you as a coordinator for "${club.name}" on Woeva: ${url}`,
         url,
       });
     } catch {
@@ -182,15 +180,13 @@ export default function ClubMembersScreen() {
     setSendingCoordInvite(profileId);
     try {
       const { data: myProfile } = await supabase.from('profiles').select('name').eq('id', user.id).single();
-      const eventId = coordScope !== 'all' ? coordScope : null;
-      const scopeLabel = eventId ? (clubEvents.find(e => e.id === eventId)?.title ?? 'event') : club.name;
       const { data } = await supabase.from('pending_invites').insert({
-        club_id: id, role: 'coordinator', event_id: eventId,
+        club_id: id, role: 'coordinator', event_id: null,
         invited_by: user.id, club_name: club.name, inviter_name: myProfile?.name ?? '',
       }).select('token').single();
       if (!data?.token) throw new Error('no token');
-      const title = `Pozvánka koordinátora: ${scopeLabel}`;
-      const body = `${myProfile?.name ?? 'Niekto'} ťa pozýva ako koordinátora pre "${scopeLabel}".`;
+      const title = `Pozvánka koordinátora: ${club.name}`;
+      const body = `${myProfile?.name ?? 'Niekto'} ťa pozýva ako koordinátora pre "${club.name}".`;
       await supabase.from('notifications').insert({
         user_id: profileId, type: 'coordinator_invite', title, body,
         data: { token: data.token, club_id: id, action: 'coordinator_invite' },
@@ -471,17 +467,6 @@ export default function ClubMembersScreen() {
               </Svg>
             </TouchableOpacity>
           </View>
-          {/* Scope selector */}
-          <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ maxHeight: 40, marginBottom: 12 }} contentContainerStyle={{ gap: 6 }}>
-            <TouchableOpacity onPress={() => setCoordScope('all')} style={{ paddingHorizontal: 14, paddingVertical: 7, borderRadius: 50, backgroundColor: coordScope === 'all' ? Colors.black : Colors.grayLight }}>
-              <Text style={{ fontSize: 13, fontWeight: '600', color: coordScope === 'all' ? Colors.white : Colors.black }}>{lang === 'sk' ? 'Všetky eventy' : 'All events'}</Text>
-            </TouchableOpacity>
-            {clubEvents.map(ev => (
-              <TouchableOpacity key={ev.id} onPress={() => setCoordScope(ev.id)} style={{ paddingHorizontal: 14, paddingVertical: 7, borderRadius: 50, backgroundColor: coordScope === ev.id ? Colors.black : Colors.grayLight }}>
-                <Text style={{ fontSize: 13, fontWeight: '600', color: coordScope === ev.id ? Colors.white : Colors.black }} numberOfLines={1}>{ev.title}</Text>
-              </TouchableOpacity>
-            ))}
-          </ScrollView>
           <TextInput
             style={st.searchInput}
             placeholder={lang === 'sk' ? 'Hľadať podľa mena...' : 'Search by name...'}
