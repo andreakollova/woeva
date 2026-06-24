@@ -111,7 +111,7 @@ export default function NotificationsScreen() {
         } else {
           await supabase.from('club_members').upsert(
             { club_id: clubId, user_id: user.id, role: 'admin', status: 'approved' },
-            { onConflict: 'club_id,user_id' }
+            { onConflict: 'club_id,user_id', ignoreDuplicates: false }
           );
         }
         await supabase.from('pending_invites').update({ status: 'accepted', accepted_by: user.id }).eq('token', token);
