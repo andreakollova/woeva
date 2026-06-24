@@ -1148,8 +1148,8 @@ export default function DashboardScreen() {
     );
   }
 
-  // ── Coordinator mode: no clubs OR coordinator tab selected ──
-  if ((clubs.length === 0 && myCoordinations.length > 0) || (activeTab === 'coordinator' && myCoordinations.length > 0)) {
+  // ── Coordinator mode: only when coordinator tab is active ──
+  if (activeTab === 'coordinator' && myCoordinations.length > 0) {
     return (
       <View style={[s.container, { paddingTop: insets.top }]}>
         <View style={s.topBar}>
