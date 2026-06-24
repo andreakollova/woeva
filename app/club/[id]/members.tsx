@@ -214,16 +214,39 @@ export default function ClubMembersScreen() {
       { text: lang === 'sk' ? 'Zrušiť' : 'Cancel', style: 'cancel' },
       { text: lang === 'sk' ? 'Odstrániť' : 'Remove', style: 'destructive', onPress: async () => {
         await supabase.from('club_members').update({ role: 'member' }).eq('club_id', id).eq('user_id', adminUserId);
+        await supabase.from('notifications').insert({
+          user_id: adminUserId, type: 'admin_removed',
+          title: lang === 'sk' ? 'Boli ste odstránení ako správca' : 'You were removed as admin',
+          body: `${club?.name ?? 'Klub'}`,
+          data: { club_id: id },
+        });
+        const { data: prof } = await supabase.from('profiles').select('push_token').eq('id', adminUserId).or('notifications_enabled.is.null,notifications_enabled.eq.true').single();
+        if (prof?.push_token?.startsWith('ExponentPushToken[')) {
+          supabase.functions.invoke('send-push', { body: { tokens: [prof.push_token], title: lang === 'sk' ? 'Boli ste odstránení ako správca' : 'Removed as admin', body: club?.name ?? 'Klub', data: { club_id: id } } });
+        }
         setAdmins(prev => prev.filter(a => a.user_id !== adminUserId));
       }},
     ]);
   }
 
   async function removeCoordinator(coordId: string) {
+    const coord = coordinators.find(c => c.id === coordId);
     Alert.alert(lang === 'sk' ? 'Odstrániť koordinátora?' : 'Remove coordinator?', '', [
       { text: lang === 'sk' ? 'Zrušiť' : 'Cancel', style: 'cancel' },
       { text: lang === 'sk' ? 'Odstrániť' : 'Remove', style: 'destructive', onPress: async () => {
         await supabase.from('coordinators').update({ status: 'removed' }).eq('id', coordId);
+        if (coord?.user_id) {
+          await supabase.from('notifications').insert({
+            user_id: coord.user_id, type: 'coordinator_removed',
+            title: lang === 'sk' ? 'Boli ste odstránení ako koordinátor' : 'You were removed as coordinator',
+            body: `${club?.name ?? 'Klub'}`,
+            data: { club_id: id },
+          });
+          const { data: prof } = await supabase.from('profiles').select('push_token').eq('id', coord.user_id).or('notifications_enabled.is.null,notifications_enabled.eq.true').single();
+          if (prof?.push_token?.startsWith('ExponentPushToken[')) {
+            supabase.functions.invoke('send-push', { body: { tokens: [prof.push_token], title: lang === 'sk' ? 'Boli ste odstránení ako koordinátor' : 'Removed as coordinator', body: club?.name ?? 'Klub', data: { club_id: id } } });
+          }
+        }
         setCoordinators(prev => prev.filter(c => c.id !== coordId));
       }},
     ]);
