@@ -63,7 +63,7 @@ export default function BookedScreen() {
         while (cur < todayDate) cur.setDate(cur.getDate() + 7);
         while (cur <= cap) {
           const ds = cur.toISOString().slice(0, 10);
-          if (!cancelled.has(ds)) return { ...e, date: ds };
+          if (!cancelled.has(ds)) return { ...e, id: `${e.id}_${ds}`, date: ds };
           cur.setDate(cur.getDate() + 7);
         }
         return null; // no upcoming occurrence
@@ -75,7 +75,7 @@ export default function BookedScreen() {
           if (!cancelled.has(ds)) last = ds;
           cur.setDate(cur.getDate() + 7);
         }
-        return last ? { ...e, date: last } : null;
+        return last ? { ...e, id: `${e.id}_${last}`, date: last } : null;
       }
     }).filter(Boolean) as BookedEvent[];
 
