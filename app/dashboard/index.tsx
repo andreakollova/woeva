@@ -721,8 +721,8 @@ export default function DashboardScreen() {
     }));
     setMyCoordinations(coordList);
 
-    // Coordinator mode: user has no admin clubs but does coordinate events
-    if (allClubs.length === 0 && coordList.length > 0) {
+    // Load coordinator events (always, regardless of clubs)
+    if (coordList.length > 0) {
       const specificIds = coordList.filter(c => c.event_id).map(c => c.event_id as string);
       const coordClubIds = [...new Set(coordList.map(c => c.club_id))];
       const today = new Date().toISOString().split('T')[0];
@@ -742,7 +742,7 @@ export default function DashboardScreen() {
         ]);
         const initCI: Record<string, Set<string>> = {};
         (ciData ?? []).forEach((ci: any) => { if (!initCI[ci.event_id]) initCI[ci.event_id] = new Set(); initCI[ci.event_id].add(ci.user_id); });
-        setCheckedIn(initCI);
+        setCheckedIn(prev => ({ ...prev, ...initCI }));
         // Count real attendees per event
         const attCounts: Record<string, number> = {};
         (attData ?? []).forEach((a: any) => { attCounts[a.event_id] = (attCounts[a.event_id] ?? 0) + 1; });
@@ -1158,7 +1158,11 @@ export default function DashboardScreen() {
                   <Path d="M19 12H5M12 5l-7 7 7 7" stroke={Colors.black} strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" />
                 </Svg>
               </TouchableOpacity>
-            : <BackButton />}
+            : <TouchableOpacity onPress={() => router.canGoBack() ? router.back() : router.replace('/(tabs)/' as any)} style={s.backBtn} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
+                <Svg width={22} height={22} viewBox="0 0 24 24" fill="none">
+                  <Path d="M19 12H5M12 5l-7 7 7 7" stroke={Colors.black} strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" />
+                </Svg>
+              </TouchableOpacity>}
           <Text style={s.pageTitle}>Koordinátor</Text>
           <View style={{ width: 36 }} />
         </View>
