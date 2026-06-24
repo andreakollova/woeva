@@ -104,14 +104,14 @@ export default function NotificationsScreen() {
           return;
         }
         if (isCoord) {
-          await supabase.from('coordinators').upsert(
-            { club_id: clubId, event_id: invite.event_id ?? null, user_id: user.id, invited_by: invite.invited_by, status: 'active' },
-            { onConflict: 'club_id,event_id,user_id' }
+          await supabase.from('coordinators').delete().eq('club_id', clubId).eq('user_id', user.id);
+          await supabase.from('coordinators').insert(
+            { club_id: clubId, event_id: invite.event_id ?? null, user_id: user.id, invited_by: invite.invited_by, status: 'active' }
           );
         } else {
-          await supabase.from('club_members').upsert(
-            { club_id: clubId, user_id: user.id, role: 'admin', status: 'approved' },
-            { onConflict: 'club_id,user_id', ignoreDuplicates: false }
+          await supabase.from('club_members').delete().eq('club_id', clubId).eq('user_id', user.id);
+          await supabase.from('club_members').insert(
+            { club_id: clubId, user_id: user.id, role: 'admin', status: 'approved' }
           );
         }
         await supabase.from('pending_invites').update({ status: 'accepted', accepted_by: user.id }).eq('token', token);

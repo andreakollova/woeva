@@ -72,14 +72,14 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       if (!invite || new Date(invite.expires_at) < new Date()) return;
 
       if (invite.role === 'admin') {
-        await supabase.from('club_members').upsert(
-          { club_id: invite.club_id, user_id: userId, role: 'admin', status: 'approved' },
-          { onConflict: 'club_id,user_id' }
+        await supabase.from('club_members').delete().eq('club_id', invite.club_id).eq('user_id', userId);
+        await supabase.from('club_members').insert(
+          { club_id: invite.club_id, user_id: userId, role: 'admin', status: 'approved' }
         );
       } else {
-        await supabase.from('coordinators').upsert(
-          { club_id: invite.club_id, event_id: invite.event_id ?? null, user_id: userId, invited_by: invite.invited_by, status: 'active' },
-          { onConflict: 'club_id,event_id,user_id' }
+        await supabase.from('coordinators').delete().eq('club_id', invite.club_id).eq('user_id', userId);
+        await supabase.from('coordinators').insert(
+          { club_id: invite.club_id, event_id: invite.event_id ?? null, user_id: userId, invited_by: invite.invited_by, status: 'active' }
         );
       }
 

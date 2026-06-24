@@ -75,9 +75,9 @@ export default function InviteScreen() {
           { club_id: invite.club_id, user_id: user.id, role: 'admin', status: 'approved' }
         );
       } else {
-        await supabase.from('coordinators').upsert(
-          { club_id: invite.club_id, event_id: invite.event_id ?? null, user_id: user.id, invited_by: invite.invited_by, status: 'active' },
-          { onConflict: 'club_id,event_id,user_id' }
+        await supabase.from('coordinators').delete().eq('club_id', invite.club_id).eq('user_id', user.id);
+        await supabase.from('coordinators').insert(
+          { club_id: invite.club_id, event_id: invite.event_id ?? null, user_id: user.id, invited_by: invite.invited_by, status: 'active' }
         );
       }
 
