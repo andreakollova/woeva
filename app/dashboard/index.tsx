@@ -1175,7 +1175,8 @@ export default function DashboardScreen() {
                   return a.date.localeCompare(b.date);
                 }).map(e => {
                   const scanCount = checkedIn[e.id]?.size ?? 0;
-                  const goingCount = Math.max(e.going_count ?? 0, e.paid_count ?? 0);
+                  const rawGoing = Math.max(e.going_count ?? 0, e.paid_count ?? 0);
+                  const goingCount = Math.max(rawGoing, scanCount);
                   const dateFmt = new Date(e.date + 'T00:00:00').toLocaleDateString('sk-SK', { weekday: 'short', day: 'numeric', month: 'short' });
                   return (
                     <View key={e.id} style={{ backgroundColor: Colors.white, borderRadius: 16, padding: 14, marginBottom: 10, borderWidth: 1, borderColor: Colors.grayBorder }}>
