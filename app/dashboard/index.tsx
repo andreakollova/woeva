@@ -503,6 +503,26 @@ export default function DashboardScreen() {
     return () => { supabase.removeChannel(ch); };
   }, [events.length]);
 
+  // Realtime attendees: update going count for coordinator events
+  React.useEffect(() => {
+    const ids = coordEvents.map(e => e.id);
+    if (ids.length === 0) return;
+    const ch = supabase
+      .channel(`coord_attendees_${Date.now()}`)
+      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'event_attendees' }, (payload: any) => {
+        const eid = payload.new?.event_id;
+        if (!ids.includes(eid)) return;
+        setCoordEvents(prev => prev.map(e => e.id === eid ? { ...e, going_count: (e.going_count ?? 0) + 1, paid_count: (e.paid_count ?? 0) + 1 } : e));
+      })
+      .on('postgres_changes', { event: 'DELETE', schema: 'public', table: 'event_attendees' }, (payload: any) => {
+        const eid = payload.old?.event_id;
+        if (!ids.includes(eid)) return;
+        setCoordEvents(prev => prev.map(e => e.id === eid ? { ...e, going_count: Math.max(0, (e.going_count ?? 1) - 1), paid_count: Math.max(0, (e.paid_count ?? 1) - 1) } : e));
+      })
+      .subscribe();
+    return () => { supabase.removeChannel(ch); };
+  }, [coordEvents.length]);
+
   // Reload members when selected club changes
   React.useEffect(() => {
     const id = selectedClubId ?? clubs[0]?.id;
