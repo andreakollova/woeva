@@ -477,7 +477,7 @@ export default function DashboardScreen() {
     const eventIds = events.map(e => e.id);
     if (eventIds.length === 0) return;
     const ch = supabase
-      .channel('checkins_realtime')
+      .channel(`checkins_${eventIds.join('_').slice(0, 50)}_${Date.now()}`)
       .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'check_ins' }, (payload: any) => {
         const { event_id, user_id } = payload.new;
         if (!eventIds.includes(event_id)) return;
