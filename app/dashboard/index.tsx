@@ -312,6 +312,7 @@ export default function DashboardScreen() {
   const pillLayoutsRef = useRef<number[]>([]);
   const [members, setMembers] = useState<Member[]>([]);
   const [events, setEvents] = useState<EventRow[]>([]);
+  const [coordEvents, setCoordEvents] = useState<EventRow[]>([]);
   const [billing, setBilling] = useState<BillingInfo | null>(null);
   const [stripeAccount, setStripeAccount] = useState<StripeAccount | null>(null);
   const [payouts, setPayouts] = useState<PayoutRecord[]>([]);
@@ -745,12 +746,10 @@ export default function DashboardScreen() {
         // Count real attendees per event
         const attCounts: Record<string, number> = {};
         (attData ?? []).forEach((a: any) => { attCounts[a.event_id] = (attCounts[a.event_id] ?? 0) + 1; });
-        setEvents(coordEvs.map(e => ({ ...e, paid_count: Math.max(attCounts[e.id] ?? 0, e.going_count ?? 0), going_count: Math.max(attCounts[e.id] ?? 0, e.going_count ?? 0), online_count: 0, door_count: 0, scan_count: 0, net_revenue: 0, platform_fee: 0, gross_revenue: 0 })) as EventRow[]);
+        setCoordEvents(coordEvs.map(e => ({ ...e, paid_count: Math.max(attCounts[e.id] ?? 0, e.going_count ?? 0), going_count: Math.max(attCounts[e.id] ?? 0, e.going_count ?? 0), online_count: 0, door_count: 0, scan_count: 0, net_revenue: 0, platform_fee: 0, gross_revenue: 0 })) as EventRow[]);
       } else {
-        setEvents(coordEvs.map(e => ({ ...e, paid_count: e.going_count ?? 0, online_count: 0, door_count: 0, scan_count: 0, net_revenue: 0, platform_fee: 0, gross_revenue: 0 })) as EventRow[]);
+        setCoordEvents(coordEvs.map(e => ({ ...e, paid_count: e.going_count ?? 0, online_count: 0, door_count: 0, scan_count: 0, net_revenue: 0, platform_fee: 0, gross_revenue: 0 })) as EventRow[]);
       }
-      setLoading(false);
-      return;
     }
 
     const clubIds = allClubs.map(c => c.id);
@@ -1154,27 +1153,21 @@ export default function DashboardScreen() {
       <View style={[s.container, { paddingTop: insets.top }]}>
         <View style={s.topBar}>
           {activeTab === 'scan'
-            ? <TouchableOpacity onPress={() => { setScannedTicket(null); setActiveTab(clubs.length > 0 ? 'coordinator' : 'home'); }} style={s.backBtn} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
+            ? <TouchableOpacity onPress={() => { setScannedTicket(null); setActiveTab('coordinator'); }} style={s.backBtn} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
                 <Svg width={22} height={22} viewBox="0 0 24 24" fill="none">
                   <Path d="M19 12H5M12 5l-7 7 7 7" stroke={Colors.black} strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" />
                 </Svg>
               </TouchableOpacity>
-            : clubs.length > 0
-              ? <TouchableOpacity onPress={() => setActiveTab('home')} style={s.backBtn} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
-                  <Svg width={22} height={22} viewBox="0 0 24 24" fill="none">
-                    <Path d="M19 12H5M12 5l-7 7 7 7" stroke={Colors.black} strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" />
-                  </Svg>
-                </TouchableOpacity>
-              : <BackButton />}
+            : <BackButton />}
           <Text style={s.pageTitle}>Koordinátor</Text>
           <View style={{ width: 36 }} />
         </View>
 
         {activeTab !== 'scan' && (
           <ScrollView contentContainerStyle={[s.scroll, { paddingBottom: insets.bottom + 100 }]} showsVerticalScrollIndicator={false} refreshControl={<RefreshControl refreshing={false} onRefresh={load} tintColor={Colors.black} />}>
-            {events.length === 0
+            {coordEvents.length === 0
               ? <Text style={s.emptySub}>Zatiaľ žiadne eventy na koordináciu.</Text>
-              : events.sort((a, b) => b.date.localeCompare(a.date)).reverse().sort((a, b) => {
+              : coordEvents.sort((a, b) => b.date.localeCompare(a.date)).reverse().sort((a, b) => {
                   // Upcoming first, then past
                   const today = new Date().toISOString().slice(0, 10);
                   const aUp = a.date >= today ? 0 : 1;
@@ -2569,16 +2562,6 @@ export default function DashboardScreen() {
             </Svg>
             <Text style={[s.bottomNavLabel, activeTab === 'stats' && s.bottomNavLabelActive]}>{t.dashboard.statsTab}</Text>
           </TouchableOpacity>
-
-          {/* Coordinator tab — only if user has coordinator assignments */}
-          {myCoordinations.length > 0 && (
-            <TouchableOpacity style={s.bottomNavItem} onPress={() => setActiveTab('coordinator')} activeOpacity={0.7}>
-              <Svg width={22} height={22} viewBox="0 0 24 24" fill="none">
-                <Path d="M3 7V5a2 2 0 0 1 2-2h2M17 3h2a2 2 0 0 1 2 2v2M21 17v2a2 2 0 0 1-2 2h-2M7 21H5a2 2 0 0 1-2-2v-2" stroke={activeTab === 'coordinator' ? Colors.black : 'rgba(0,0,0,0.35)'} strokeWidth={activeTab === 'coordinator' ? 2.5 : 1.8} strokeLinecap="round" strokeLinejoin="round" />
-              </Svg>
-              <Text style={[s.bottomNavLabel, activeTab === 'coordinator' && s.bottomNavLabelActive]}>Koordinátor</Text>
-            </TouchableOpacity>
-          )}
 
           {/* Payouts */}
           <TouchableOpacity style={s.bottomNavItem} onPress={() => setActiveTab('payouts')} activeOpacity={0.7}>
