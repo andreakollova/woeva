@@ -70,7 +70,7 @@ export default function OtpScreen() {
     setResendLoading(false);
     setResendSent(true);
     setResendTimer(60);
-    setOtp(['', '', '', '', '', '']);
+    setOtp(['', '', '', '', '', '', '', '']);
     setTimeout(() => setResendSent(false), 8000);
   }
 
