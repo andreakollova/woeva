@@ -18,39 +18,51 @@ serve(async (req) => {
     const { type, eventId, clubId, attendeeName } = await req.json();
 
     if (type === 'event_join' && eventId) {
-      // Get event + creator
-      const { data: event } = await db.from('events').select('title, creator_id, date').eq('id', eventId).single();
+      // Get event + creator + club owner + admins
+      const { data: event } = await db.from('events').select('title, creator_id, club_id, date').eq('id', eventId).single();
       if (!event?.creator_id) return new Response('no creator', { status: 200 });
 
       const dateStr = event.date ? new Date(event.date).toLocaleDateString('sk-SK', { day: 'numeric', month: 'numeric' }) : '';
       const title = dateStr ? `${event.title} | ${dateStr}` : event.title;
       const body = `${attendeeName} sa registroval/a na tvoj event.`;
 
-      // In-app notification
-      await db.from('notifications').insert({
-        user_id: event.creator_id,
-        type: 'join',
-        title,
-        body,
-        data: { event_id: eventId },
-      });
+      // Collect all recipients: event creator + club owner + club admins
+      const recipientIds = new Set<string>();
+      recipientIds.add(event.creator_id);
 
-      // Push
-      const { data: creatorProfile } = await db
+      if (event.club_id) {
+        const { data: club } = await db.from('clubs').select('creator_id').eq('id', event.club_id).single();
+        if (club?.creator_id) recipientIds.add(club.creator_id);
+        const { data: admins } = await db.from('club_members').select('user_id').eq('club_id', event.club_id).eq('role', 'admin').eq('status', 'approved');
+        (admins ?? []).forEach((a: any) => recipientIds.add(a.user_id));
+      }
+
+      const ids = [...recipientIds];
+
+      // In-app notifications for all
+      await db.from('notifications').insert(
+        ids.map(uid => ({ user_id: uid, type: 'join', title, body, data: { event_id: eventId } }))
+      );
+
+      // Push to all with tokens
+      const { data: profiles } = await db
         .from('profiles').select('push_token')
-        .eq('id', event.creator_id)
+        .in('id', ids)
         .or('notifications_enabled.is.null,notifications_enabled.eq.true')
-        .not('push_token', 'is', null)
-        .single();
+        .not('push_token', 'is', null);
 
-      if (creatorProfile?.push_token?.startsWith('ExponentPushToken[')) {
+      const tokens = [...new Set(
+        (profiles ?? []).map((p: any) => p.push_token).filter((t: any) => t?.startsWith('ExponentPushToken['))
+      )];
+
+      if (tokens.length > 0) {
         await fetch(`${Deno.env.get('SUPABASE_URL')}/functions/v1/send-push`, {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
             'Authorization': `Bearer ${Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')}`,
           },
-          body: JSON.stringify({ tokens: [creatorProfile.push_token], title, body, data: { event_id: eventId } }),
+          body: JSON.stringify({ tokens, title, body, data: { event_id: eventId } }),
         });
       }
     }
