@@ -1522,7 +1522,7 @@ export default function DashboardScreen() {
                 style={[s.viewFilterChip, selectedClubId === c.id && s.viewFilterChipActive]}
                 onLayout={e => { pillLayoutsRef.current[ci + 1] = e.nativeEvent.layout.x; }}
                 onPress={() => setSelectedClubId(c.id)} activeOpacity={0.7}>
-                <Text style={[s.viewFilterText, selectedClubId === c.id && s.viewFilterTextActive]} numberOfLines={1}>{c.creator_id !== user?.id ? `(správca) ${c.name}` : c.name}</Text>
+                <Text style={[s.viewFilterText, selectedClubId === c.id && s.viewFilterTextActive]} numberOfLines={1}>{c.creator_id !== user?.id ? `${c.name} (správca)` : c.name}</Text>
               </TouchableOpacity>
             ))}
             <TouchableOpacity
