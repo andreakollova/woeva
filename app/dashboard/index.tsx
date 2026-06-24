@@ -1745,7 +1745,7 @@ export default function DashboardScreen() {
                       {/* Tappable left: cover + title → navigate to event */}
                       <TouchableOpacity
                         style={{ flexDirection: 'row', alignItems: 'center', flex: 1, gap: 10 }}
-                        onPress={() => { const uid = e.id.indexOf('_') > 0 ? e.id.slice(0, e.id.indexOf('_')) : e.id; router.push(`/event/${uid}` as any); }}
+                        onPress={() => router.push(`/event/${e.id}` as any)}
                         activeOpacity={0.7}
                       >
                         {getRotatingCover(e)
