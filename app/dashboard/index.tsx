@@ -1148,8 +1148,8 @@ export default function DashboardScreen() {
     );
   }
 
-  // ── Coordinator mode: only when coordinator tab is active ──
-  if (activeTab === 'coordinator' && myCoordinations.length > 0) {
+  // ── Coordinator mode: coordinator tab OR scan from coordinator ──
+  if ((activeTab === 'coordinator' || (activeTab === 'scan' && scanOriginRef.current === 'coordinator')) && myCoordinations.length > 0) {
     return (
       <View style={[s.container, { paddingTop: insets.top }]}>
         <View style={s.topBar}>
