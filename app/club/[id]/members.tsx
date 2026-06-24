@@ -47,6 +47,8 @@ export default function ClubMembersScreen() {
   const [coordQuery, setCoordQuery] = useState('');
   const [coordResults, setCoordResults] = useState<{ id: string; name: string; avatar_url: string | null }[]>([]);
   const [sendingCoordInvite, setSendingCoordInvite] = useState<string | null>(null);
+  const [coordScope, setCoordScope] = useState<'all' | string>('all');
+  const [clubEvents, setClubEvents] = useState<{ id: string; title: string }[]>([]);
 
   useEffect(() => { load(); }, [id, user]);
   useFocusEffect(useCallback(() => { setStatusBarStyle('dark'); }, []));
@@ -55,7 +57,7 @@ export default function ClubMembersScreen() {
   useEffect(() => {
     if (!id) return;
     const ch = supabase
-      .channel(`members_${id}_${Date.now()}`)
+      .channel(`members_${id}`)
       .on('postgres_changes', { event: '*', schema: 'public', table: 'club_members', filter: `club_id=eq.${id}` }, () => load())
       .on('postgres_changes', { event: '*', schema: 'public', table: 'coordinators', filter: `club_id=eq.${id}` }, () => load())
       .subscribe();
@@ -73,6 +75,10 @@ export default function ClubMembersScreen() {
     setClub(clubData ?? null);
     setAdmins(((adminData ?? []) as any[]).map(m => ({ user_id: m.user_id, name: m.profile?.name ?? '', avatar_url: m.profile?.avatar_url ?? null })));
     setCoordinators(((coordData ?? []) as any[]).map(c => ({ id: c.id, user_id: c.user_id, event_id: c.event_id ?? null, name: c.profile?.name ?? '', avatar_url: c.profile?.avatar_url ?? null, event_title: c.event?.title ?? null })));
+    // Load club events for coordinator scope selector
+    const today = new Date().toISOString().slice(0, 10);
+    const { data: evData } = await supabase.from('events').select('id, title').eq('club_id', id).gte('date', today).neq('status', 'cancelled').order('date', { ascending: true }).limit(20);
+    setClubEvents((evData ?? []) as any[]);
     const all = (allMembers ?? []) as ClubMember[];
     setApproved(all.filter(m => m.status === 'approved'));
     setPending(all.filter(m => m.status === 'pending'));
@@ -105,16 +111,18 @@ export default function ClubMembersScreen() {
     setSharingCoord(true);
     try {
       const { data: myProfile } = await supabase.from('profiles').select('name').eq('id', user.id).single();
+      const eventId = coordScope !== 'all' ? coordScope : null;
       const { data } = await supabase.from('pending_invites').insert({
-        club_id: id, role: 'coordinator', event_id: null,
+        club_id: id, role: 'coordinator', event_id: eventId,
         invited_by: user.id, club_name: club.name, inviter_name: myProfile?.name ?? '',
       }).select('token').single();
       if (!data?.token) throw new Error('no token');
       const url = `https://woeva.com/invite?token=${data.token}`;
+      const scopeLabel = eventId ? (clubEvents.find(e => e.id === eventId)?.title ?? 'event') : club.name;
       await Share.share({
         message: lang === 'sk'
-          ? `${myProfile?.name ?? 'Niekto'} ťa pozýva ako koordinátora pre klub "${club.name}" vo Woeva. Prijmi pozvánku: ${url}`
-          : `${myProfile?.name ?? 'Someone'} invited you as a coordinator for "${club.name}" on Woeva: ${url}`,
+          ? `${myProfile?.name ?? 'Niekto'} ťa pozýva ako koordinátora pre "${scopeLabel}" vo Woeva. Prijmi pozvánku: ${url}`
+          : `${myProfile?.name ?? 'Someone'} invited you as a coordinator for "${scopeLabel}" on Woeva: ${url}`,
         url,
       });
     } catch {
@@ -174,13 +182,15 @@ export default function ClubMembersScreen() {
     setSendingCoordInvite(profileId);
     try {
       const { data: myProfile } = await supabase.from('profiles').select('name').eq('id', user.id).single();
+      const eventId = coordScope !== 'all' ? coordScope : null;
+      const scopeLabel = eventId ? (clubEvents.find(e => e.id === eventId)?.title ?? 'event') : club.name;
       const { data } = await supabase.from('pending_invites').insert({
-        club_id: id, role: 'coordinator', event_id: null,
+        club_id: id, role: 'coordinator', event_id: eventId,
         invited_by: user.id, club_name: club.name, inviter_name: myProfile?.name ?? '',
       }).select('token').single();
       if (!data?.token) throw new Error('no token');
-      const title = `Pozvánka koordinátora: ${club.name}`;
-      const body = `${myProfile?.name ?? 'Niekto'} ťa pozýva ako koordinátora klubu ${club.name}.`;
+      const title = `Pozvánka koordinátora: ${scopeLabel}`;
+      const body = `${myProfile?.name ?? 'Niekto'} ťa pozýva ako koordinátora pre "${scopeLabel}".`;
       await supabase.from('notifications').insert({
         user_id: profileId, type: 'coordinator_invite', title, body,
         data: { token: data.token, club_id: id, action: 'coordinator_invite' },
@@ -461,6 +471,17 @@ export default function ClubMembersScreen() {
               </Svg>
             </TouchableOpacity>
           </View>
+          {/* Scope selector */}
+          <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ maxHeight: 40, marginBottom: 12 }} contentContainerStyle={{ gap: 6 }}>
+            <TouchableOpacity onPress={() => setCoordScope('all')} style={{ paddingHorizontal: 14, paddingVertical: 7, borderRadius: 50, backgroundColor: coordScope === 'all' ? Colors.black : Colors.grayLight }}>
+              <Text style={{ fontSize: 13, fontWeight: '600', color: coordScope === 'all' ? Colors.white : Colors.black }}>{lang === 'sk' ? 'Všetky eventy' : 'All events'}</Text>
+            </TouchableOpacity>
+            {clubEvents.map(ev => (
+              <TouchableOpacity key={ev.id} onPress={() => setCoordScope(ev.id)} style={{ paddingHorizontal: 14, paddingVertical: 7, borderRadius: 50, backgroundColor: coordScope === ev.id ? Colors.black : Colors.grayLight }}>
+                <Text style={{ fontSize: 13, fontWeight: '600', color: coordScope === ev.id ? Colors.white : Colors.black }} numberOfLines={1}>{ev.title}</Text>
+              </TouchableOpacity>
+            ))}
+          </ScrollView>
           <TextInput
             style={st.searchInput}
             placeholder={lang === 'sk' ? 'Hľadať podľa mena...' : 'Search by name...'}

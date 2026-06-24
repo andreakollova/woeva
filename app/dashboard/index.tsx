@@ -838,7 +838,7 @@ export default function DashboardScreen() {
         if (!initCheckedIn[ci.event_id]) initCheckedIn[ci.event_id] = new Set();
         initCheckedIn[ci.event_id].add(ci.user_id);
       });
-      setCheckedIn(initCheckedIn);
+      setCheckedIn(prev => ({ ...prev, ...initCheckedIn }));
 
       setEvents(eventsData.map(e => {
         const isFree = e.is_free || (e.price ?? 0) === 0;
