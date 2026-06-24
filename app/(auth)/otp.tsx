@@ -13,7 +13,7 @@ export default function OtpScreen() {
   const insets = useSafeAreaInsets();
   const { phone, email, name, type: otpType } = useLocalSearchParams<{ phone?: string; email?: string; name?: string; type?: string }>();
   const isEmail = otpType === 'email';
-  const { t } = useTranslations();
+  const { t, lang } = useTranslations();
   const [otp, setOtp] = useState(['', '', '', '', '', '', '', '']);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
@@ -107,6 +107,14 @@ export default function OtpScreen() {
 
       {error ? <Text style={styles.errorText}>{error}</Text> : null}
 
+      {isEmail && (
+        <Text style={styles.emailHint}>
+          {lang === 'sk'
+            ? 'Email môže prísť do 5 – 7 minút. Skontroluj aj spam. Ak nechodí, skús prihlásenie cez Google alebo Apple.'
+            : 'Email may take 5 – 7 minutes. Check spam too. If it doesn\'t arrive, try Google or Apple sign-in.'}
+        </Text>
+      )}
+
       <View style={styles.bottom}>
         <Button label={t.auth.verify} onPress={handleVerify} loading={loading} variant="black" />
         {resendTimer > 0
@@ -144,4 +152,5 @@ const styles = StyleSheet.create({
   resendSuccessText: { fontSize: 13, color: Colors.lime, fontWeight: '700' },
   resendTimer: { textAlign: 'center', fontSize: 14, color: Colors.gray },
   resendTimerBold: { fontWeight: '700', color: Colors.black },
+  emailHint: { fontSize: 13, color: Colors.gray, textAlign: 'center', lineHeight: 19, marginBottom: 20 },
 });
