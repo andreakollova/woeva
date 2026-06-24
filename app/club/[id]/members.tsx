@@ -55,7 +55,7 @@ export default function ClubMembersScreen() {
   useEffect(() => {
     if (!id) return;
     const ch = supabase
-      .channel(`members_${id}`)
+      .channel(`members_${id}_${Date.now()}`)
       .on('postgres_changes', { event: '*', schema: 'public', table: 'club_members', filter: `club_id=eq.${id}` }, () => load())
       .on('postgres_changes', { event: '*', schema: 'public', table: 'coordinators', filter: `club_id=eq.${id}` }, () => load())
       .subscribe();

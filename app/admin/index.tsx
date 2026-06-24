@@ -132,7 +132,7 @@ export default function AdminIndexScreen() {
   useEffect(() => {
     load();
     const channel = supabase
-      .channel('admin-overview')
+      .channel(`admin-overview-${Date.now()}`)
       .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'profiles' }, () => load())
       .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'events' }, () => load())
       .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'reports' }, () => load())
