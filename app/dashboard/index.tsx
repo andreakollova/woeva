@@ -477,7 +477,7 @@ export default function DashboardScreen() {
     const eventIds = events.map(e => e.id);
     if (eventIds.length === 0) return;
     const ch = supabase
-      .channel(`checkins_realtime_${Date.now()}`)
+      .channel('checkins_realtime')
       .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'check_ins' }, (payload: any) => {
         const { event_id, user_id } = payload.new;
         if (!eventIds.includes(event_id)) return;
@@ -1175,24 +1175,30 @@ export default function DashboardScreen() {
                   return a.date.localeCompare(b.date);
                 }).map(e => {
                   const scanCount = checkedIn[e.id]?.size ?? 0;
-                  const rawGoing = Math.max(e.going_count ?? 0, e.paid_count ?? 0);
-                  const goingCount = Math.max(rawGoing, scanCount);
+                  const goingCount = Math.max(e.going_count ?? 0, e.paid_count ?? 0);
                   const dateFmt = new Date(e.date + 'T00:00:00').toLocaleDateString('sk-SK', { weekday: 'short', day: 'numeric', month: 'short' });
                   return (
                     <View key={e.id} style={{ backgroundColor: Colors.white, borderRadius: 16, padding: 14, marginBottom: 10, borderWidth: 1, borderColor: Colors.grayBorder }}>
-                      <TouchableOpacity style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }} onPress={() => openAttendees(e)} activeOpacity={0.7}>
-                        <View style={{ width: 56, height: 56, borderRadius: 12, overflow: 'hidden', backgroundColor: Colors.grayLight }}>
+                      {/* Top: cover + info + share icon */}
+                      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
+                        <TouchableOpacity style={{ width: 56, height: 56, borderRadius: 12, overflow: 'hidden', backgroundColor: Colors.grayLight }} onPress={() => router.push(`/event/${e.id}` as any)} activeOpacity={0.7}>
                           {(e.cover_url || ((e as any).cover_urls?.[0])) && <Image source={{ uri: e.cover_url ?? (e as any).cover_urls[0] }} style={StyleSheet.absoluteFill as any} resizeMode="cover" />}
-                        </View>
-                        <View style={{ flex: 1 }}>
+                        </TouchableOpacity>
+                        <TouchableOpacity style={{ flex: 1 }} onPress={() => openAttendees(e)} activeOpacity={0.7}>
                           <Text style={[s.listName, { fontSize: 16 }]} numberOfLines={1}>{e.title}</Text>
                           <Text style={s.listSub}>{dateFmt}{e.time ? ` · ${e.time.slice(0, 5)}` : ''}</Text>
                           <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12, marginTop: 4 }}>
                             <Text style={{ fontSize: 12, color: Colors.gray, fontFamily: Fonts.medium }}>{goingCount} {goingLabel(goingCount, lang)}</Text>
                             <Text style={{ fontSize: 12, color: scanCount > 0 ? '#22C55E' : Colors.gray, fontWeight: '600', fontFamily: Fonts.semibold }}>✓ {scanCount}/{goingCount}</Text>
                           </View>
-                        </View>
-                      </TouchableOpacity>
+                        </TouchableOpacity>
+                        <TouchableOpacity onPress={() => { Share.share({ message: `https://woeva.com/share-event?id=${e.id}` }); }} hitSlop={8} activeOpacity={0.7} style={{ padding: 6 }}>
+                          <Svg width={18} height={18} viewBox="0 0 24 24" fill="none">
+                            <Path d="M4 12v8a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-8M16 6l-4-4-4 4M12 2v13" stroke={Colors.gray} strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" />
+                          </Svg>
+                        </TouchableOpacity>
+                      </View>
+                      {/* Bottom: scan + attendees */}
                       <View style={{ flexDirection: 'row', gap: 8, marginTop: 10 }}>
                         <TouchableOpacity
                           style={{ flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, backgroundColor: Colors.black, borderRadius: 10, paddingVertical: 9 }}
@@ -1204,22 +1210,14 @@ export default function DashboardScreen() {
                           <Text style={{ fontSize: 12, fontWeight: '700', color: Colors.white, fontFamily: Fonts.bold }}>Skenovať</Text>
                         </TouchableOpacity>
                         <TouchableOpacity
-                          style={{ flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, backgroundColor: Colors.grayLight, borderRadius: 10, paddingVertical: 9 }}
-                          onPress={() => { Share.share({ message: `https://woeva.com/event/${e.id}` }); }} activeOpacity={0.7}
-                        >
-                          <Svg width={14} height={14} viewBox="0 0 24 24" fill="none">
-                            <Path d="M4 12v8a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-8M16 6l-4-4-4 4M12 2v13" stroke={Colors.black} strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" />
-                          </Svg>
-                          <Text style={{ fontSize: 12, fontWeight: '600', color: Colors.black, fontFamily: Fonts.semibold }}>Zdieľať</Text>
-                        </TouchableOpacity>
-                        <TouchableOpacity
-                          style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, backgroundColor: Colors.grayLight, borderRadius: 10, paddingVertical: 9, paddingHorizontal: 14 }}
+                          style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, backgroundColor: Colors.grayLight, borderRadius: 10, paddingVertical: 9, paddingHorizontal: 16 }}
                           onPress={() => openAttendees(e)} activeOpacity={0.7}
                         >
                           <Svg width={14} height={14} viewBox="0 0 24 24" fill="none">
                             <Path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2" stroke={Colors.black} strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" />
                             <Circle cx={9} cy={7} r={4} stroke={Colors.black} strokeWidth={2} />
                           </Svg>
+                          <Text style={{ fontSize: 12, fontWeight: '600', color: Colors.black, fontFamily: Fonts.semibold }}>{goingCount}</Text>
                         </TouchableOpacity>
                       </View>
                     </View>
@@ -1298,9 +1296,9 @@ export default function DashboardScreen() {
           </View>
         )}
 
-        {/* Bottom nav - coordinator: Home + Scan */}
+        {/* Bottom nav - coordinator: centered Home + Eventy + Scan */}
         <View style={[s.bottomNavWrapper, { paddingBottom: insets.bottom + 8 }]}>
-          <View style={[s.bottomNavPill, { justifyContent: 'space-around' }]}>
+          <View style={[s.bottomNavPill, { justifyContent: 'center', gap: 32 }]}>
             <TouchableOpacity style={s.bottomNavItem} onPress={() => router.push('/(tabs)' as any)} activeOpacity={0.7}>
               <Svg width={22} height={22} viewBox="0 0 24 24" fill="none">
                 <Path d="M3 9l9-7 9 7v11a2 2 0 01-2 2H5a2 2 0 01-2-2z M9 22V12h6v10" stroke="rgba(0,0,0,0.35)" strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round" />
@@ -1313,13 +1311,14 @@ export default function DashboardScreen() {
               </Svg>
               <Text style={[s.bottomNavLabel, activeTab === 'home' && s.bottomNavLabelActive]}>Eventy</Text>
             </TouchableOpacity>
-            <TouchableOpacity style={s.bottomNavScanBtn} onPress={() => setActiveTab('scan')} activeOpacity={0.85}>
+            <TouchableOpacity style={s.bottomNavItem} onPress={() => setActiveTab('scan')} activeOpacity={0.7}>
               <Svg width={22} height={22} viewBox="0 0 24 24" fill="none">
-                <Rect x="3" y="3" width="6" height="6" rx="1" stroke={activeTab === 'scan' ? Colors.black : Colors.gray} strokeWidth={2} />
-                <Rect x="15" y="3" width="6" height="6" rx="1" stroke={activeTab === 'scan' ? Colors.black : Colors.gray} strokeWidth={2} />
-                <Rect x="3" y="15" width="6" height="6" rx="1" stroke={activeTab === 'scan' ? Colors.black : Colors.gray} strokeWidth={2} />
-                <Path d="M15 17h3M17 15v3" stroke={activeTab === 'scan' ? Colors.black : Colors.gray} strokeWidth={2} strokeLinecap="round" />
+                <Rect x="3" y="3" width="6" height="6" rx="1" stroke={activeTab === 'scan' ? Colors.black : 'rgba(0,0,0,0.35)'} strokeWidth={2} />
+                <Rect x="15" y="3" width="6" height="6" rx="1" stroke={activeTab === 'scan' ? Colors.black : 'rgba(0,0,0,0.35)'} strokeWidth={2} />
+                <Rect x="3" y="15" width="6" height="6" rx="1" stroke={activeTab === 'scan' ? Colors.black : 'rgba(0,0,0,0.35)'} strokeWidth={2} />
+                <Path d="M15 17h3M17 15v3" stroke={activeTab === 'scan' ? Colors.black : 'rgba(0,0,0,0.35)'} strokeWidth={2} strokeLinecap="round" />
               </Svg>
+              <Text style={[s.bottomNavLabel, activeTab === 'scan' && s.bottomNavLabelActive]}>Skenovať</Text>
             </TouchableOpacity>
           </View>
         </View>
