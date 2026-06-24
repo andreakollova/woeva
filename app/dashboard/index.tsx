@@ -481,7 +481,7 @@ export default function DashboardScreen() {
     const eventIds = events.map(e => e.id);
     if (eventIds.length === 0) return;
     const ch = supabase
-      .channel(`checkins_${eventIds.join('_').slice(0, 50)}_${Date.now()}`)
+      .channel(`checkins_${eventIds.join('_').slice(0, 50)}`)
       .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'check_ins' }, (payload: any) => {
         const { event_id, user_id } = payload.new;
         if (!eventIds.includes(event_id)) return;
@@ -510,7 +510,7 @@ export default function DashboardScreen() {
     const ids = [...events.map(e => e.id), ...coordEvents.map(e => e.id)];
     if (ids.length === 0) return;
     const ch = supabase
-      .channel(`coord_attendees_${Date.now()}`)
+      .channel('dashboard_attendees')
       .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'event_attendees' }, (payload: any) => {
         const eid = payload.new?.event_id;
         if (!ids.includes(eid)) return;
